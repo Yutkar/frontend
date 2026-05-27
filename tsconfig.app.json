@@ -6,6 +6,7 @@
     "module": "esnext",
     "types": ["vite/client"],
     "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -14,6 +15,22 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@app/*": ["src/app/*"],
+      "@features/*": ["src/features/*"],
+      "@layouts/*": ["src/layouts/*"],
+      "@mock/*": ["src/mock/*"],
+      "@pages": ["src/pages/index.ts"],
+      "@pages/*": ["src/pages/*"],
+      "@routes": ["src/routes/index.ts"],
+      "@routes/*": ["src/routes/*"],
+      "@services/*": ["src/services/*"],
+      "@shared/*": ["src/shared/*"],
+      "@store/*": ["src/store/*"],
+      "@widgets": ["src/widgets/index.ts"],
+      "@widgets/*": ["src/widgets/*"]
+    },
 
     /* Linting */
     "noUnusedLocals": true,
