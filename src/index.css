@@ -2160,9 +2160,25 @@ h3 {
 
 
 .logout-button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--danger-soft);
+  border-radius: var(--radius);
+  color: var(--danger);
+  display: inline-flex;
+  font-weight: 700;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
   transition: all 0.2s ease;
 }
 
 .logout-button:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
   transform: translateY(-1px);
+}
+
+.logout-button:active {
+  transform: translateY(0);
 }

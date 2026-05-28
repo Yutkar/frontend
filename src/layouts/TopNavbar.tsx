@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { useGlobalStore } from '@store/global'
-import { RoleSwitcher, ThemeToggle } from '@shared/ui/core-components'
+import { ThemeToggle } from '@shared/ui/core-components'
 
 type TopNavbarProps = {
   routes: AppRoute[]
@@ -34,7 +34,6 @@ export function TopNavbar({ routes }: TopNavbarProps) {
       </div>
 
       <div className="navbar-actions">
-        <RoleSwitcher />
         <ThemeToggle />
 
         <button className="notification-button" type="button">
@@ -57,11 +56,11 @@ export function TopNavbar({ routes }: TopNavbarProps) {
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-2xl transition-all duration-200 hover:shadow-sm border border-transparent hover:border-red-200 active:scale-95"
+          className="logout-button"
           title="Выйти из системы"
         >
           <LogOut size={18} strokeWidth={2.5} />
-          <span className="hidden md:inline font-medium">Выйти</span>
+          <span>Выйти</span>
         </button>
       </div>
     </header>
