@@ -1,9 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { useGlobalStore } from '@store/global'
 import { AppLayout } from '@layouts/AppLayout'
+import { LoginPage } from '@pages/LoginPage'     // ← Изменено на named import
 
 type AppRouterProps = {
   routes: AppRoute[]
@@ -16,6 +18,11 @@ function routePath(path: string): string {
 function GuardedRoute({ route }: { route: AppRoute }) {
   const user = useGlobalStore((state) => state.user)
   const allowed = !route.allowedRoles || route.allowedRoles.includes(user.role)
+
+  // Простая проверка
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
 
   if (!allowed) {
     return (
@@ -34,15 +41,24 @@ function GuardedRoute({ route }: { route: AppRoute }) {
 }
 
 export function AppRouter({ routes }: AppRouterProps) {
+  const initializeAuth = useGlobalStore((state) => state.initializeAuth)
+
+  useEffect(() => {
+    initializeAuth()
+  }, [initializeAuth])
+
   const standaloneRoutes = routes.filter((route) => route.standalone)
   const shellRoutes = routes.filter((route) => !route.fullscreen && !route.standalone)
   const fullscreenRoutes = routes.filter((route) => route.fullscreen)
   const navigationRoutes = routes.filter((route) => !route.hideFromSidebar && !route.standalone)
+
   const fallbackPath = shellRoutes.find((route) => route.path === '/dashboard')?.path ?? shellRoutes[0]?.path ?? '/'
 
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
+
         <Route element={<AppLayout routes={navigationRoutes} />}>
           <Route element={<Navigate replace to={fallbackPath} />} index />
           {shellRoutes.map((route) => (
@@ -70,7 +86,7 @@ export function AppRouter({ routes }: AppRouterProps) {
           />
         ))}
 
-        <Route element={<Navigate replace to={fallbackPath} />} path="*" />
+        <Route element={<Navigate replace to="/login" />} path="*" />
       </Routes>
     </BrowserRouter>
   )

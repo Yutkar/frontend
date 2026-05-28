@@ -1453,3 +1453,12 @@ h3 {
     font-size: 50px;
   }
 }
+
+
+.logout-button {
+  transition: all 0.2s ease;
+}
+
+.logout-button:hover {
+  transform: translateY(-1px);
+}
