@@ -6,6 +6,10 @@ import { useGlobalStore } from '@store/global'
 export function SettingsPage() {
   const user = useGlobalStore((state) => state.user)
 
+  if (!user) {
+    return null
+  }
+
   return (
     <div className="page-stack">
       <section className="content-grid settings-grid">

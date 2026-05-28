@@ -9,22 +9,24 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const loginAsRole = useGlobalStore((state) => state.loginAsRole)
+  const login = useGlobalStore((state) => state.login)
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     setIsLoading(true)
 
-    // Пока имитируем вход (потом можно подключить настоящий API)
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    // По умолчанию входим как manager (можно изменить логику позже)
-    await loginAsRole('manager')
-    navigate('/dashboard')
-
-    setIsLoading(false)
+    try {
+      await login(email, password)
+      navigate('/dashboard')
+    } catch (err) {
+      setError('Неверный email или пароль. Попробуйте снова.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -46,6 +48,12 @@ export function LoginPage() {
           <h2 className="text-2xl font-semibold text-center mb-8">Вход в систему</h2>
 
           <form onSubmit={handleSubmit} className="space-y-6 max-w-md mx-auto">
+            {error && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Email
@@ -54,7 +62,7 @@ export function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder="admin@smartq.test"
                 className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 required
               />
@@ -83,8 +91,21 @@ export function LoginPage() {
             </Button>
           </form>
 
-          {/* Ссылка на регистрацию */}
-          <div className="text-center mt-6">
+          <div className="login-help mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-semibold mb-2">Тестовые учетные записи</p>
+            <ul className="space-y-2 list-disc list-inside">
+              <li>admin@smartq.test / admin123</li>
+              <li>manager@smartq.test / manager123</li>
+              <li>specialist@smartq.test / specialist123</li>
+            </ul>
+          </div>
+
+          <div className="text-center mt-6 space-y-3">
+            <p>
+              <Link to="/forgot-password" className="text-sky-600 hover:text-sky-700 font-medium hover:underline">
+                Забыли пароль?
+              </Link>
+            </p>
             <p className="text-sm text-gray-600">
               Нет аккаунта?{' '}
               <Link 

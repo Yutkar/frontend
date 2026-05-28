@@ -48,6 +48,8 @@ export function AppRouter({ routes }: AppRouterProps) {
   }, [initializeAuth])
 
   const standaloneRoutes = routes.filter((route) => route.standalone)
+  const publicStandaloneRoutes = standaloneRoutes.filter((route) => route.public)
+  const protectedStandaloneRoutes = standaloneRoutes.filter((route) => !route.public)
   const shellRoutes = routes.filter((route) => !route.fullscreen && !route.standalone)
   const fullscreenRoutes = routes.filter((route) => route.fullscreen)
   const navigationRoutes = routes.filter((route) => !route.hideFromSidebar && !route.standalone)
@@ -70,7 +72,7 @@ export function AppRouter({ routes }: AppRouterProps) {
           ))}
         </Route>
 
-        {fullscreenRoutes.map((route) => (
+          {fullscreenRoutes.map((route) => (
           <Route
             element={<GuardedRoute route={route} />}
             key={route.path}
@@ -78,7 +80,15 @@ export function AppRouter({ routes }: AppRouterProps) {
           />
         ))}
 
-        {standaloneRoutes.map((route) => (
+        {publicStandaloneRoutes.map((route) => (
+          <Route
+            key={route.path}
+            path={routePath(route.path)}
+            element={route.element}
+          />
+        ))}
+
+        {protectedStandaloneRoutes.map((route) => (
           <Route
             element={<GuardedRoute route={route} />}
             key={route.path}

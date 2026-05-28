@@ -3,18 +3,20 @@ import { authApi } from '@services/api'
 import type { Role, ThemeMode, User } from '@shared/types'
 
 type GlobalState = {
-  user: User
+  user: User | null
   theme: ThemeMode
   sidebarCollapsed: boolean
   setTheme: (theme: ThemeMode) => void
   toggleSidebar: () => void
+  login: (email: string, password: string) => Promise<void>
+  register: (name: string, email: string, password: string, role: Role) => Promise<void>
   loginAsRole: (role: Role) => Promise<void>
   logout: () => void
   initializeAuth: () => void
 }
 
-export const useGlobalStore = create<GlobalState>((set) => ({   // ← убрали get
-  user: authApi.getDefaultUser(),
+export const useGlobalStore = create<GlobalState>((set) => ({
+  user: null,
   theme: 'light',
   sidebarCollapsed: false,
 
@@ -23,6 +25,18 @@ export const useGlobalStore = create<GlobalState>((set) => ({   // ← убра�
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
+  login: async (email, password) => {
+    const user = await authApi.login(email, password)
+    set({ user })
+    localStorage.setItem('currentUser', JSON.stringify(user))
+  },
+
+  register: async (name, email, password, role) => {
+    const user = await authApi.register(name, email, password, role)
+    set({ user })
+    localStorage.setItem('currentUser', JSON.stringify(user))
+  },
+
   loginAsRole: async (role) => {
     const user = await authApi.loginAsRole(role)
     set({ user })
@@ -30,8 +44,7 @@ export const useGlobalStore = create<GlobalState>((set) => ({   // ← убра�
   },
 
   logout: () => {
-    const defaultUser = authApi.getDefaultUser()
-    set({ user: defaultUser })
+    set({ user: null })
     localStorage.removeItem('currentUser')
   },
 

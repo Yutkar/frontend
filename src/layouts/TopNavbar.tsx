@@ -41,16 +41,18 @@ export function TopNavbar({ routes }: TopNavbarProps) {
           <span>3</span>
         </button>
 
-        <div className="user-chip">
-          <div className="avatar">{user.avatarInitials}</div>
-          <div>
-            <strong>{user.name}</strong>
-            <span>
-              <ShieldCheck size={13} />
-              {t.roles[user.role]}
-            </span>
+        {user ? (
+          <div className="user-chip">
+            <div className="avatar">{user.avatarInitials}</div>
+            <div>
+              <strong>{user.name}</strong>
+              <span>
+                <ShieldCheck size={13} />
+                {t.roles[user.role]}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <button
           onClick={handleLogout}

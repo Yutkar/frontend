@@ -18,7 +18,7 @@ export function RoleSwitcher() {
     <div aria-label={t.system.role} className="segmented-control">
       {roles.map((role) => (
         <button
-          className={user.role === role ? 'active' : ''}
+          className={user?.role === role ? 'active' : ''}
           key={role}
           onClick={() => void loginAsRole(role)}
           type="button"

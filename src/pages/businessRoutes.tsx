@@ -12,21 +12,30 @@ import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { AnalyticsPage } from './AnalyticsPage'
 import { DashboardPage } from './DashboardPage'
-import { LoginPage } from './LoginPage'
 import { QueuePage } from './QueuePage'
+import { RegisterPage } from './RegisterPage'
 import { SettingsPage } from './SettingsPage'
 import { SpecialistPanelPage } from './SpecialistPanelPage'
 import { TicketCreatePage } from './TicketCreatePage'
 import { TvBoardPage } from './TvBoardPage'
+import { PasswordRecoveryPage } from './PasswordRecoveryPage'
 
 export const smartqBusinessRoutes: AppRoute[] = [
   {
-    path: '/login',
-    label: t.nav.login,
-    icon: ShieldCheck,
+    path: '/register',
+    label: 'Регистрация',
     hideFromSidebar: true,
     standalone: true,
-    element: <LoginPage />,
+    public: true,
+    element: <RegisterPage />,
+  },
+  {
+    path: '/forgot-password',
+    label: 'Восстановление пароля',
+    hideFromSidebar: true,
+    standalone: true,
+    public: true,
+    element: <PasswordRecoveryPage />,
   },
   {
     path: '/dashboard',
