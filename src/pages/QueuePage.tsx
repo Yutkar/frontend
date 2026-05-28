@@ -21,10 +21,9 @@ const statusOrder: Record<TicketStatus, number> = {
   waiting: 0,
   called: 1,
   in_service: 2,
-  redirected: 3,
-  completed: 4,
-  cancelled: 5,
-  no_show: 6,
+  completed: 3,
+  cancelled: 4,
+  no_show: 5,
 }
 
 export function QueuePage() {

@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@app': new URL('./src/app', import.meta.url).pathname,
+      '@components': new URL('./src/components', import.meta.url).pathname,
       '@features': new URL('./src/features', import.meta.url).pathname,
       '@layouts': new URL('./src/layouts', import.meta.url).pathname,
       '@mock': new URL('./src/mock', import.meta.url).pathname,
@@ -15,6 +16,7 @@ export default defineConfig({
       '@services': new URL('./src/services', import.meta.url).pathname,
       '@shared': new URL('./src/shared', import.meta.url).pathname,
       '@store': new URL('./src/store', import.meta.url).pathname,
+      '@types': new URL('./src/types', import.meta.url).pathname,
       '@widgets': new URL('./src/widgets', import.meta.url).pathname,
     },
   },

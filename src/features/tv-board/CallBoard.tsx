@@ -9,8 +9,10 @@ type CallBoardProps = {
 
 export function CallBoard({ rooms, tickets }: CallBoardProps) {
   const activeCalls = tickets.filter((ticket) =>
-    ['called', 'in_service', 'redirected'].includes(ticket.status),
+    ['called', 'in_service'].includes(ticket.status),
   )
+  const currentCall = activeCalls[0]
+  const secondaryCalls = activeCalls.slice(1, 5)
   const recentCalls = tickets
     .filter((ticket) => ticket.calledAt)
     .sort((left, right) => new Date(right.calledAt ?? '').getTime() - new Date(left.calledAt ?? '').getTime())
@@ -20,17 +22,15 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
     <div className="tv-grid">
       <section className="tv-current">
         <span className="eyebrow">{t.queue.currentCalls}</span>
-        {activeCalls.map((ticket) => {
-          const room = rooms.find((item) => item.id === ticket.roomId)
+        {currentCall ? (
+          <TvCallCard featured rooms={rooms} ticket={currentCall} />
+        ) : (
+          <div className="tv-empty-call">{t.queue.waitingForCall}</div>
+        )}
 
-          return (
-            <article className="tv-call-card" key={ticket.id}>
-              <strong>{ticket.number}</strong>
-              <span>{room?.name ?? t.queue.routing}</span>
-              <small>{getServiceTypeLabel(ticket.serviceType)}</small>
-            </article>
-          )
-        })}
+        {secondaryCalls.map((ticket) => (
+          <TvCallCard key={ticket.id} rooms={rooms} ticket={ticket} />
+        ))}
       </section>
 
       <section className="tv-recent">
@@ -48,5 +48,25 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
         })}
       </section>
     </div>
+  )
+}
+
+function TvCallCard({
+  featured = false,
+  rooms,
+  ticket,
+}: {
+  featured?: boolean
+  rooms: Room[]
+  ticket: Ticket
+}) {
+  const room = rooms.find((item) => item.id === ticket.roomId)
+
+  return (
+    <article className={`tv-call-card ${featured ? 'tv-call-featured' : ''}`}>
+      <strong>{ticket.number}</strong>
+      <span>{room?.name ?? t.queue.routing}</span>
+      <small>{getServiceTypeLabel(ticket.serviceType)}</small>
+    </article>
   )
 }

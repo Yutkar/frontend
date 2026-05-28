@@ -50,7 +50,7 @@ export const smartqBusinessRoutes: AppRoute[] = [
     element: <QueuePage />,
   },
   {
-    path: '/tickets/new',
+    path: '/tickets',
     label: t.nav.createTicket,
     icon: ClipboardPlus,
     element: <TicketCreatePage />,

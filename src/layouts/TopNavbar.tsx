@@ -2,8 +2,8 @@ import { Bell, Radio, ShieldCheck, LogOut } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { RoleSwitcher, ThemeToggle } from '@shared/ui/core-components'
 import { useGlobalStore } from '@store/global'
+import { RoleSwitcher, ThemeToggle } from '@shared/ui/core-components'
 
 type TopNavbarProps = {
   routes: AppRoute[]
@@ -12,9 +12,10 @@ type TopNavbarProps = {
 export function TopNavbar({ routes }: TopNavbarProps) {
   const location = useLocation()
   const navigate = useNavigate()
-  
+
   const user = useGlobalStore((state) => state.user)
-  const logout = useGlobalStore((state) => state.logout)   // ← Добавили
+  const logout = useGlobalStore((state) => state.logout)
+
   const currentRoute = routes.find((route) => route.path === location.pathname)
 
   const handleLogout = () => {
@@ -35,7 +36,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
       <div className="navbar-actions">
         <RoleSwitcher />
         <ThemeToggle />
-        
+
         <button className="notification-button" type="button">
           <Bell size={18} />
           <span>3</span>

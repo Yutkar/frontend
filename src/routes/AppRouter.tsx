@@ -17,7 +17,7 @@ function routePath(path: string): string {
 
 function GuardedRoute({ route }: { route: AppRoute }) {
   const user = useGlobalStore((state) => state.user)
-  const allowed = !route.allowedRoles || route.allowedRoles.includes(user.role)
+  const allowed = !route.allowedRoles || route.allowedRoles.includes(user?.role)
 
   // Простая проверка
   if (!user) {
@@ -39,7 +39,6 @@ function GuardedRoute({ route }: { route: AppRoute }) {
 
   return <>{route.element}</>
 }
-
 export function AppRouter({ routes }: AppRouterProps) {
   const initializeAuth = useGlobalStore((state) => state.initializeAuth)
 
@@ -73,12 +72,12 @@ export function AppRouter({ routes }: AppRouterProps) {
         </Route>
 
           {fullscreenRoutes.map((route) => (
-          <Route
-            element={<GuardedRoute route={route} />}
-            key={route.path}
-            path={routePath(route.path)}
-          />
-        ))}
+            <Route
+              element={<GuardedRoute route={route} />}
+              key={route.path}
+              path={routePath(route.path)}
+            />
+          ))}
 
         {publicStandaloneRoutes.map((route) => (
           <Route

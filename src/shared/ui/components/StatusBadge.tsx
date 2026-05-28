@@ -23,5 +23,9 @@ export function StatusBadge({
       ? getPriorityMeta(priority)
       : { label: label ?? t.status.default, tone }
 
-  return <span className={`status-badge status-${meta.tone}`}>{label ?? meta.label}</span>
+  return (
+    <span className={`status-badge status-${meta.tone} ${status ? `ticket-status-${status}` : ''}`}>
+      {label ?? meta.label}
+    </span>
+  )
 }
