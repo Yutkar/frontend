@@ -1,5 +1,4 @@
 import { apiClient } from './api/client'
-
 export const queueService = {
   async getStats() {
     const response = await apiClient.get('/queue/stats')
