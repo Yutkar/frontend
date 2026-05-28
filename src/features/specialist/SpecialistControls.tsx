@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
-import { CheckCircle2, FastForward, Play, Route } from 'lucide-react'
+import { CheckCircle2, FastForward, Play, RotateCcw, Route, UserX } from 'lucide-react'
 import type { Room, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
-import { getServiceTypeLabel } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
 type SpecialistControlsProps = {
@@ -23,7 +22,9 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const completeService = useQueueStore((state) => state.completeService)
   const loading = useQueueStore((state) => state.loading)
   const redirectTicket = useQueueStore((state) => state.redirectTicket)
+  const returnTicket = useQueueStore((state) => state.returnTicket)
   const rooms = useQueueStore((state) => state.rooms)
+  const skipTicket = useQueueStore((state) => state.skipTicket)
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
 
@@ -37,7 +38,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         .filter(
           (ticket) =>
             ticket.status === 'waiting' &&
-            getServiceTypeLabel(ticket.serviceType) === room.department,
+            ticket.roomId === room.id,
         )
         .sort((left, right) => {
           const priorityDelta = priorityOrder[left.priority] - priorityOrder[right.priority]
@@ -48,7 +49,14 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
 
           return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
         }),
-    [room.department, tickets],
+    [room.id, tickets],
+  )
+  const skippedTickets = useMemo(
+    () =>
+      tickets.filter(
+        (ticket) => ticket.status === 'no_show' && ticket.roomId === room.id,
+      ),
+    [room.id, tickets],
   )
   const redirectRooms = rooms.filter(
     (item) => item.id !== room.id && item.status === 'open' && !item.currentTicketId,
@@ -104,6 +112,22 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
                   variant="primary"
                 >
                   {t.specialist.complete}
+                </Button>
+                <Button
+                  disabled={loading || currentTicket.status !== 'in_service'}
+                  icon={<UserX size={17} />}
+                  onClick={() => void skipTicket(currentTicket.id)}
+                  variant="danger"
+                >
+                  Пропустить (неявка)
+                </Button>
+                <Button
+                  disabled={loading || currentTicket.status !== 'no_show'}
+                  icon={<RotateCcw size={17} />}
+                  onClick={() => void returnTicket(currentTicket.id)}
+                  variant="secondary"
+                >
+                  Вернуть пациента
                 </Button>
               </div>
             }
@@ -167,6 +191,37 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
             <p>{t.specialist.roomAvailable}</p>
           </div>
         )}
+
+        <div className="panel-header skipped-header">
+          <div>
+            <span className="eyebrow">Неявка</span>
+            <h2>Пропущенные пациенты</h2>
+          </div>
+          <strong className="waiting-count">{skippedTickets.length}</strong>
+        </div>
+
+        {skippedTickets.length > 0 ? (
+          <div className="specialist-waiting-list">
+            {skippedTickets.map((ticket) => (
+              <TicketCard
+                actionSlot={
+                  <Button
+                    disabled={loading}
+                    icon={<RotateCcw size={17} />}
+                    onClick={() => void returnTicket(ticket.id)}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Вернуть пациента
+                  </Button>
+                }
+                compact
+                key={ticket.id}
+                ticket={ticket}
+              />
+            ))}
+          </div>
+        ) : null}
       </aside>
     </div>
   )

@@ -2,10 +2,12 @@ import type { Ticket, TicketStatus } from '@shared/types'
 import { getTicketStatusMeta } from '@shared/utils'
 
 const statuses: TicketStatus[] = [
+  'created',
   'waiting',
   'called',
   'in_service',
   'completed',
+  'redirected',
   'cancelled',
   'no_show',
 ]

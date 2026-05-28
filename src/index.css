@@ -626,6 +626,11 @@ h3 {
   color: #516170;
 }
 
+.ticket-status-created {
+  background: #edf2f7;
+  color: #516170;
+}
+
 .ticket-status-called {
   background: #dff1ff;
   color: #0e5d92;
@@ -647,6 +652,11 @@ h3 {
 }
 
 .ticket-status-no_show {
+  background: #fff1d6;
+  color: #8a5a00;
+}
+
+.ticket-status-redirected {
   background: #fff1d6;
   color: #8a5a00;
 }
@@ -1483,6 +1493,11 @@ h3 {
   color: #4a5568;
 }
 
+.architecture-status-created {
+  background: #edf2f7;
+  color: #4a5568;
+}
+
 .architecture-status-called {
   background: #dff1ff;
   color: #0e5d92;
@@ -1506,6 +1521,11 @@ h3 {
 .architecture-status-no_show {
   background: #111827;
   color: #ffffff;
+}
+
+.architecture-status-redirected {
+  background: #fff1d6;
+  color: #8a5a00;
 }
 
 .board-shell {

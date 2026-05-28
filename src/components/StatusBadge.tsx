@@ -1,12 +1,14 @@
 import type { TicketStatus } from '../types'
 
 const statusLabels: Record<TicketStatus, string> = {
+  created: 'Создан',
   waiting: 'Ожидает',
   called: 'Вызван',
   in_service: 'В обслуживании',
   completed: 'Завершён',
   cancelled: 'Отменён',
   no_show: 'Не явился',
+  redirected: 'Перенаправлен',
 }
 
 type StatusBadgeProps = {
