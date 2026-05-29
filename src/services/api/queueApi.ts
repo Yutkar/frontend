@@ -6,6 +6,7 @@ import type {
   Ticket,
   TicketCreateInput,
 } from '@shared/types'
+import { ticketService } from '@services/ticketService'
 import { apiClient } from './client'
 
 const emptyKpi: QueueKpi = {
@@ -104,6 +105,28 @@ export const queueApi = {
       return await loadQueueSnapshot()
     } catch (error) {
       console.error('queueApi.redirectTicket failed', error)
+      throw error
+    }
+  },
+
+  async skipTicket(ticketId: string): Promise<QueueSnapshot> {
+    try {
+      await ticketService.skipTicket(ticketId)
+
+      return await loadQueueSnapshot()
+    } catch (error) {
+      console.error('queueApi.skipTicket failed', error)
+      throw error
+    }
+  },
+
+  async returnTicket(ticketId: string): Promise<QueueSnapshot> {
+    try {
+      await ticketService.returnTicket(ticketId)
+
+      return await loadQueueSnapshot()
+    } catch (error) {
+      console.error('queueApi.returnTicket failed', error)
       throw error
     }
   },

@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Menu } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
@@ -27,14 +28,19 @@ export function Sidebar({ collapsed, onToggle, routes }: SidebarProps) {
       </div>
 
       <nav className="sidebar-nav">
-        {routes.map((route) => {
+        {routes.map((route, index) => {
           const Icon = route.icon
+          const previousRoute = routes[index - 1]
+          const showSection = route.navSection && route.navSection !== previousRoute?.navSection
 
           return (
-            <NavLink className="sidebar-link" key={route.path} to={route.path}>
-              <Icon size={19} strokeWidth={2.1} />
-              <span>{route.label}</span>
-            </NavLink>
+            <Fragment key={route.path}>
+              {showSection ? <span className="sidebar-section-label">{route.navSection}</span> : null}
+              <NavLink className="sidebar-link" to={route.path}>
+                <Icon size={19} strokeWidth={2.1} />
+                <span>{route.label}</span>
+              </NavLink>
+            </Fragment>
           )
         })}
       </nav>

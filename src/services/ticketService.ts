@@ -94,6 +94,26 @@ export const ticketService = {
     }
   },
 
+  async skipTicket(id: string): Promise<Ticket> {
+    try {
+      return await ticketService.noShowTicket(id)
+    } catch (error) {
+      console.error('ticketService.skipTicket failed', error)
+      throw error
+    }
+  },
+
+  async returnTicket(id: string): Promise<Ticket> {
+    try {
+      const response = await apiClient.post<Ticket>(`/tickets/${id}/return`)
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.returnTicket failed', error)
+      throw error
+    }
+  },
+
   async redirectTicket(id: string, newRoomId: string): Promise<Ticket> {
     try {
       const response = await apiClient.post<Ticket>(`/tickets/${id}/redirect`, {

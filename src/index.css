@@ -226,6 +226,18 @@ h3 {
   color: var(--primary-strong);
 }
 
+.sidebar-section-label {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 850;
+  margin: 14px 12px 2px;
+  text-transform: uppercase;
+}
+
+.sidebar-collapsed .sidebar-section-label {
+  display: none;
+}
+
 .app-main {
   min-width: 0;
 }
@@ -877,6 +889,13 @@ h3 {
 
 .redirect-panel .field {
   flex: 1 1 260px;
+}
+
+.skipped-header {
+  border-top: 1px solid var(--border);
+  margin-bottom: 0;
+  margin-top: 2px;
+  padding-top: 16px;
 }
 
 .room-list,
@@ -1693,6 +1712,195 @@ h3 {
   margin-top: 6px;
 }
 
+.admin-crud-grid {
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-kpi-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-kpi-grid article {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 128px;
+  padding: 16px;
+}
+
+.admin-kpi-grid svg {
+  color: var(--primary);
+}
+
+.admin-kpi-grid span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-kpi-grid strong {
+  color: var(--text);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.admin-checkbox-grid {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: 14px;
+}
+
+.admin-checkbox-grid legend {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 0 6px;
+}
+
+.admin-checkbox-grid label {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.admin-table-shell {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+}
+
+.admin-table {
+  border-collapse: collapse;
+  min-width: 760px;
+  width: 100%;
+}
+
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 13px 14px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-table th {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.kiosk-page {
+  align-items: center;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  min-height: 100svh;
+  padding: 28px;
+}
+
+.kiosk-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  max-width: 980px;
+  padding: 28px;
+  width: 100%;
+}
+
+.kiosk-brand {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+}
+
+.kiosk-brand h1 {
+  font-size: 34px;
+}
+
+.kiosk-service-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kiosk-service-grid button {
+  background: var(--surface-muted);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 850;
+  min-height: 132px;
+  padding: 18px;
+}
+
+.kiosk-service-grid button.selected,
+.kiosk-service-grid button:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-strong);
+}
+
+.kiosk-submit {
+  font-size: 24px;
+  min-height: 72px;
+}
+
+.kiosk-success {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 460px;
+  justify-content: center;
+  text-align: center;
+}
+
+.kiosk-success svg {
+  color: var(--success);
+}
+
+.kiosk-success span,
+.kiosk-success p {
+  color: var(--text-muted);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.kiosk-success strong {
+  color: var(--primary-strong);
+  font-size: clamp(82px, 16vw, 168px);
+  line-height: 0.95;
+}
+
 .analytics-grid {
   display: grid;
   gap: 18px;
@@ -1974,6 +2182,7 @@ h3 {
   .ticket-create-grid,
   .dashboard-grid,
   .specialist-workspace,
+  .admin-crud-grid,
   .settings-grid,
   .tv-grid {
     grid-template-columns: 1fr;
@@ -1981,6 +2190,7 @@ h3 {
 
   .kpi-grid,
   .room-load-grid,
+  .admin-kpi-grid,
   .login-role-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2029,7 +2239,9 @@ h3 {
 
   .kpi-grid,
   .live-queue-kpis,
-  .architecture-summary-grid,
+    .architecture-summary-grid,
+  .admin-kpi-grid,
+  .admin-checkbox-grid,
   .status-rail,
   .analytics-grid,
   .form-grid,
@@ -2111,5 +2323,26 @@ h3 {
     grid-template-columns: 1fr;
     position: static;
     width: 100%;
+  }
+
+  .kiosk-page {
+    padding: 16px;
+  }
+
+  .kiosk-panel {
+    padding: 18px;
+  }
+
+  .kiosk-brand h1 {
+    font-size: 28px;
+  }
+
+  .kiosk-service-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kiosk-service-grid button {
+    font-size: 20px;
+    min-height: 96px;
   }
 }

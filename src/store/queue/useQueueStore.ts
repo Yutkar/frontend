@@ -26,7 +26,9 @@ type QueueState = {
   createTicket: (input: TicketCreateInput) => Promise<Ticket | undefined>
   loadQueue: () => Promise<void>
   redirectTicket: (input: RedirectTicketInput) => Promise<void>
+  returnTicket: (ticketId: string) => Promise<void>
   selectTicket: (ticketId?: string) => void
+  skipTicket: (ticketId: string) => Promise<void>
   startService: (ticketId: string) => Promise<void>
 }
 
@@ -93,7 +95,19 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     set({ ...snapshot, hydrated: true, loading: false })
   },
 
+  returnTicket: async (ticketId) => {
+    set({ loading: true })
+    const snapshot = await queueApi.returnTicket(ticketId)
+    set({ ...snapshot, hydrated: true, loading: false, selectedTicketId: ticketId })
+  },
+
   selectTicket: (ticketId) => set({ selectedTicketId: ticketId }),
+
+  skipTicket: async (ticketId) => {
+    set({ loading: true })
+    const snapshot = await queueApi.skipTicket(ticketId)
+    set({ ...snapshot, hydrated: true, loading: false, selectedTicketId: undefined })
+  },
 
   startService: async (ticketId) => {
     set({ loading: true })

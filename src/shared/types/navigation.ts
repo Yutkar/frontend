@@ -10,5 +10,6 @@ export type AppRoute = {
   allowedRoles?: Role[]
   fullscreen?: boolean
   hideFromSidebar?: boolean
+  navSection?: string
   standalone?: boolean
 }
