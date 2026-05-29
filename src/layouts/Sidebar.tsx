@@ -1,17 +1,16 @@
+import { useState } from 'react'
 import { Menu } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { IconButton } from '@shared/ui/core-components'
-import { useGlobalStore } from '@store/global'
 
 type SidebarProps = {
   routes: AppRoute[]
 }
 
 export function Sidebar({ routes }: SidebarProps) {
-  const collapsed = useGlobalStore((state) => state.sidebarCollapsed)
-  const toggleSidebar = useGlobalStore((state) => state.toggleSidebar)
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
@@ -21,7 +20,11 @@ export function Sidebar({ routes }: SidebarProps) {
           <strong>{t.system.smartq}</strong>
           <span>{t.system.controlSystem}</span>
         </div>
-        <IconButton icon={<Menu size={18} />} label={t.system.toggleSidebar} onClick={toggleSidebar} />
+        <IconButton
+          icon={<Menu size={18} />}
+          label={t.system.toggleSidebar}
+          onClick={() => setCollapsed((value) => !value)}
+        />
       </div>
 
       <nav className="sidebar-nav">

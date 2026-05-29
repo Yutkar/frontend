@@ -3,7 +3,6 @@ export type TicketStatus =
   | 'called'
   | 'in_service'
   | 'completed'
-  | 'redirected'
   | 'cancelled'
   | 'no_show'
 

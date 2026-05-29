@@ -1,8 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
-import { Button } from '@shared/ui/components'
-import { useGlobalStore } from '@store/global'
 import { AppLayout } from '@layouts/AppLayout'
 
 type AppRouterProps = {
@@ -11,26 +8,6 @@ type AppRouterProps = {
 
 function routePath(path: string): string {
   return path.replace(/^\//, '')
-}
-
-function GuardedRoute({ route }: { route: AppRoute }) {
-  const user = useGlobalStore((state) => state.user)
-  const allowed = !route.allowedRoles || route.allowedRoles.includes(user.role)
-
-  if (!allowed) {
-    return (
-      <section className="empty-state">
-        <span className="eyebrow">{t.system.accessControl}</span>
-        <h1>{t.system.rolePermissionRequired}</h1>
-        <p>{t.system.cannotOpenWorkspace}</p>
-        <Button onClick={() => window.history.back()} variant="primary">
-          {t.system.goBack}
-        </Button>
-      </section>
-    )
-  }
-
-  return <>{route.element}</>
 }
 
 export function AppRouter({ routes }: AppRouterProps) {
@@ -47,7 +24,7 @@ export function AppRouter({ routes }: AppRouterProps) {
           <Route element={<Navigate replace to={fallbackPath} />} index />
           {shellRoutes.map((route) => (
             <Route
-              element={<GuardedRoute route={route} />}
+              element={route.element}
               key={route.path}
               path={routePath(route.path)}
             />
@@ -56,7 +33,7 @@ export function AppRouter({ routes }: AppRouterProps) {
 
         {fullscreenRoutes.map((route) => (
           <Route
-            element={<GuardedRoute route={route} />}
+            element={route.element}
             key={route.path}
             path={routePath(route.path)}
           />
@@ -64,7 +41,7 @@ export function AppRouter({ routes }: AppRouterProps) {
 
         {standaloneRoutes.map((route) => (
           <Route
-            element={<GuardedRoute route={route} />}
+            element={route.element}
             key={route.path}
             path={routePath(route.path)}
           />

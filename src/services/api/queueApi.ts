@@ -39,7 +39,7 @@ function syncRoomLoad(rooms: Room[], tickets: Ticket[]): Room[] {
     const assignedActive = tickets.filter(
       (ticket) =>
         ticket.roomId === room.id &&
-        ['called', 'in_service', 'redirected'].includes(ticket.status),
+        ['called', 'in_service'].includes(ticket.status),
     ).length
     const waitingPressure = tickets.filter(
       (ticket) => ticket.status === 'waiting' && getServiceTypeLabel(ticket.serviceType) === room.department,
@@ -53,9 +53,16 @@ function syncRoomLoad(rooms: Room[], tickets: Ticket[]): Room[] {
   })
 }
 
-function selectNextWaitingTicket(tickets: Ticket[]): Ticket | undefined {
-  return [...tickets]
-    .filter((ticket) => ticket.status === 'waiting')
+function selectNextWaitingTicket(tickets: Ticket[], room?: Room): Ticket | undefined {
+  const waitingTickets = tickets.filter((ticket) => {
+    if (ticket.status !== 'waiting') {
+      return false
+    }
+
+    return room ? getServiceTypeLabel(ticket.serviceType) === room.department : true
+  })
+
+  return waitingTickets
     .sort((left, right) => {
       const priorityDelta = priorityWeight[right.priority] - priorityWeight[left.priority]
 
@@ -93,9 +100,9 @@ export const queueApi = {
 
   async callNextTicket(roomId: string): Promise<QueueSnapshot> {
     const room = queueState.rooms.find((item) => item.id === roomId) ?? queueState.rooms[0]
-    const nextTicket = selectNextWaitingTicket(queueState.tickets)
+    const nextTicket = selectNextWaitingTicket(queueState.tickets, room)
 
-    if (!room || !nextTicket) {
+    if (!room || room.currentTicketId || room.status !== 'open' || !nextTicket) {
       return resolveMockApi(getSnapshot())
     }
 
@@ -203,7 +210,7 @@ export const queueApi = {
     const ticket = queueState.tickets.find((item) => item.id === input.ticketId)
     const room = queueState.rooms.find((item) => item.id === input.roomId)
 
-    if (!ticket || !room) {
+    if (!ticket || !room || room.status !== 'open' || room.currentTicketId) {
       return resolveMockApi(getSnapshot())
     }
 
@@ -224,9 +231,10 @@ export const queueApi = {
           ? {
               ...item,
               calledAt: new Date().toISOString(),
+              etaMinutes: 0,
               notes: input.reason,
               roomId: room.id,
-              status: 'redirected',
+              status: 'called',
             }
           : item,
       ),

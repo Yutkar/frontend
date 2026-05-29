@@ -18,6 +18,8 @@
     "baseUrl": ".",
     "paths": {
       "@app/*": ["src/app/*"],
+      "@components": ["src/components/index.ts"],
+      "@components/*": ["src/components/*"],
       "@features/*": ["src/features/*"],
       "@layouts/*": ["src/layouts/*"],
       "@mock/*": ["src/mock/*"],
@@ -28,6 +30,8 @@
       "@services/*": ["src/services/*"],
       "@shared/*": ["src/shared/*"],
       "@store/*": ["src/store/*"],
+      "@types": ["src/types/index.ts"],
+      "@types/*": ["src/types/*"],
       "@widgets": ["src/widgets/index.ts"],
       "@widgets/*": ["src/widgets/*"]
     },

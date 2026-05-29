@@ -18,7 +18,6 @@ export const ticketStatusMeta: Record<TicketStatus, Meta> = {
   called: { label: t.status.called, tone: 'info' },
   in_service: { label: t.status.in_service, tone: 'success' },
   completed: { label: t.status.completed, tone: 'success' },
-  redirected: { label: t.status.redirected, tone: 'warning' },
   cancelled: { label: t.status.cancelled, tone: 'danger' },
   no_show: { label: t.status.no_show, tone: 'danger' },
 }
@@ -52,7 +51,7 @@ export function getServiceTypeLabel(serviceType: ServiceType): string {
 }
 
 export function isActiveTicket(ticket: Ticket): boolean {
-  return ['waiting', 'called', 'in_service', 'redirected'].includes(ticket.status)
+  return ['waiting', 'called', 'in_service'].includes(ticket.status)
 }
 
 export function getWaitSeverity(minutes: number): Tone {

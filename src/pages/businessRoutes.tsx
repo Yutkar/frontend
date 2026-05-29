@@ -1,74 +1,56 @@
 import {
   Activity,
   BarChart3,
-  ClipboardPlus,
+  ClipboardList,
   LayoutDashboard,
   Monitor,
-  Settings,
-  ShieldCheck,
   Stethoscope,
 } from 'lucide-react'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { AnalyticsPage } from './AnalyticsPage'
-import { DashboardPage } from './DashboardPage'
-import { LoginPage } from './LoginPage'
-import { QueuePage } from './QueuePage'
-import { SettingsPage } from './SettingsPage'
-import { SpecialistPanelPage } from './SpecialistPanelPage'
-import { TicketCreatePage } from './TicketCreatePage'
-import { TvBoardPage } from './TvBoardPage'
+import { Analytics } from './Analytics'
+import { Board } from './Board'
+import { Dashboard } from './Dashboard'
+import { Queue } from './Queue'
+import { Specialist } from './Specialist'
+import { Tickets } from './Tickets'
 
 export const smartqBusinessRoutes: AppRoute[] = [
-  {
-    path: '/login',
-    label: t.nav.login,
-    icon: ShieldCheck,
-    hideFromSidebar: true,
-    standalone: true,
-    element: <LoginPage />,
-  },
   {
     path: '/dashboard',
     label: t.nav.dashboard,
     icon: LayoutDashboard,
-    element: <DashboardPage />,
+    element: <Dashboard />,
   },
   {
     path: '/queue',
     label: t.nav.queue,
     icon: Activity,
-    element: <QueuePage />,
+    element: <Queue />,
   },
   {
-    path: '/tickets/new',
-    label: t.nav.createTicket,
-    icon: ClipboardPlus,
-    element: <TicketCreatePage />,
+    path: '/tickets',
+    label: t.nav.tickets,
+    icon: ClipboardList,
+    element: <Tickets />,
   },
   {
     path: '/analytics',
     label: t.nav.analytics,
     icon: BarChart3,
-    element: <AnalyticsPage />,
+    element: <Analytics />,
   },
   {
     path: '/specialist',
     label: t.nav.specialist,
     icon: Stethoscope,
-    element: <SpecialistPanelPage />,
+    element: <Specialist />,
   },
   {
     path: '/board',
     label: t.nav.tvBoard,
     icon: Monitor,
     fullscreen: true,
-    element: <TvBoardPage />,
-  },
-  {
-    path: '/settings',
-    label: t.nav.settings,
-    icon: Settings,
-    element: <SettingsPage />,
+    element: <Board />,
   },
 ]
