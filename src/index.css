@@ -120,6 +120,11 @@ h3 {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 100svh;
+  transition: grid-template-columns 180ms ease;
+}
+
+.app-shell-collapsed {
+  grid-template-columns: var(--sidebar-collapsed) minmax(0, 1fr);
 }
 
 .sidebar {
@@ -137,6 +142,16 @@ h3 {
 
 .sidebar-collapsed {
   width: var(--sidebar-collapsed);
+}
+
+.sidebar-collapsed .sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  justify-items: center;
+}
+
+.sidebar-collapsed .icon-button {
+  width: 44px;
 }
 
 .sidebar-brand {
@@ -180,6 +195,12 @@ h3 {
 .sidebar-collapsed .brand-copy,
 .sidebar-collapsed .sidebar-link span {
   display: none;
+}
+
+.sidebar-collapsed .sidebar-link {
+  gap: 0;
+  justify-content: center;
+  padding: 0;
 }
 
 .sidebar-nav {
