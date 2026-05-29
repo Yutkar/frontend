@@ -38,6 +38,13 @@ export interface User {
   role: UserRole
 }
 
+export interface QueueStats {
+  activeTickets: number
+  averageWaitMinutes: number
+  completedToday: number
+  overloadedRooms: number
+}
+
 export type CreateTicketInput = {
   serviceTypeId: string
   priority: TicketPriority

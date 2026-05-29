@@ -1,46 +1,147 @@
-import { cloneData, rooms, setTickets, tickets } from './data'
+import { apiClient } from './api/client'
 import { ticketService } from './ticketService'
-import type { Room, Ticket } from '../types'
+import type { QueueStats, Room, Ticket } from '../types'
 
 type QueueListener = (tickets: Ticket[]) => void
+type QueueOverloadStatus = {
+  overloaded: boolean
+  overloadedRooms?: Room[]
+  message?: string
+}
 
 export const queueService = {
+  async getStats(): Promise<QueueStats> {
+    try {
+      const response = await apiClient.get<QueueStats>('/queue/stats')
+
+      return response.data
+    } catch (error) {
+      console.error('queueService.getStats failed', error)
+      throw error
+    }
+  },
+
+  async getQueueByRoom(roomId: string): Promise<Ticket[]> {
+    try {
+      const response = await apiClient.get<Ticket[]>(`/queue/room/${roomId}`)
+
+      return response.data
+    } catch (error) {
+      console.error('queueService.getQueueByRoom failed', error)
+      throw error
+    }
+  },
+
+  async getNextTicket(roomId: string): Promise<Ticket | undefined> {
+    try {
+      const response = await apiClient.get<Ticket>(`/queue/room/${roomId}/next`)
+
+      return response.data
+    } catch (error) {
+      console.error('queueService.getNextTicket failed', error)
+      throw error
+    }
+  },
+
+  async getHighPriority(): Promise<Ticket[]> {
+    try {
+      const response = await apiClient.get<Ticket[]>('/queue/high-priority')
+
+      return response.data
+    } catch (error) {
+      console.error('queueService.getHighPriority failed', error)
+      throw error
+    }
+  },
+
+  async checkOverload(): Promise<QueueOverloadStatus> {
+    try {
+      const response = await apiClient.get<QueueOverloadStatus>('/queue/overload')
+
+      return response.data
+    } catch (error) {
+      console.error('queueService.checkOverload failed', error)
+      throw error
+    }
+  },
+
   async getQueue(): Promise<Ticket[]> {
-    return cloneData(tickets)
+    try {
+      return await ticketService.getTickets()
+    } catch (error) {
+      console.error('queueService.getQueue failed', error)
+      throw error
+    }
   },
 
   async getRooms(): Promise<Room[]> {
-    return cloneData(rooms)
+    try {
+      const response = await apiClient.get<Room[]>('/rooms')
+
+      return response.data
+    } catch (error) {
+      console.error('queueService.getRooms failed', error)
+      throw error
+    }
   },
 
-  async callNext(): Promise<Ticket | undefined> {
-    const nextTicket = tickets.find((ticket) => ticket.status === 'waiting')
+  async callNext(roomId?: string): Promise<Ticket | undefined> {
+    try {
+      const nextTicket = roomId
+        ? await queueService.getNextTicket(roomId)
+        : (await queueService.getHighPriority())[0]
 
-    if (!nextTicket) {
-      return undefined
+      if (!nextTicket) {
+        return undefined
+      }
+
+      return await ticketService.callTicket(nextTicket.id)
+    } catch (error) {
+      console.error('queueService.callNext failed', error)
+      throw error
     }
-
-    return ticketService.updateTicketStatus({
-      ticketId: nextTicket.id,
-      status: 'called',
-    })
   },
 
   async startService(ticketId: string): Promise<Ticket | undefined> {
-    return ticketService.updateTicketStatus({ ticketId, status: 'in_service' })
+    try {
+      return await ticketService.startTicket(ticketId)
+    } catch (error) {
+      console.error('queueService.startService failed', error)
+      throw error
+    }
   },
 
   async completeService(ticketId: string): Promise<Ticket | undefined> {
-    return ticketService.updateTicketStatus({ ticketId, status: 'completed' })
+    try {
+      return await ticketService.completeTicket(ticketId)
+    } catch (error) {
+      console.error('queueService.completeService failed', error)
+      throw error
+    }
   },
 
   subscribeQueue(listener: QueueListener): () => void {
-    listener(cloneData(tickets))
+    let active = true
 
-    return () => {}
+    queueService.getQueue()
+      .then((tickets) => {
+        if (active) {
+          listener(tickets)
+        }
+      })
+      .catch((error) => {
+        console.error('queueService.subscribeQueue failed', error)
+      })
+
+    return () => {
+      active = false
+    }
   },
 
-  replaceQueue(nextTickets: Ticket[]): void {
-    setTickets(nextTickets)
+  replaceQueue(_nextTickets: Ticket[]): void {
+    const error = new Error('queueService.replaceQueue is not available with the backend API')
+
+    console.error('queueService.replaceQueue failed', error)
+    throw error
   },
 }

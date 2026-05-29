@@ -27,7 +27,7 @@ class SmartQSocketClient {
     }
   }
 
-  emitMockEvent(event: QueueEvent): void {
+  emitEvent(event: QueueEvent): void {
     if (!this.connected) {
       return
     }

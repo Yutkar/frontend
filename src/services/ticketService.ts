@@ -1,4 +1,4 @@
-import { cloneData, rooms, serviceTypes, setTickets, tickets } from './data'
+import { apiClient } from './api/client'
 import type {
   CreateTicketInput,
   Ticket,
@@ -7,52 +7,132 @@ import type {
 
 export const ticketService = {
   async getTickets(): Promise<Ticket[]> {
-    return cloneData(tickets)
+    try {
+      const response = await apiClient.get<Ticket[]>('/tickets')
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.getTickets failed', error)
+      throw error
+    }
   },
 
   async getTicketById(id: string): Promise<Ticket | undefined> {
-    return cloneData(tickets.find((ticket) => ticket.id === id))
+    try {
+      const response = await apiClient.get<Ticket>(`/tickets/${id}`)
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.getTicketById failed', error)
+      throw error
+    }
   },
 
   async createTicket(input: CreateTicketInput): Promise<Ticket> {
-    const serviceType = serviceTypes.find((item) => item.id === input.serviceTypeId) ?? serviceTypes[0]
-    const room = rooms.find((item) =>
-      item.serviceTypes.some((itemServiceType) => itemServiceType.id === serviceType.id),
-    ) ?? rooms[0]
-    const ticket: Ticket = {
-      id: `ticket-${Date.now()}`,
-      number: `A${String(tickets.length + 1).padStart(3, '0')}`,
-      serviceType,
-      status: 'waiting',
-      room,
-      priority: input.priority,
-      eta: Math.max(5, tickets.filter((item) => item.status === 'waiting').length * 5),
+    try {
+      const response = await apiClient.post<Ticket>('/tickets', input)
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.createTicket failed', error)
+      throw error
     }
+  },
 
-    setTickets([ticket, ...tickets])
+  async callTicket(id: string): Promise<Ticket> {
+    try {
+      const response = await apiClient.post<Ticket>(`/tickets/${id}/call`)
 
-    return cloneData(ticket)
+      return response.data
+    } catch (error) {
+      console.error('ticketService.callTicket failed', error)
+      throw error
+    }
+  },
+
+  async startTicket(id: string): Promise<Ticket> {
+    try {
+      const response = await apiClient.post<Ticket>(`/tickets/${id}/start`)
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.startTicket failed', error)
+      throw error
+    }
+  },
+
+  async completeTicket(id: string): Promise<Ticket> {
+    try {
+      const response = await apiClient.post<Ticket>(`/tickets/${id}/complete`)
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.completeTicket failed', error)
+      throw error
+    }
+  },
+
+  async cancelTicket(id: string): Promise<Ticket> {
+    try {
+      const response = await apiClient.post<Ticket>(`/tickets/${id}/cancel`)
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.cancelTicket failed', error)
+      throw error
+    }
+  },
+
+  async noShowTicket(id: string): Promise<Ticket> {
+    try {
+      const response = await apiClient.post<Ticket>(`/tickets/${id}/no-show`)
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.noShowTicket failed', error)
+      throw error
+    }
+  },
+
+  async redirectTicket(id: string, newRoomId: string): Promise<Ticket> {
+    try {
+      const response = await apiClient.post<Ticket>(`/tickets/${id}/redirect`, {
+        newRoomId,
+      })
+
+      return response.data
+    } catch (error) {
+      console.error('ticketService.redirectTicket failed', error)
+      throw error
+    }
   },
 
   async updateTicketStatus(input: UpdateTicketStatusInput): Promise<Ticket | undefined> {
-    let updatedTicket: Ticket | undefined
+    try {
+      if (input.status === 'called') {
+        return await ticketService.callTicket(input.ticketId)
+      }
 
-    setTickets(
-      tickets.map((ticket) => {
-        if (ticket.id !== input.ticketId) {
-          return ticket
-        }
+      if (input.status === 'in_service') {
+        return await ticketService.startTicket(input.ticketId)
+      }
 
-        updatedTicket = {
-          ...ticket,
-          status: input.status,
-          eta: input.status === 'waiting' ? ticket.eta : 0,
-        }
+      if (input.status === 'completed') {
+        return await ticketService.completeTicket(input.ticketId)
+      }
 
-        return updatedTicket
-      }),
-    )
+      if (input.status === 'cancelled') {
+        return await ticketService.cancelTicket(input.ticketId)
+      }
 
-    return cloneData(updatedTicket)
+      if (input.status === 'no_show') {
+        return await ticketService.noShowTicket(input.ticketId)
+      }
+
+      return await ticketService.getTicketById(input.ticketId)
+    } catch (error) {
+      console.error('ticketService.updateTicketStatus failed', error)
+      throw error
+    }
   },
 }

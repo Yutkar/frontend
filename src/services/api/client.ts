@@ -1,24 +1,19 @@
 import axios from 'axios'
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_SMARTQ_API_URL ?? '/api',
+  baseURL: import.meta.env.VITE_SMARTQ_API_URL || 'http://localhost:3000',
+  timeout: 12_000,
   headers: {
     'Content-Type': 'application/json',
-    'X-SmartQ-Client': 'frontend',
   },
-  timeout: 12_000,
 })
 
 apiClient.interceptors.request.use((config) => {
-  config.headers.Authorization = 'Bearer mock-smartq-token'
+  const token = localStorage.getItem('access_token')
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
 
   return config
 })
-
-export async function resolveMockApi<T>(payload: T, delayMs = 180): Promise<T> {
-  await new Promise((resolve) => {
-    window.setTimeout(resolve, delayMs)
-  })
-
-  return structuredClone(payload)
-}
