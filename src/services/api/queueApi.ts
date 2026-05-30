@@ -1,39 +1,29 @@
 import type {
-  QueueKpi,
   QueueSnapshot,
   RedirectTicketInput,
-  Room,
-  Ticket,
   TicketCreateInput,
 } from '@shared/types'
+import {
+  toBackendTicketCreateInput,
+  toQueueSnapshot,
+  type BackendOverloadRoom,
+  type BackendQueueStats,
+  type BackendTicket,
+} from './backendAdapters'
 import { apiClient } from './client'
-
-const emptyKpi: QueueKpi = {
-  activeTickets: 0,
-  averageWaitMinutes: 0,
-  completedToday: 0,
-  overloadedRooms: 0,
-}
 
 async function loadQueueSnapshot(): Promise<QueueSnapshot> {
   const [
     ticketsResponse,
-    roomsResponse,
     statsResponse,
+    overloadResponse,
   ] = await Promise.all([
-    apiClient.get<Ticket[]>('/tickets'),
-    apiClient.get<Room[]>('/rooms'),
-    apiClient.get<QueueKpi>('/queue/stats'),
+    apiClient.get<BackendTicket[]>('/tickets'),
+    apiClient.get<BackendQueueStats[]>('/queue/stats'),
+    apiClient.get<BackendOverloadRoom[]>('/queue/overload'),
   ])
 
-  return {
-    tickets: ticketsResponse.data,
-    rooms: roomsResponse.data,
-    events: [],
-    recommendations: [],
-    analytics: [],
-    kpi: statsResponse.data ?? emptyKpi,
-  }
+  return toQueueSnapshot(ticketsResponse.data, statsResponse.data, overloadResponse.data)
 }
 
 export const queueApi = {
@@ -46,9 +36,20 @@ export const queueApi = {
     }
   },
 
+  async getBoardSnapshot(): Promise<QueueSnapshot> {
+    try {
+      const response = await apiClient.get<BackendTicket[]>('/queue/board')
+
+      return toQueueSnapshot(response.data)
+    } catch (error) {
+      console.error('queueApi.getBoardSnapshot failed', error)
+      throw error
+    }
+  },
+
   async createTicket(input: TicketCreateInput): Promise<QueueSnapshot> {
     try {
-      await apiClient.post<Ticket>('/tickets', input)
+      await apiClient.post<BackendTicket>('/tickets', toBackendTicketCreateInput(input))
 
       return await loadQueueSnapshot()
     } catch (error) {
@@ -57,12 +58,23 @@ export const queueApi = {
     }
   },
 
+  async createKioskTicket(input: TicketCreateInput): Promise<QueueSnapshot> {
+    try {
+      await apiClient.post<BackendTicket>('/tickets/kiosk', toBackendTicketCreateInput(input))
+
+      return await loadQueueSnapshot()
+    } catch (error) {
+      console.error('queueApi.createKioskTicket failed', error)
+      throw error
+    }
+  },
+
   async callNextTicket(roomId: string): Promise<QueueSnapshot> {
     try {
-      const response = await apiClient.get<Ticket | undefined>(`/queue/room/${roomId}/next`)
+      const response = await apiClient.get<BackendTicket | null>(`/queue/room/${roomId}/next`)
 
       if (response.data?.id) {
-        await apiClient.post<Ticket>(`/tickets/${response.data.id}/call`)
+        await apiClient.post<BackendTicket>(`/tickets/${response.data.id}/call`)
       }
 
       return await loadQueueSnapshot()
@@ -74,7 +86,7 @@ export const queueApi = {
 
   async startService(ticketId: string): Promise<QueueSnapshot> {
     try {
-      await apiClient.post<Ticket>(`/tickets/${ticketId}/start`)
+      await apiClient.post<BackendTicket>(`/tickets/${ticketId}/start`)
 
       return await loadQueueSnapshot()
     } catch (error) {
@@ -85,7 +97,7 @@ export const queueApi = {
 
   async completeService(ticketId: string): Promise<QueueSnapshot> {
     try {
-      await apiClient.post<Ticket>(`/tickets/${ticketId}/complete`)
+      await apiClient.post<BackendTicket>(`/tickets/${ticketId}/complete`)
 
       return await loadQueueSnapshot()
     } catch (error) {
@@ -94,11 +106,32 @@ export const queueApi = {
     }
   },
 
+  async skipTicket(ticketId: string): Promise<QueueSnapshot> {
+    try {
+      await apiClient.post<BackendTicket>(`/tickets/${ticketId}/no-show`)
+
+      return await loadQueueSnapshot()
+    } catch (error) {
+      console.error('queueApi.skipTicket failed', error)
+      throw error
+    }
+  },
+
+  async returnTicket(ticketId: string): Promise<QueueSnapshot> {
+    try {
+      await apiClient.post<BackendTicket>(`/tickets/${ticketId}/arrive`)
+
+      return await loadQueueSnapshot()
+    } catch (error) {
+      console.error('queueApi.returnTicket failed', error)
+      throw error
+    }
+  },
+
   async redirectTicket(input: RedirectTicketInput): Promise<QueueSnapshot> {
     try {
-      await apiClient.post<Ticket>(`/tickets/${input.ticketId}/redirect`, {
-        newRoomId: input.roomId,
-        reason: input.reason,
+      await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, {
+        newRoomId: Number(input.roomId),
       })
 
       return await loadQueueSnapshot()

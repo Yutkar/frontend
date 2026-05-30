@@ -18,12 +18,14 @@ const priorityOrder: Record<TicketPriority, number> = {
 }
 
 const statusOrder: Record<TicketStatus, number> = {
-  waiting: 0,
-  called: 1,
-  in_service: 2,
-  completed: 3,
-  cancelled: 4,
-  no_show: 5,
+  created: 0,
+  waiting: 1,
+  called: 2,
+  in_service: 3,
+  completed: 4,
+  redirected: 5,
+  cancelled: 6,
+  no_show: 7,
 }
 
 export function QueuePage() {

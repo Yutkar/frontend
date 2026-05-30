@@ -10,7 +10,11 @@ export function SpecialistPanelPage() {
 
   const user = useGlobalStore((state) => state.user)
   const rooms = useQueueStore((state) => state.rooms)
-  const room = rooms.find((item) => item.id === user.roomId) ?? rooms[0]
+  const room = rooms.find((item) => item.id === user?.roomId) ?? rooms[0]
+
+  if (!user) {
+    return null
+  }
 
   if (!room) {
     return (

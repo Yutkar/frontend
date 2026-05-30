@@ -11,4 +11,5 @@ export type AppRoute = {
   fullscreen?: boolean
   hideFromSidebar?: boolean
   standalone?: boolean
+  public?: boolean
 }

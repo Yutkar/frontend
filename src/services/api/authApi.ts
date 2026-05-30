@@ -1,12 +1,21 @@
 import { userService } from '@services/userService'
 import type { Role, User } from '@shared/types'
+import { apiClient } from './client'
 
-const defaultUser: User = {
-  id: '',
-  name: '',
-  role: 'manager',
-  department: '',
-  avatarInitials: 'SQ',
+const roleDefaults: Record<Role, Pick<User, 'department' | 'name' | 'roomId'>> = {
+  admin: {
+    department: 'Администрирование',
+    name: 'Администратор',
+  },
+  manager: {
+    department: 'Управление очередью',
+    name: 'Менеджер',
+  },
+  specialist: {
+    department: 'consultation',
+    name: 'Специалист',
+    roomId: '1',
+  },
 }
 
 function getAvatarInitials(name: string): string {
@@ -20,67 +29,60 @@ function getAvatarInitials(name: string): string {
   return initials || 'SQ'
 }
 
-function toSharedUser(user: Awaited<ReturnType<typeof userService.getCurrentUser>>): User {
+function toUser(role: Role, email?: string, name?: string): User {
+  const defaults = roleDefaults[role]
+  const resolvedName = name || defaults.name
+
   return {
-    id: user.id,
-    name: user.name,
-    role: user.role,
-    department: '',
-    avatarInitials: getAvatarInitials(user.name),
+    id: email ?? role,
+    name: resolvedName,
+    role,
+    department: defaults.department,
+    roomId: defaults.roomId,
+    avatarInitials: getAvatarInitials(resolvedName),
   }
 }
 
 export const authApi = {
-  getDefaultUser(): User {
-    return defaultUser
+  getDefaultUser(): User | null {
+    return null
   },
 
   async login(email: string, password: string): Promise<User> {
     try {
       const response = await userService.login(email, password)
 
-      return toSharedUser(response.user)
+      return toUser(response.role, email)
     } catch (error) {
       console.error('authApi.login failed', error)
       throw error
     }
   },
 
-  async register(
-    name: string,
-    email: string,
-    password: string,
-    role: Role,
-  ): Promise<User> {
+  async register(name: string, email: string, password: string, role: Role): Promise<User> {
     try {
       const response = await userService.register(name, email, password, role)
 
-      return toSharedUser(response.user)
+      return toUser(response.role, email, name)
     } catch (error) {
       console.error('authApi.register failed', error)
       throw error
     }
   },
 
-  async getCurrentUser(): Promise<User> {
+  async resetPassword(email: string): Promise<void> {
     try {
-      const user = await userService.getCurrentUser()
-
-      return toSharedUser(user)
+      await apiClient.post('/auth/reset-password', { email })
     } catch (error) {
-      console.error('authApi.getCurrentUser failed', error)
+      console.error('authApi.resetPassword failed', error)
       throw error
     }
   },
 
   async loginAsRole(_role: Role): Promise<User> {
-    try {
-      const user = await userService.getCurrentUser()
+    const error = new Error('Переключение ролей недоступно при подключении к backend.')
 
-      return toSharedUser(user)
-    } catch (error) {
-      console.error('authApi.loginAsRole failed', error)
-      throw error
-    }
+    console.error('authApi.loginAsRole failed', error)
+    throw error
   },
 }

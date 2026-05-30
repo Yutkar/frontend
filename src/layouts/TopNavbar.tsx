@@ -1,7 +1,9 @@
-import { Radio } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { Bell, Radio, ShieldCheck, LogOut } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
+import { useGlobalStore } from '@store/global'
+import { ThemeToggle } from '@shared/ui/core-components'
 
 type TopNavbarProps = {
   routes: AppRoute[]
@@ -9,7 +11,17 @@ type TopNavbarProps = {
 
 export function TopNavbar({ routes }: TopNavbarProps) {
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const user = useGlobalStore((state) => state.user)
+  const logout = useGlobalStore((state) => state.logout)
+
   const currentRoute = routes.find((route) => route.path === location.pathname)
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <header className="top-navbar">
@@ -22,7 +34,34 @@ export function TopNavbar({ routes }: TopNavbarProps) {
       </div>
 
       <div className="navbar-actions">
-        <span className="topbar-shell-label">{t.system.backendReady}</span>
+        <ThemeToggle />
+
+        <button className="notification-button" type="button">
+          <Bell size={18} />
+          <span>3</span>
+        </button>
+
+        {user ? (
+          <div className="user-chip">
+            <div className="avatar">{user.avatarInitials}</div>
+            <div>
+              <strong>{user.name}</strong>
+              <span>
+                <ShieldCheck size={13} />
+                {t.roles[user.role]}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        <button
+          onClick={handleLogout}
+          className="logout-button"
+          title="Выйти из системы"
+        >
+          <LogOut size={18} strokeWidth={2.5} />
+          <span>Выйти</span>
+        </button>
       </div>
     </header>
   )

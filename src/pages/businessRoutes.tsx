@@ -1,56 +1,90 @@
 import {
   Activity,
   BarChart3,
-  ClipboardList,
+  ClipboardPlus,
   LayoutDashboard,
   Monitor,
+  Settings,
+  ShieldCheck,
   Stethoscope,
 } from 'lucide-react'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { Analytics } from './Analytics'
-import { Board } from './Board'
-import { Dashboard } from './Dashboard'
-import { Queue } from './Queue'
-import { Specialist } from './Specialist'
-import { Tickets } from './Tickets'
+import { AnalyticsPage } from './AnalyticsPage'
+import { DashboardPage } from './DashboardPage'
+import { QueuePage } from './QueuePage'
+import { RegisterPage } from './RegisterPage'
+import { SettingsPage } from './SettingsPage'
+import { SpecialistPanelPage } from './SpecialistPanelPage'
+import { TicketCreatePage } from './TicketCreatePage'
+import { TvBoardPage } from './TvBoardPage'
+import { PasswordRecoveryPage } from './PasswordRecoveryPage'
 
 export const smartqBusinessRoutes: AppRoute[] = [
+  {
+    path: '/register',
+    label: 'Регистрация',
+    hideFromSidebar: true,
+    standalone: true,
+    public: true,
+    element: <RegisterPage />,
+  },
+  {
+    path: '/forgot-password',
+    label: 'Восстановление пароля',
+    hideFromSidebar: true,
+    standalone: true,
+    public: true,
+    element: <PasswordRecoveryPage />,
+  },
   {
     path: '/dashboard',
     label: t.nav.dashboard,
     icon: LayoutDashboard,
-    element: <Dashboard />,
+    allowedRoles: ['admin', 'manager'],
+    element: <DashboardPage />,
   },
   {
     path: '/queue',
     label: t.nav.queue,
     icon: Activity,
-    element: <Queue />,
+    allowedRoles: ['admin', 'manager'],
+    element: <QueuePage />,
   },
   {
     path: '/tickets',
-    label: t.nav.tickets,
-    icon: ClipboardList,
-    element: <Tickets />,
+    label: t.nav.createTicket,
+    icon: ClipboardPlus,
+    allowedRoles: ['admin', 'manager'],
+    element: <TicketCreatePage />,
   },
   {
     path: '/analytics',
     label: t.nav.analytics,
     icon: BarChart3,
-    element: <Analytics />,
+    allowedRoles: ['admin', 'manager'],
+    element: <AnalyticsPage />,
   },
   {
     path: '/specialist',
     label: t.nav.specialist,
     icon: Stethoscope,
-    element: <Specialist />,
+    allowedRoles: ['specialist'],
+    element: <SpecialistPanelPage />,
   },
   {
     path: '/board',
     label: t.nav.tvBoard,
     icon: Monitor,
     fullscreen: true,
-    element: <Board />,
+    allowedRoles: ['admin', 'manager'],
+    element: <TvBoardPage />,
+  },
+  {
+    path: '/settings',
+    label: t.nav.settings,
+    icon: Settings,
+    allowedRoles: ['admin', 'manager', 'specialist'],
+    element: <SettingsPage />,
   },
 ]

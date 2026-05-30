@@ -1,10 +1,12 @@
 export type TicketStatus =
+  | 'created'
   | 'waiting'
   | 'called'
   | 'in_service'
   | 'completed'
   | 'cancelled'
   | 'no_show'
+  | 'redirected'
 
 export type TicketPriority = 'low' | 'normal' | 'high'
 

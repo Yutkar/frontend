@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { IconButton } from '@shared/ui/core-components'
+import { useGlobalStore } from '@store/global'
 
 type SidebarProps = {
   collapsed: boolean
@@ -11,6 +12,14 @@ type SidebarProps = {
 }
 
 export function Sidebar({ collapsed, onToggle, routes }: SidebarProps) {
+  const user = useGlobalStore((state) => state.user)
+
+  // Фильтруем маршруты по ролям пользователя
+  const visibleRoutes = routes.filter((route) => {
+    if (!route.allowedRoles) return true
+    return route.allowedRoles.includes(user?.role || '')
+  })
+
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-brand">
@@ -27,7 +36,7 @@ export function Sidebar({ collapsed, onToggle, routes }: SidebarProps) {
       </div>
 
       <nav className="sidebar-nav">
-        {routes.map((route) => {
+        {visibleRoutes.map((route) => {
           const Icon = route.icon
 
           return (
