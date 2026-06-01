@@ -5,6 +5,7 @@ import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { Button } from '@shared/ui/components'
 import {
   getRoomActive,
+  getAdminErrorMessage,
   getRoomName,
   getRoomServiceTypeIds,
   getServiceTypeNames,
@@ -53,7 +54,7 @@ export function AdminRoomsPage() {
       setServiceTypes(nextServiceTypes)
     } catch (loadError) {
       console.error('Admin rooms load failed', loadError)
-      setError('Не удалось загрузить кабинеты.')
+      setError(getAdminErrorMessage(loadError, 'Не удалось загрузить кабинеты'))
     } finally {
       setLoading(false)
     }
@@ -118,7 +119,10 @@ export function AdminRoomsPage() {
       await loadData()
     } catch (saveError) {
       console.error('Admin room save failed', saveError)
-      setError('Не удалось сохранить кабинет.')
+      setError(getAdminErrorMessage(
+        saveError,
+        editingRoomId ? 'Не удалось сохранить кабинет' : 'Не удалось создать кабинет',
+      ))
     } finally {
       setSaving(false)
     }
@@ -137,7 +141,7 @@ export function AdminRoomsPage() {
       await loadData()
     } catch (deleteError) {
       console.error('Admin room delete failed', deleteError)
-      setError('Не удалось удалить кабинет.')
+      setError(getAdminErrorMessage(deleteError, 'Не удалось удалить кабинет'))
     }
   }
 

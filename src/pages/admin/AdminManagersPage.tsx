@@ -3,7 +3,7 @@ import { PlusCircle, ShieldCheck } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import type { User } from '@shared/types'
 import { Button } from '@shared/ui/components'
-import { getUserEmail } from './adminPageHelpers'
+import { getAdminErrorMessage, getUserEmail } from './adminPageHelpers'
 
 type ManagerFormState = {
   email: string
@@ -34,7 +34,7 @@ export function AdminManagersPage() {
       setManagers(await adminService.getManagers())
     } catch (loadError) {
       console.error('Admin managers load failed', loadError)
-      setError('Не удалось загрузить менеджеров.')
+      setError(getAdminErrorMessage(loadError, 'Не удалось загрузить менеджеров'))
     } finally {
       setLoading(false)
     }
@@ -94,7 +94,10 @@ export function AdminManagersPage() {
       await loadData()
     } catch (saveError) {
       console.error('Admin manager save failed', saveError)
-      setError('Не удалось сохранить менеджера.')
+      setError(getAdminErrorMessage(
+        saveError,
+        editingManagerId ? 'Не удалось сохранить менеджера' : 'Не удалось создать менеджера',
+      ))
     } finally {
       setSaving(false)
     }
@@ -113,7 +116,7 @@ export function AdminManagersPage() {
       await loadData()
     } catch (deleteError) {
       console.error('Admin manager delete failed', deleteError)
-      setError('Не удалось удалить менеджера.')
+      setError(getAdminErrorMessage(deleteError, 'Не удалось удалить менеджера'))
     }
   }
 

@@ -10,5 +10,6 @@ export type User = {
   department: string
   roomId?: string
   assignedRoomId?: string
+  roomAssignmentPending?: boolean
   avatarInitials: string
 }

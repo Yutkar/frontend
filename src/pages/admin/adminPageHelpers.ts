@@ -6,9 +6,11 @@ export type AdminRoomRecord = AdminRecord & {
   isActive?: boolean
   name?: string
   roomName?: string
+  services?: Array<string | number | { id?: string | number; name?: string; title?: string }>
   serviceTypeIds?: Array<string | number>
-  serviceTypes?: Array<string | number | { id?: string | number; name?: string }>
+  serviceTypes?: Array<string | number | { id?: string | number; name?: string; title?: string }>
   status?: string
+  title?: string
 }
 
 export const roleLabels: Record<Role, string> = {
@@ -19,10 +21,10 @@ export const roleLabels: Record<Role, string> = {
 
 export function getRoomName(room?: AdminRoomRecord): string {
   if (!room) {
-    return 'Не назначен'
+    return 'Кабинет не назначен'
   }
 
-  return room.name ?? room.roomName ?? `Кабинет ${room.id}`
+  return room.name ?? room.title ?? room.roomName ?? 'Без названия'
 }
 
 export function getRoomActive(room: AdminRoomRecord): boolean {
@@ -34,10 +36,12 @@ export function getRoomServiceTypeIds(room: AdminRoomRecord): string[] {
     return room.serviceTypeIds.map(String)
   }
 
-  if (Array.isArray(room.serviceTypes)) {
-    return room.serviceTypes.map((serviceType) => {
+  const services = room.serviceTypes ?? room.services
+
+  if (Array.isArray(services)) {
+    return services.map((serviceType) => {
       if (typeof serviceType === 'object' && serviceType !== null) {
-        return String(serviceType.id ?? serviceType.name ?? '')
+        return String(serviceType.id ?? serviceType.name ?? serviceType.title ?? '')
       }
 
       return String(serviceType)
@@ -68,4 +72,18 @@ export function getUserRoomId(user: User): string {
 
 export function getUserEmail(user: User): string {
   return user.email ?? 'Не указан'
+}
+
+export function getAdminErrorMessage(error: unknown, fallbackMessage: string): string {
+  if (error instanceof Error) {
+    if (error.message.includes('подключение')) {
+      return `${fallbackMessage}. Проверьте подключение к backend.`
+    }
+
+    if (error.message.includes('backend')) {
+      return error.message
+    }
+  }
+
+  return `${fallbackMessage}. Проверьте подключение к backend.`
 }

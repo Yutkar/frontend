@@ -4,6 +4,7 @@ import { adminService } from '@services/adminService'
 import type { User } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import {
+  getAdminErrorMessage,
   getRoomName,
   getUserEmail,
   getUserRoomId,
@@ -54,7 +55,7 @@ export function AdminStaffPage() {
       setRooms(nextRooms as AdminRoomRecord[])
     } catch (loadError) {
       console.error('Admin staff load failed', loadError)
-      setError('Не удалось загрузить персонал.')
+      setError(getAdminErrorMessage(loadError, 'Не удалось загрузить персонал'))
     } finally {
       setLoading(false)
     }
@@ -107,22 +108,25 @@ export function AdminStaffPage() {
     }
 
     try {
-      if (editingUserId) {
-        await adminService.updateStaff(editingUserId, payload)
-      } else if (form.role === 'manager') {
-        await adminService.createManager(payload)
-      } else {
-        await adminService.createDoctor(payload)
-      }
+      const savedUser = editingUserId
+        ? await adminService.updateStaff(editingUserId, payload)
+        : form.role === 'manager'
+          ? await adminService.createManager(payload)
+          : await adminService.createDoctor(payload)
 
-      setSuccessMessage(form.role === 'manager'
-        ? 'Менеджер успешно сохранён'
-        : 'Персонал успешно сохранён')
+      setSuccessMessage(savedUser.roomAssignmentPending
+        ? 'Врач создан. Кабинет можно назначить после обновления списка.'
+        : form.role === 'manager'
+          ? 'Менеджер успешно сохранён'
+          : 'Врач успешно сохранён')
       resetForm()
       await loadData()
     } catch (saveError) {
       console.error('Admin staff save failed', saveError)
-      setError('Не удалось сохранить персонал.')
+      setError(getAdminErrorMessage(
+        saveError,
+        editingUserId ? 'Не удалось сохранить врача' : 'Не удалось создать врача',
+      ))
     } finally {
       setSaving(false)
     }
@@ -137,11 +141,11 @@ export function AdminStaffPage() {
 
     try {
       await adminService.deleteStaff(staffMember.id)
-      setSuccessMessage('Сотрудник удалён')
+      setSuccessMessage('Врач удалён')
       await loadData()
     } catch (deleteError) {
       console.error('Admin staff delete failed', deleteError)
-      setError('Не удалось удалить сотрудника.')
+      setError(getAdminErrorMessage(deleteError, 'Не удалось удалить врача'))
     }
   }
 

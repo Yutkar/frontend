@@ -4,6 +4,7 @@ import { adminService } from '@services/adminService'
 import type { User } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import {
+  getAdminErrorMessage,
   getRoomName,
   getUserRoomId,
   type AdminRoomRecord,
@@ -35,7 +36,7 @@ export function AdminDoctorRoomsPage() {
       setRoomId((current) => current || String(nextRooms[0]?.id ?? ''))
     } catch (loadError) {
       console.error('Doctor room bindings load failed', loadError)
-      setError('Не удалось загрузить привязки врачей.')
+      setError(getAdminErrorMessage(loadError, 'Не удалось загрузить привязки врачей'))
     } finally {
       setLoading(false)
     }
@@ -62,7 +63,7 @@ export function AdminDoctorRoomsPage() {
       await loadData()
     } catch (saveError) {
       console.error('Doctor room binding save failed', saveError)
-      setError('Не удалось сохранить привязку.')
+      setError(getAdminErrorMessage(saveError, 'Не удалось сохранить привязку'))
     } finally {
       setSaving(false)
     }
