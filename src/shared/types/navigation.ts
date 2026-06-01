@@ -6,7 +6,7 @@ export type AppRoute = {
   path: string
   label: string
   element: ReactNode
-  icon: LucideIcon
+  icon?: LucideIcon
   allowedRoles?: Role[]
   fullscreen?: boolean
   hideFromSidebar?: boolean

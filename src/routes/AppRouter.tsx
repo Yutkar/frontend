@@ -18,7 +18,7 @@ function routePath(path: string): string {
 function GuardedRoute({ route }: { route: AppRoute }) {
   const user = useGlobalStore((state) => state.user)
   const initialized = useGlobalStore((state) => state.initialized)
-  const allowed = !route.allowedRoles || route.allowedRoles.includes(user?.role)
+  const allowed = !route.allowedRoles || (user ? route.allowedRoles.includes(user.role) : false)
 
   if (!initialized) {
     return null

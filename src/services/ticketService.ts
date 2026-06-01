@@ -1,10 +1,8 @@
-import { apiClient } from './api/client'
 import {
-  toArchitectureTicket,
-  toArchitectureTickets,
-  toBackendArchitectureTicketCreateInput,
-  type BackendTicket,
-} from './api/backendAdapters'
+  ticketApi,
+  type TicketSettingsOptions,
+  type TicketSettingsPayload,
+} from './api'
 import type {
   CreateTicketInput,
   Ticket,
@@ -14,9 +12,7 @@ import type {
 export const ticketService = {
   async getTickets(): Promise<Ticket[]> {
     try {
-      const response = await apiClient.get<BackendTicket[]>('/tickets')
-
-      return toArchitectureTickets(response.data)
+      return await ticketApi.getTickets()
     } catch (error) {
       console.error('ticketService.getTickets failed', error)
       throw error
@@ -25,9 +21,7 @@ export const ticketService = {
 
   async getTicketById(id: string): Promise<Ticket | undefined> {
     try {
-      const response = await apiClient.get<BackendTicket>(`/tickets/${id}`)
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.getTicketById(id)
     } catch (error) {
       console.error('ticketService.getTicketById failed', error)
       throw error
@@ -36,12 +30,7 @@ export const ticketService = {
 
   async createTicket(input: CreateTicketInput): Promise<Ticket> {
     try {
-      const response = await apiClient.post<BackendTicket>(
-        '/tickets',
-        toBackendArchitectureTicketCreateInput(input),
-      )
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.createTicket(input)
     } catch (error) {
       console.error('ticketService.createTicket failed', error)
       throw error
@@ -50,9 +39,7 @@ export const ticketService = {
 
   async arriveTicket(id: string): Promise<Ticket> {
     try {
-      const response = await apiClient.post<BackendTicket>(`/tickets/${id}/arrive`)
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.arriveTicket(id)
     } catch (error) {
       console.error('ticketService.arriveTicket failed', error)
       throw error
@@ -61,9 +48,7 @@ export const ticketService = {
 
   async callTicket(id: string): Promise<Ticket> {
     try {
-      const response = await apiClient.post<BackendTicket>(`/tickets/${id}/call`)
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.callTicket(id)
     } catch (error) {
       console.error('ticketService.callTicket failed', error)
       throw error
@@ -72,9 +57,7 @@ export const ticketService = {
 
   async startTicket(id: string): Promise<Ticket> {
     try {
-      const response = await apiClient.post<BackendTicket>(`/tickets/${id}/start`)
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.startTicket(id)
     } catch (error) {
       console.error('ticketService.startTicket failed', error)
       throw error
@@ -83,9 +66,7 @@ export const ticketService = {
 
   async completeTicket(id: string): Promise<Ticket> {
     try {
-      const response = await apiClient.post<BackendTicket>(`/tickets/${id}/complete`)
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.completeTicket(id)
     } catch (error) {
       console.error('ticketService.completeTicket failed', error)
       throw error
@@ -94,9 +75,7 @@ export const ticketService = {
 
   async cancelTicket(id: string): Promise<Ticket> {
     try {
-      const response = await apiClient.post<BackendTicket>(`/tickets/${id}/cancel`)
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.cancelTicket(id)
     } catch (error) {
       console.error('ticketService.cancelTicket failed', error)
       throw error
@@ -105,9 +84,7 @@ export const ticketService = {
 
   async noShowTicket(id: string): Promise<Ticket> {
     try {
-      const response = await apiClient.post<BackendTicket>(`/tickets/${id}/no-show`)
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.noShowTicket(id)
     } catch (error) {
       console.error('ticketService.noShowTicket failed', error)
       throw error
@@ -116,7 +93,7 @@ export const ticketService = {
 
   async skipTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketService.noShowTicket(id)
+      return await ticketApi.skipTicket(id)
     } catch (error) {
       console.error('ticketService.skipTicket failed', error)
       throw error
@@ -125,7 +102,7 @@ export const ticketService = {
 
   async returnTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketService.arriveTicket(id)
+      return await ticketApi.returnTicket(id)
     } catch (error) {
       console.error('ticketService.returnTicket failed', error)
       throw error
@@ -134,11 +111,7 @@ export const ticketService = {
 
   async redirectTicket(id: string, newRoomId: string | number): Promise<Ticket> {
     try {
-      const response = await apiClient.post<BackendTicket>(`/tickets/${id}/redirect`, {
-        newRoomId: Number(newRoomId),
-      })
-
-      return toArchitectureTicket(response.data)
+      return await ticketApi.redirectTicket(id, newRoomId)
     } catch (error) {
       console.error('ticketService.redirectTicket failed', error)
       throw error
@@ -147,33 +120,27 @@ export const ticketService = {
 
   async updateTicketStatus(input: UpdateTicketStatusInput): Promise<Ticket | undefined> {
     try {
-      if (input.status === 'waiting') {
-        return await ticketService.arriveTicket(input.ticketId)
-      }
-
-      if (input.status === 'called') {
-        return await ticketService.callTicket(input.ticketId)
-      }
-
-      if (input.status === 'in_service') {
-        return await ticketService.startTicket(input.ticketId)
-      }
-
-      if (input.status === 'completed') {
-        return await ticketService.completeTicket(input.ticketId)
-      }
-
-      if (input.status === 'cancelled') {
-        return await ticketService.cancelTicket(input.ticketId)
-      }
-
-      if (input.status === 'no_show') {
-        return await ticketService.noShowTicket(input.ticketId)
-      }
-
-      return await ticketService.getTicketById(input.ticketId)
+      return await ticketApi.updateTicketStatus(input)
     } catch (error) {
       console.error('ticketService.updateTicketStatus failed', error)
+      throw error
+    }
+  },
+
+  async getTicketSettingsOptions(): Promise<TicketSettingsOptions> {
+    try {
+      return await ticketApi.getTicketSettingsOptions()
+    } catch (error) {
+      console.error('ticketService.getTicketSettingsOptions failed', error)
+      throw error
+    }
+  },
+
+  async updateTicketSettings(id: string, payload: TicketSettingsPayload): Promise<void> {
+    try {
+      await ticketApi.updateTicketSettings(id, payload)
+    } catch (error) {
+      console.error('ticketService.updateTicketSettings failed', error)
       throw error
     }
   },

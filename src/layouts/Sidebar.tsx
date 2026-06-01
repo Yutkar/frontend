@@ -17,7 +17,7 @@ export function Sidebar({ collapsed, onToggle, routes }: SidebarProps) {
   // Фильтруем маршруты по ролям пользователя
   const visibleRoutes = routes.filter((route) => {
     if (!route.allowedRoles) return true
-    return route.allowedRoles.includes(user?.role || '')
+    return user ? route.allowedRoles.includes(user.role) : false
   })
 
   return (
@@ -38,6 +38,10 @@ export function Sidebar({ collapsed, onToggle, routes }: SidebarProps) {
       <nav className="sidebar-nav">
         {visibleRoutes.map((route) => {
           const Icon = route.icon
+
+          if (!Icon) {
+            return null
+          }
 
           return (
             <NavLink className="sidebar-link" key={route.path} to={route.path}>

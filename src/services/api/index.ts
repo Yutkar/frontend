@@ -1,4 +1,35 @@
-export { apiClient } from './client'
-export { authApi } from './authApi'
-export { queueApi } from './queueApi'
+import { API_MODE } from './apiProvider'
+import { backendAdminApi } from './backend/backendAdminApi'
+import { backendAuthApi } from './backend/backendAuthApi'
+import { backendKioskApi } from './backend/backendKioskApi'
+import { backendQueueApi } from './backend/backendQueueApi'
+import { backendTicketApi } from './backend/backendTicketApi'
+import { mockAdminApi } from './mock/mockAdminApi'
+import { mockAuthApi } from './mock/mockAuthApi'
+import { mockKioskApi } from './mock/mockKioskApi'
+import { mockQueueApi } from './mock/mockQueueApi'
+import { mockTicketApi } from './mock/mockTicketApi'
+
+export const ticketApi = API_MODE === 'backend' ? backendTicketApi : mockTicketApi
+export const queueApi = API_MODE === 'backend' ? backendQueueApi : mockQueueApi
+export const authApi = API_MODE === 'backend' ? backendAuthApi : mockAuthApi
+export const adminApi = API_MODE === 'backend' ? backendAdminApi : mockAdminApi
+export const kioskApi = API_MODE === 'backend' ? backendKioskApi : mockKioskApi
+
 export { socketClient } from './socketClient'
+export type {
+  AdminApi,
+  AdminRecord,
+  AdminRecordInput,
+  AdminUserInput,
+  AuthApi,
+  KioskApi,
+  QueueApi,
+  QueueListener,
+  QueueOverloadRoom,
+  TicketApi,
+  TicketSettingsOptions,
+  TicketSettingsPayload,
+  TicketSettingsServiceTypeOption,
+  TicketSettingsUserOption,
+} from './types'

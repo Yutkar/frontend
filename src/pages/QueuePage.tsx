@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { ArrowDownUp, Radio } from 'lucide-react'
+import { ArrowDownUp, Radio, SlidersHorizontal } from 'lucide-react'
 import { QueueStatusRail } from '@features/queue/QueueStatusRail'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
-import type { TicketPriority, TicketStatus } from '@shared/types'
+import { TicketSettingsModal } from '@features/tickets/TicketSettingsModal'
+import type { Ticket, TicketPriority, TicketStatus } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, QueueTableBase, TicketCard } from '@shared/ui/components'
+import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 import { DashboardKpis, RecentCallsWidget, RoomLoadWidget } from '@widgets'
 
@@ -32,16 +34,21 @@ export function QueuePage() {
   useQueueBootstrap()
 
   const [sortBy, setSortBy] = useState<QueueSort>('priority')
+  const [settingsTicket, setSettingsTicket] = useState<Ticket | undefined>()
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const events = useQueueStore((state) => state.events)
+  const loadQueue = useQueueStore((state) => state.loadQueue)
   const loading = useQueueStore((state) => state.loading)
   const rooms = useQueueStore((state) => state.rooms)
   const selectedTicketId = useQueueStore((state) => state.selectedTicketId)
   const selectTicket = useQueueStore((state) => state.selectTicket)
   const tickets = useQueueStore((state) => state.tickets)
+  const user = useGlobalStore((state) => state.user)
 
   const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0]
   const dispatchRoom = rooms.find((room) => room.status === 'open') ?? rooms[0]
+  const canManageTicketSettings = user?.role === 'admin' || user?.role === 'manager'
+  const canUseQueueActions = user?.role === 'admin'
   const sortedTickets = useMemo(() => {
     return [...tickets].sort((left, right) => {
       if (sortBy === 'eta') {
@@ -89,21 +96,35 @@ export function QueuePage() {
                   </button>
                 ))}
               </div>
-              <Button
-                disabled={!dispatchRoom || loading}
-                icon={<Radio size={17} />}
-                onClick={() => dispatchRoom && void callNextTicket(dispatchRoom.id)}
-                variant="primary"
-              >
-                {t.queue.callNext}
-              </Button>
+              {canUseQueueActions ? (
+                <Button
+                  disabled={!dispatchRoom || loading}
+                  icon={<Radio size={17} />}
+                  onClick={() => dispatchRoom && void callNextTicket(dispatchRoom.id)}
+                  variant="primary"
+                >
+                  {t.queue.callNext}
+                </Button>
+              ) : null}
             </div>
           </div>
           <QueueTableBase
             actionSlot={(ticket) => (
-              <Button onClick={() => selectTicket(ticket.id)} size="sm" variant="ghost">
-                {t.queue.focus}
-              </Button>
+              <div className="button-row">
+                <Button onClick={() => selectTicket(ticket.id)} size="sm" variant="ghost">
+                  {t.queue.focus}
+                </Button>
+                {canManageTicketSettings ? (
+                  <Button
+                    icon={<SlidersHorizontal size={15} />}
+                    onClick={() => setSettingsTicket(ticket)}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Настройки
+                  </Button>
+                ) : null}
+              </div>
             )}
             onSelectTicket={(ticket) => selectTicket(ticket.id)}
             rooms={rooms}
@@ -114,6 +135,18 @@ export function QueuePage() {
         <aside className="side-column">
           {selectedTicket ? (
             <TicketCard
+              actionSlot={
+                canManageTicketSettings ? (
+                  <Button
+                    icon={<SlidersHorizontal size={16} />}
+                    onClick={() => setSettingsTicket(selectedTicket)}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Настройки
+                  </Button>
+                ) : null
+              }
               room={rooms.find((room) => room.id === selectedTicket.roomId)}
               ticket={selectedTicket}
             />
@@ -122,6 +155,14 @@ export function QueuePage() {
           <RecentCallsWidget events={events} />
         </aside>
       </section>
+
+      <TicketSettingsModal
+        fallbackRooms={rooms}
+        onClose={() => setSettingsTicket(undefined)}
+        onSaved={loadQueue}
+        open={Boolean(settingsTicket)}
+        ticket={settingsTicket}
+      />
     </div>
   )
 }
