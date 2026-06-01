@@ -1,4 +1,8 @@
-import { ticketApi } from './api'
+import {
+  ticketApi,
+  type TicketSettingsOptions,
+  type TicketSettingsPayload,
+} from './api'
 import type {
   CreateTicketInput,
   Ticket,
@@ -119,6 +123,24 @@ export const ticketService = {
       return await ticketApi.updateTicketStatus(input)
     } catch (error) {
       console.error('ticketService.updateTicketStatus failed', error)
+      throw error
+    }
+  },
+
+  async getTicketSettingsOptions(): Promise<TicketSettingsOptions> {
+    try {
+      return await ticketApi.getTicketSettingsOptions()
+    } catch (error) {
+      console.error('ticketService.getTicketSettingsOptions failed', error)
+      throw error
+    }
+  },
+
+  async updateTicketSettings(id: string, payload: TicketSettingsPayload): Promise<void> {
+    try {
+      await ticketApi.updateTicketSettings(id, payload)
+    } catch (error) {
+      console.error('ticketService.updateTicketSettings failed', error)
       throw error
     }
   },

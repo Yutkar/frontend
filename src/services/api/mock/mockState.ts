@@ -17,7 +17,11 @@ import type {
   Ticket as ArchitectureTicket,
   TicketPriority as ArchitectureTicketPriority,
 } from '../../../types'
-import type { QueueOverloadRoom } from '../types'
+import type {
+  QueueOverloadRoom,
+  TicketSettingsPayload,
+  TicketSettingsServiceTypeOption,
+} from '../types'
 
 const sharedServiceTypeByArchitectureId: Record<string, SharedServiceType> = {
   '1': 'consultation',
@@ -70,6 +74,19 @@ const priorityWeight: Record<SharedTicketPriority, number> = {
   normal: 2,
   low: 1,
 }
+
+const serviceTypeOptions: TicketSettingsServiceTypeOption[] = [
+  'registration',
+  'consultation',
+  'diagnostics',
+  'laboratory',
+  'pharmacy',
+  'billing',
+].map((serviceType) => ({
+  code: serviceType as SharedServiceType,
+  id: Object.entries(sharedServiceTypeByArchitectureId).find(([, value]) => value === serviceType)?.[0] ?? serviceType,
+  name: getServiceTypeLabel(serviceType as SharedServiceType),
+}))
 
 let queueSnapshot = createInitialQueueSnapshot()
 
@@ -213,6 +230,10 @@ export function createArchitectureTicket(input: ArchitectureCreateTicketInput): 
   return toArchitectureTicket(ticket)
 }
 
+export function getMockServiceTypeOptions(): TicketSettingsServiceTypeOption[] {
+  return clone(serviceTypeOptions)
+}
+
 export function updateSharedTicketStatus(
   id: string,
   status: SharedTicketStatus,
@@ -258,6 +279,54 @@ export function redirectSharedTicket(id: string, newRoomId: string | number): Sh
   ticket.status = 'redirected'
   ticket.roomId = String(newRoomId)
   pushEvent(ticket, 'redirected')
+  refreshQueueSnapshot()
+
+  return clone(ticket)
+}
+
+export function updateSharedTicketSettings(id: string, payload: TicketSettingsPayload): SharedTicket {
+  const ticket = findSharedTicket(id)
+
+  if (payload.serviceType) {
+    ticket.serviceType = payload.serviceType
+  } else if (payload.serviceTypeId) {
+    ticket.serviceType = sharedServiceTypeByArchitectureId[String(payload.serviceTypeId)] ?? ticket.serviceType
+  }
+
+  if (payload.roomId !== undefined) {
+    ticket.roomId = payload.roomId ? String(payload.roomId) : undefined
+  }
+
+  if (payload.doctorId !== undefined) {
+    ticket.assignedTo = payload.doctorId ? String(payload.doctorId) : undefined
+  }
+
+  if (payload.priority) {
+    ticket.priority = payload.priority
+  }
+
+  if (payload.comment !== undefined) {
+    ticket.notes = payload.comment.trim() || undefined
+  }
+
+  if (payload.etaMinutes !== undefined) {
+    ticket.etaMinutes = Math.max(0, Math.round(payload.etaMinutes))
+  }
+
+  if (payload.status) {
+    const updatedTicket = updateSharedTicketStatus(id, payload.status)
+
+    return {
+      ...updatedTicket,
+      serviceType: ticket.serviceType,
+      roomId: ticket.roomId,
+      assignedTo: ticket.assignedTo,
+      priority: ticket.priority,
+      notes: ticket.notes,
+      etaMinutes: ticket.etaMinutes,
+    }
+  }
+
   refreshQueueSnapshot()
 
   return clone(ticket)

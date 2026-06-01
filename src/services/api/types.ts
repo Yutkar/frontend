@@ -1,8 +1,12 @@
 import type {
   QueueSnapshot,
   RedirectTicketInput,
+  Room as SharedRoom,
+  ServiceType as SharedServiceType,
   Ticket as SharedTicket,
   TicketCreateInput as SharedTicketCreateInput,
+  TicketPriority as SharedTicketPriority,
+  TicketStatus as SharedTicketStatus,
   User as SharedUser,
 } from '@shared/types'
 import type {
@@ -17,6 +21,35 @@ export type QueueOverloadRoom = {
   roomId: string
   roomName: string
   queueCount: number
+}
+
+export type TicketSettingsServiceTypeOption = {
+  id: string | number
+  code: SharedServiceType
+  name: string
+}
+
+export type TicketSettingsUserOption = {
+  id: string | number
+  name: string
+  role?: SharedUser['role']
+}
+
+export type TicketSettingsOptions = {
+  rooms: Pick<SharedRoom, 'id' | 'name'>[]
+  serviceTypes: TicketSettingsServiceTypeOption[]
+  specialists: TicketSettingsUserOption[]
+}
+
+export type TicketSettingsPayload = {
+  serviceTypeId?: string | number
+  serviceType?: SharedServiceType
+  roomId?: string | number
+  doctorId?: string | number
+  priority?: SharedTicketPriority
+  status?: SharedTicketStatus
+  comment?: string
+  etaMinutes?: number
 }
 
 export type TicketApi = {
@@ -34,6 +67,8 @@ export type TicketApi = {
   returnTicket: (id: string) => Promise<ArchitectureTicket>
   redirectTicket: (id: string, newRoomId: string | number) => Promise<ArchitectureTicket>
   updateTicketStatus: (input: UpdateTicketStatusInput) => Promise<ArchitectureTicket | undefined>
+  getTicketSettingsOptions: () => Promise<TicketSettingsOptions>
+  updateTicketSettings: (id: string, payload: TicketSettingsPayload) => Promise<void>
 }
 
 export type QueueListener = (tickets: ArchitectureTicket[]) => void

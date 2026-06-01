@@ -28,4 +28,8 @@ export type {
   QueueListener,
   QueueOverloadRoom,
   TicketApi,
+  TicketSettingsOptions,
+  TicketSettingsPayload,
+  TicketSettingsServiceTypeOption,
+  TicketSettingsUserOption,
 } from './types'

@@ -1,11 +1,15 @@
+import { mockUsers } from '@mock/auth.mock'
 import type { TicketStatus } from '../../../types'
 import type { TicketApi } from '../types'
 import {
   createArchitectureTicket,
   getArchitectureTicketById,
   getArchitectureTickets,
+  getMockServiceTypeOptions,
+  getQueueSnapshot,
   redirectSharedTicket,
   toArchitectureTicket,
+  updateSharedTicketSettings,
   updateSharedTicketStatus,
 } from './mockState'
 
@@ -68,5 +72,30 @@ export const mockTicketApi: TicketApi = {
 
   updateTicketStatus(input) {
     return Promise.resolve(updateTicketStatus(input.ticketId, input.status))
+  },
+
+  getTicketSettingsOptions() {
+    const snapshot = getQueueSnapshot()
+
+    return Promise.resolve({
+      rooms: snapshot.rooms.map((room) => ({
+        id: room.id,
+        name: room.name,
+      })),
+      serviceTypes: getMockServiceTypeOptions(),
+      specialists: Object.values(mockUsers)
+        .filter((user) => user.role === 'specialist')
+        .map((user) => ({
+          id: user.id,
+          name: user.name,
+          role: user.role,
+        })),
+    })
+  },
+
+  updateTicketSettings(id, payload) {
+    updateSharedTicketSettings(id, payload)
+
+    return Promise.resolve()
   },
 }
