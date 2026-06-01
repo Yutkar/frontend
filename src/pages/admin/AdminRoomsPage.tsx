@@ -1,0 +1,257 @@
+import { useEffect, useState, type FormEvent } from 'react'
+import { Building2, PlusCircle } from 'lucide-react'
+import { adminService } from '@services/adminService'
+import type { TicketSettingsServiceTypeOption } from '@services/api'
+import { Button } from '@shared/ui/components'
+import {
+  getRoomActive,
+  getRoomName,
+  getRoomServiceTypeIds,
+  getServiceTypeNames,
+  type AdminRoomRecord,
+} from './adminPageHelpers'
+
+type RoomFormState = {
+  active: boolean
+  name: string
+  serviceTypeIds: string[]
+}
+
+const emptyForm: RoomFormState = {
+  active: true,
+  name: '',
+  serviceTypeIds: [],
+}
+
+function normalizeId(value: string): string | number {
+  const numberValue = Number(value)
+
+  return Number.isFinite(numberValue) && value.trim() !== '' ? numberValue : value
+}
+
+export function AdminRoomsPage() {
+  const [editingRoomId, setEditingRoomId] = useState<string | number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState<RoomFormState>(emptyForm)
+  const [loading, setLoading] = useState(true)
+  const [rooms, setRooms] = useState<AdminRoomRecord[]>([])
+  const [saving, setSaving] = useState(false)
+  const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  async function loadData() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [nextRooms, nextServiceTypes] = await Promise.all([
+        adminService.getRooms(),
+        adminService.getServiceTypes(),
+      ])
+
+      setRooms(nextRooms as AdminRoomRecord[])
+      setServiceTypes(nextServiceTypes)
+    } catch (loadError) {
+      console.error('Admin rooms load failed', loadError)
+      setError('Не удалось загрузить кабинеты.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadData()
+  }, [])
+
+  function resetForm() {
+    setEditingRoomId(null)
+    setForm(emptyForm)
+    setError(null)
+  }
+
+  function handleEdit(room: AdminRoomRecord) {
+    setEditingRoomId(room.id)
+    setForm({
+      active: getRoomActive(room),
+      name: getRoomName(room),
+      serviceTypeIds: getRoomServiceTypeIds(room),
+    })
+    setSuccessMessage(null)
+  }
+
+  function toggleServiceType(id: string) {
+    setForm((current) => ({
+      ...current,
+      serviceTypeIds: current.serviceTypeIds.includes(id)
+        ? current.serviceTypeIds.filter((item) => item !== id)
+        : [...current.serviceTypeIds, id],
+    }))
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!form.name.trim()) {
+      setError('Введите название кабинета.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    const payload = {
+      active: form.active,
+      isActive: form.active,
+      name: form.name.trim(),
+      serviceTypeIds: form.serviceTypeIds.map(normalizeId),
+    }
+
+    try {
+      if (editingRoomId) {
+        await adminService.updateRoom(editingRoomId, payload)
+      } else {
+        await adminService.createRoom(payload)
+      }
+
+      setSuccessMessage('Кабинет успешно сохранён')
+      resetForm()
+      await loadData()
+    } catch (saveError) {
+      console.error('Admin room save failed', saveError)
+      setError('Не удалось сохранить кабинет.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(room: AdminRoomRecord) {
+    if (!window.confirm(`Удалить кабинет "${getRoomName(room)}"?`)) {
+      return
+    }
+
+    setError(null)
+
+    try {
+      await adminService.deleteRoom(room.id)
+      setSuccessMessage('Кабинет удалён')
+      await loadData()
+    } catch (deleteError) {
+      console.error('Admin room delete failed', deleteError)
+      setError('Не удалось удалить кабинет.')
+    }
+  }
+
+  return (
+    <div className="page-stack">
+      <section className="admin-page-grid">
+        <div className="primary-panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">
+                <Building2 size={14} />
+                Администрирование
+              </span>
+              <h2>Кабинеты</h2>
+            </div>
+            <Button icon={<PlusCircle size={17} />} onClick={resetForm} variant="secondary">
+              Добавить кабинет
+            </Button>
+          </div>
+
+          {error ? <div className="modal-error">{error}</div> : null}
+          {successMessage ? <div className="modal-success">{successMessage}</div> : null}
+
+          {loading ? (
+            <div className="empty-state compact-empty">
+              <h2>Загружаем кабинеты</h2>
+            </div>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Название кабинета</th>
+                    <th>Типы услуг</th>
+                    <th>Активен</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rooms.map((room) => (
+                    <tr key={String(room.id)}>
+                      <td>{getRoomName(room)}</td>
+                      <td>{getServiceTypeNames(room, serviceTypes)}</td>
+                      <td>{getRoomActive(room) ? 'Да' : 'Нет'}</td>
+                      <td>
+                        <div className="button-row">
+                          <Button onClick={() => handleEdit(room)} size="sm" variant="secondary">
+                            Редактировать
+                          </Button>
+                          <Button onClick={() => void handleDelete(room)} size="sm" variant="danger">
+                            Удалить
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <aside className="widget-panel admin-form-panel">
+          <form className="admin-form" onSubmit={handleSubmit}>
+            <div className="panel-header">
+              <div>
+                <span className="eyebrow">Кабинет</span>
+                <h2>{editingRoomId ? 'Редактировать кабинет' : 'Добавить кабинет'}</h2>
+              </div>
+            </div>
+
+            <label className="field">
+              <span>Название кабинета</span>
+              <input
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Кабинет 101"
+                value={form.name}
+              />
+            </label>
+
+            <fieldset className="admin-checkbox-group">
+              <legend>Типы услуг</legend>
+              {serviceTypes.map((serviceType) => (
+                <label key={String(serviceType.id)}>
+                  <input
+                    checked={form.serviceTypeIds.includes(String(serviceType.id))}
+                    onChange={() => toggleServiceType(String(serviceType.id))}
+                    type="checkbox"
+                  />
+                  <span>{serviceType.name}</span>
+                </label>
+              ))}
+            </fieldset>
+
+            <label className="admin-toggle-row">
+              <input
+                checked={form.active}
+                onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))}
+                type="checkbox"
+              />
+              <span>Активен</span>
+            </label>
+
+            <div className="modal-actions">
+              <Button disabled={saving} onClick={resetForm} variant="ghost">
+                Отмена
+              </Button>
+              <Button disabled={saving} type="submit" variant="primary">
+                Сохранить
+              </Button>
+            </div>
+          </form>
+        </aside>
+      </section>
+    </div>
+  )
+}

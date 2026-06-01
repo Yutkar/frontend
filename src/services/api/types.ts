@@ -52,6 +52,13 @@ export type TicketSettingsPayload = {
   etaMinutes?: number
 }
 
+export type TicketCreateSettingsPayload = TicketSettingsPayload & {
+  priority: SharedTicketPriority
+  serviceTypeId: string | number
+  serviceType?: SharedServiceType
+  status: SharedTicketStatus
+}
+
 export type TicketApi = {
   getTickets: () => Promise<ArchitectureTicket[]>
   getTicketById: (id: string) => Promise<ArchitectureTicket | undefined>
@@ -67,6 +74,7 @@ export type TicketApi = {
   returnTicket: (id: string) => Promise<ArchitectureTicket>
   redirectTicket: (id: string, newRoomId: string | number) => Promise<ArchitectureTicket>
   updateTicketStatus: (input: UpdateTicketStatusInput) => Promise<ArchitectureTicket | undefined>
+  createTicketWithSettings: (payload: TicketCreateSettingsPayload) => Promise<SharedTicket>
   getTicketSettingsOptions: () => Promise<TicketSettingsOptions>
   updateTicketSettings: (id: string, payload: TicketSettingsPayload) => Promise<void>
 }
@@ -126,6 +134,7 @@ export type AdminUserInput = Partial<SharedUser> & {
 }
 
 export type AdminApi = {
+  getServiceTypes: () => Promise<TicketSettingsServiceTypeOption[]>
   getRooms: () => Promise<AdminRecord[]>
   createRoom: (input: AdminRecordInput) => Promise<AdminRecord>
   updateRoom: (id: string | number, input: AdminRecordInput) => Promise<AdminRecord>
@@ -138,8 +147,10 @@ export type AdminApi = {
   createUser: (input: AdminUserInput) => Promise<SharedUser>
   updateUser: (id: string | number, input: Partial<AdminUserInput>) => Promise<SharedUser>
   deleteUser: (id: string | number) => Promise<void>
+  assignDoctorToRoom: (userId: string | number, roomId: string | number) => Promise<SharedUser>
 }
 
 export type KioskApi = {
   createTicket: (input: SharedTicketCreateInput) => Promise<SharedTicket>
+  createTicketForKiosk: (input: TicketCreateSettingsPayload) => Promise<SharedTicket>
 }

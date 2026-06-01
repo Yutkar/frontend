@@ -28,6 +28,7 @@ export type {
   QueueListener,
   QueueOverloadRoom,
   TicketApi,
+  TicketCreateSettingsPayload,
   TicketSettingsOptions,
   TicketSettingsPayload,
   TicketSettingsServiceTypeOption,

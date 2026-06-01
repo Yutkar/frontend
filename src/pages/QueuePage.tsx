@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { ArrowDownUp, Radio, SlidersHorizontal } from 'lucide-react'
+import { ArrowDownUp, PlusCircle, Radio, SlidersHorizontal } from 'lucide-react'
 import { QueueStatusRail } from '@features/queue/QueueStatusRail'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
+import { TicketManualCreateModal } from '@features/tickets/TicketManualCreateModal'
 import { TicketSettingsModal } from '@features/tickets/TicketSettingsModal'
 import type { Ticket, TicketPriority, TicketStatus } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
@@ -15,8 +16,9 @@ type QueueSort = 'priority' | 'eta' | 'status'
 const priorityOrder: Record<TicketPriority, number> = {
   critical: 0,
   high: 1,
-  normal: 2,
-  low: 3,
+  above_normal: 2,
+  normal: 3,
+  low: 4,
 }
 
 const statusOrder: Record<TicketStatus, number> = {
@@ -33,8 +35,10 @@ const statusOrder: Record<TicketStatus, number> = {
 export function QueuePage() {
   useQueueBootstrap()
 
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [sortBy, setSortBy] = useState<QueueSort>('priority')
   const [settingsTicket, setSettingsTicket] = useState<Ticket | undefined>()
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const events = useQueueStore((state) => state.events)
   const loadQueue = useQueueStore((state) => state.loadQueue)
@@ -63,10 +67,16 @@ export function QueuePage() {
     })
   }, [sortBy, tickets])
 
+  async function handleTicketSaved() {
+    await loadQueue()
+    setSuccessMessage('Талон успешно сохранён')
+  }
+
   return (
     <div className="page-stack">
       <DashboardKpis />
       <QueueStatusRail tickets={tickets} />
+      {successMessage ? <div className="modal-success">{successMessage}</div> : null}
 
       <section className="content-grid">
         <div className="primary-panel">
@@ -76,6 +86,18 @@ export function QueuePage() {
               <h2>{t.queue.liveTicketTable}</h2>
             </div>
             <div className="queue-toolbar">
+              {canManageTicketSettings ? (
+                <Button
+                  icon={<PlusCircle size={17} />}
+                  onClick={() => {
+                    setSuccessMessage(null)
+                    setCreateModalOpen(true)
+                  }}
+                  variant="secondary"
+                >
+                  Создать талон
+                </Button>
+              ) : null}
               <div className="sort-control">
                 <span>
                   <ArrowDownUp size={14} />
@@ -117,11 +139,14 @@ export function QueuePage() {
                 {canManageTicketSettings ? (
                   <Button
                     icon={<SlidersHorizontal size={15} />}
-                    onClick={() => setSettingsTicket(ticket)}
+                    onClick={() => {
+                      setSuccessMessage(null)
+                      setSettingsTicket(ticket)
+                    }}
                     size="sm"
                     variant="secondary"
                   >
-                    Настройки
+                    Редактировать
                   </Button>
                 ) : null}
               </div>
@@ -139,11 +164,14 @@ export function QueuePage() {
                 canManageTicketSettings ? (
                   <Button
                     icon={<SlidersHorizontal size={16} />}
-                    onClick={() => setSettingsTicket(selectedTicket)}
+                    onClick={() => {
+                      setSuccessMessage(null)
+                      setSettingsTicket(selectedTicket)
+                    }}
                     size="sm"
                     variant="secondary"
                   >
-                    Настройки
+                    Редактировать
                   </Button>
                 ) : null
               }
@@ -159,9 +187,15 @@ export function QueuePage() {
       <TicketSettingsModal
         fallbackRooms={rooms}
         onClose={() => setSettingsTicket(undefined)}
-        onSaved={loadQueue}
+        onSaved={handleTicketSaved}
         open={Boolean(settingsTicket)}
         ticket={settingsTicket}
+      />
+      <TicketManualCreateModal
+        fallbackRooms={rooms}
+        onClose={() => setCreateModalOpen(false)}
+        onSaved={handleTicketSaved}
+        open={createModalOpen}
       />
     </div>
   )

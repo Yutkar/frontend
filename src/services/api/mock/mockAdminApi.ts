@@ -1,7 +1,7 @@
 import { mockUsers } from '@mock/auth.mock'
 import type { User } from '@shared/types'
 import type { AdminApi, AdminRecord, AdminRecordInput, AdminUserInput } from '../types'
-import { getQueueSnapshot } from './mockState'
+import { getMockServiceTypeOptions, getQueueSnapshot } from './mockState'
 
 let rooms = getQueueSnapshot().rooms.map<AdminRecord>((room) => ({ ...room }))
 let staff: AdminRecord[] = [
@@ -55,13 +55,29 @@ function createUserRecord(input: AdminUserInput): User {
   const user: User = {
     avatarInitials: input.avatarInitials ?? input.name.slice(0, 2).toUpperCase(),
     department: input.department ?? 'SmartQ',
+    email: input.email,
     id: input.id ?? nextId('user'),
     name: input.name,
     role: input.role,
+    assignedRoomId: input.roomId,
     roomId: input.roomId,
   }
 
   users = [...users, user]
+
+  if (user.role === 'specialist') {
+    staff = [
+      ...staff,
+      {
+        department: user.department,
+        email: user.email,
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        roomId: user.roomId,
+      },
+    ]
+  }
 
   return clone(user)
 }
@@ -76,12 +92,29 @@ function updateUserRecord(id: string | number, input: Partial<AdminUserInput>): 
   users[index] = {
     ...users[index],
     ...input,
+    assignedRoomId: input.roomId ?? input.assignedRoomId ?? users[index].assignedRoomId,
+    roomId: input.roomId ?? input.assignedRoomId ?? users[index].roomId,
+  }
+
+  const staffIndex = staff.findIndex((member) => String(member.id) === String(id))
+
+  if (staffIndex !== -1) {
+    staff[staffIndex] = {
+      ...staff[staffIndex],
+      ...input,
+      assignedRoomId: input.roomId ?? input.assignedRoomId ?? staff[staffIndex].assignedRoomId,
+      roomId: input.roomId ?? input.assignedRoomId ?? staff[staffIndex].roomId,
+    }
   }
 
   return clone(users[index])
 }
 
 export const mockAdminApi: AdminApi = {
+  getServiceTypes() {
+    return Promise.resolve(getMockServiceTypeOptions())
+  },
+
   getRooms() {
     return Promise.resolve(clone(rooms))
   },
@@ -146,7 +179,15 @@ export const mockAdminApi: AdminApi = {
 
   deleteUser(id) {
     users = users.filter((user) => String(user.id) !== String(id))
+    staff = staff.filter((member) => String(member.id) !== String(id))
 
     return Promise.resolve()
+  },
+
+  assignDoctorToRoom(userId, roomId) {
+    return Promise.resolve(updateUserRecord(userId, {
+      assignedRoomId: String(roomId),
+      roomId: String(roomId),
+    }))
   },
 }

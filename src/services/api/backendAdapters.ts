@@ -98,6 +98,15 @@ const serviceTypeByBackendName: Record<string, ServiceType> = {
   pharmacy: 'pharmacy',
   registration: 'registration',
   xray: 'diagnostics',
+  анализы: 'laboratory',
+  аптека: 'pharmacy',
+  диагностика: 'diagnostics',
+  другое: 'registration',
+  консультация: 'consultation',
+  лаборатория: 'laboratory',
+  оплата: 'billing',
+  регистрация: 'registration',
+  рентген: 'diagnostics',
 }
 
 const architectureServiceByBackendName: Record<string, ArchitectureServiceType['code']> = {
@@ -129,6 +138,10 @@ export function toBackendPriority(priority?: TicketPriority | ArchitectureTicket
     return 4
   }
 
+  if (priority === 'above_normal') {
+    return 3
+  }
+
   if (priority === 'critical') {
     return 5
   }
@@ -145,8 +158,12 @@ export function toSharedPriority(priority = 2): TicketPriority {
     return 'critical'
   }
 
-  if (priority >= 3) {
+  if (priority >= 4) {
     return 'high'
+  }
+
+  if (priority >= 3) {
+    return 'above_normal'
   }
 
   return 'normal'

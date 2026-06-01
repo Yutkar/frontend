@@ -9,6 +9,7 @@ export type AppRoute = {
   icon?: LucideIcon
   allowedRoles?: Role[]
   fullscreen?: boolean
+  groupLabel?: string
   hideFromSidebar?: boolean
   standalone?: boolean
   public?: boolean

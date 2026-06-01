@@ -12,8 +12,9 @@ type SpecialistControlsProps = {
 const priorityOrder: Record<TicketPriority, number> = {
   critical: 0,
   high: 1,
-  normal: 2,
-  low: 3,
+  above_normal: 2,
+  normal: 3,
+  low: 4,
 }
 
 const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const

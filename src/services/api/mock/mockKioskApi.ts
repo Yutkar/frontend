@@ -1,8 +1,19 @@
 import type { KioskApi } from '../types'
-import { createSharedTicket } from './mockState'
+import {
+  createSharedTicket,
+  getSharedServiceTypeByOptionId,
+} from './mockState'
 
 export const mockKioskApi: KioskApi = {
   createTicket(input) {
     return Promise.resolve(createSharedTicket(input))
+  },
+
+  createTicketForKiosk(input) {
+    return Promise.resolve(createSharedTicket({
+      patientName: 'Посетитель',
+      priority: input.priority,
+      serviceType: input.serviceType ?? getSharedServiceTypeByOptionId(input.serviceTypeId),
+    }))
   },
 }

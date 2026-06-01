@@ -5,6 +5,7 @@ import {
   toArchitectureTickets,
   toBackendArchitectureTicketCreateInput,
   toBackendPriority,
+  toSharedTicket,
   type BackendTicket,
 } from '../backendAdapters'
 import { apiClient } from '../client'
@@ -46,6 +47,15 @@ const serviceCodeByBackendName: Record<string, SharedServiceType> = {
   pharmacy: 'pharmacy',
   registration: 'registration',
   xray: 'diagnostics',
+  анализы: 'laboratory',
+  аптека: 'pharmacy',
+  диагностика: 'diagnostics',
+  другое: 'registration',
+  консультация: 'consultation',
+  лаборатория: 'laboratory',
+  оплата: 'billing',
+  регистрация: 'registration',
+  рентген: 'diagnostics',
 }
 
 async function postTicketAction(id: string, action: string) {
@@ -162,6 +172,13 @@ function toBackendSettingsPayload(payload: TicketSettingsPayload) {
   return body
 }
 
+function toBackendCreateSettingsPayload(payload: TicketSettingsPayload & { priority: TicketPriority }) {
+  return {
+    priority: toBackendPriority(payload.priority),
+    serviceTypeId: Number(payload.serviceTypeId),
+  }
+}
+
 export const backendTicketApi: TicketApi = {
   async getTickets() {
     const response = await apiClient.get<BackendTicket[]>('/tickets')
@@ -247,6 +264,38 @@ export const backendTicketApi: TicketApi = {
     const action = actionByStatus[input.status]
 
     return action ? action() : backendTicketApi.getTicketById(input.ticketId)
+  },
+
+  async createTicketWithSettings(payload) {
+    const createResponse = await apiClient.post<BackendTicket>(
+      '/tickets',
+      toBackendCreateSettingsPayload(payload),
+    )
+    const arrivedTicket = await arriveCreatedTicket(createResponse.data)
+    let resolvedTicket = arrivedTicket
+
+    try {
+      const updateResponse = await apiClient.patch<BackendTicket>(
+        `/tickets/${arrivedTicket.id}`,
+        toBackendSettingsPayload(payload),
+      )
+
+      if (updateResponse.data) {
+        resolvedTicket = updateResponse.data
+      }
+    } catch (error) {
+      console.warn('backendTicketApi.createTicketWithSettings: PATCH /tickets/:id is not available yet', error)
+    }
+
+    try {
+      const response = await apiClient.get<BackendTicket>(`/tickets/${arrivedTicket.id}`)
+
+      resolvedTicket = response.data
+    } catch (error) {
+      console.warn('backendTicketApi.createTicketWithSettings: GET /tickets/:id failed', error)
+    }
+
+    return toSharedTicket(resolvedTicket)
   },
 
   async getTicketSettingsOptions() {

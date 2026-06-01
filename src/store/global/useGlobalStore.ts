@@ -2,6 +2,27 @@ import { create } from 'zustand'
 import { authApi } from '@services/api'
 import type { Role, ThemeMode, User } from '@shared/types'
 
+const themeStorageKey = 'smartq-theme'
+
+function getInitialTheme(): ThemeMode {
+  if (typeof window === 'undefined') {
+    return 'light'
+  }
+
+  const savedTheme = window.localStorage.getItem(themeStorageKey)
+
+  return savedTheme === 'dark' ? 'dark' : 'light'
+}
+
+function applyTheme(theme: ThemeMode): void {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  document.documentElement.dataset.theme = theme
+  window.localStorage.setItem(themeStorageKey, theme)
+}
+
 type GlobalState = {
   user: User | null
   theme: ThemeMode
@@ -18,11 +39,14 @@ type GlobalState = {
 
 export const useGlobalStore = create<GlobalState>((set) => ({
   user: null,
-  theme: 'light',
+  theme: getInitialTheme(),
   sidebarCollapsed: false,
   initialized: false,
 
-  setTheme: (theme) => set({ theme }),
+  setTheme: (theme) => {
+    applyTheme(theme)
+    set({ theme })
+  },
   
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),

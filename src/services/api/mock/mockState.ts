@@ -62,6 +62,7 @@ const architecturePriorityBySharedPriority: Record<
   SharedTicketPriority,
   ArchitectureTicketPriority
 > = {
+  above_normal: 'high',
   critical: 'high',
   high: 'high',
   low: 'low',
@@ -71,6 +72,7 @@ const architecturePriorityBySharedPriority: Record<
 const priorityWeight: Record<SharedTicketPriority, number> = {
   critical: 4,
   high: 3,
+  above_normal: 2.5,
   normal: 2,
   low: 1,
 }
@@ -232,6 +234,10 @@ export function createArchitectureTicket(input: ArchitectureCreateTicketInput): 
 
 export function getMockServiceTypeOptions(): TicketSettingsServiceTypeOption[] {
   return clone(serviceTypeOptions)
+}
+
+export function getSharedServiceTypeByOptionId(id: string | number): SharedServiceType {
+  return sharedServiceTypeByArchitectureId[String(id)] ?? 'consultation'
 }
 
 export function updateSharedTicketStatus(

@@ -209,6 +209,26 @@ h3 {
   gap: 8px;
 }
 
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sidebar-group-label {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+.sidebar-collapsed .sidebar-group-label {
+  display: none;
+}
+
 .sidebar-link {
   align-items: center;
   border-radius: var(--radius);
@@ -962,6 +982,74 @@ h3 {
   border-top: 1px solid var(--border);
   justify-content: flex-end;
   padding-top: 16px;
+}
+
+.ticket-print-empty,
+.ticket-print-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.ticket-print-empty p {
+  color: var(--text-muted);
+}
+
+.ticket-print-preview {
+  background: #ffffff;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+}
+
+.ticket-print-brand {
+  font-size: 22px;
+  text-align: center;
+}
+
+.ticket-print-preview h2 {
+  border-bottom: 1px solid #d7dde8;
+  font-size: 25px;
+  padding-bottom: 14px;
+  text-align: center;
+}
+
+.ticket-print-preview dl {
+  display: grid;
+  gap: 12px;
+}
+
+.ticket-print-preview dl div {
+  display: grid;
+  gap: 4px;
+}
+
+.ticket-print-preview dt {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ticket-print-preview dd {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.ticket-print-preview p {
+  border-top: 1px solid #d7dde8;
+  font-size: 16px;
+  font-weight: 800;
+  padding-top: 14px;
+  text-align: center;
 }
 
 .redirect-panel {
@@ -2287,4 +2375,297 @@ h3 {
 
 .logout-button:active {
   transform: translateY(0);
+}
+
+.modal-success {
+  background: var(--success-soft);
+  border: 1px solid color-mix(in srgb, var(--success), transparent 58%);
+  border-radius: var(--radius);
+  color: var(--success);
+  font-weight: 800;
+  padding: 12px 14px;
+}
+
+.admin-page-grid {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+}
+
+.admin-form-panel,
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-table-wrap {
+  overflow: auto;
+}
+
+.admin-table {
+  border-collapse: collapse;
+  min-width: 720px;
+  width: 100%;
+}
+
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 13px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-table th {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-table td {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.admin-checkbox-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+}
+
+.admin-checkbox-group legend {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 6px;
+}
+
+.admin-checkbox-group label,
+.admin-toggle-row {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  font-weight: 700;
+  gap: 10px;
+}
+
+.admin-checkbox-group input,
+.admin-toggle-row input {
+  accent-color: var(--primary);
+  height: 18px;
+  width: 18px;
+}
+
+.admin-inline-form {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+}
+
+.admin-binding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-binding-list article {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+}
+
+.admin-binding-list span {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.kiosk-page {
+  align-items: center;
+  background:
+    linear-gradient(180deg, var(--surface-muted) 0%, var(--bg) 100%);
+  display: flex;
+  justify-content: center;
+  min-height: 100svh;
+  padding: 32px;
+}
+
+.kiosk-shell,
+.kiosk-result {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 960px;
+  padding: 34px;
+  width: min(100%, 960px);
+}
+
+.kiosk-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+}
+
+.kiosk-heading strong {
+  color: var(--primary);
+  font-size: 30px;
+  font-weight: 850;
+}
+
+.kiosk-heading h1 {
+  font-size: 34px;
+}
+
+.kiosk-service-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kiosk-service-button {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: inline-flex;
+  font-size: 24px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 112px;
+  padding: 18px;
+  text-align: center;
+}
+
+.kiosk-service-button.active,
+.kiosk-service-button:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-strong);
+}
+
+.kiosk-submit {
+  align-self: center;
+  font-size: 22px;
+  min-height: 64px;
+  min-width: min(100%, 320px);
+}
+
+.kiosk-result {
+  align-items: center;
+  text-align: center;
+}
+
+.kiosk-result > svg {
+  color: var(--success);
+}
+
+.kiosk-result-label {
+  color: var(--success);
+  font-size: 30px;
+  font-weight: 850;
+}
+
+.kiosk-ticket-number {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kiosk-ticket-number span {
+  color: var(--text-muted);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.kiosk-ticket-number strong {
+  color: var(--text);
+  font-size: 72px;
+  line-height: 1;
+}
+
+.kiosk-result .ticket-print-panel {
+  box-shadow: none;
+  max-width: 420px;
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .kiosk-page {
+    padding: 16px;
+  }
+
+  .kiosk-shell,
+  .kiosk-result {
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .kiosk-heading h1 {
+    font-size: 28px;
+  }
+
+  .kiosk-service-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kiosk-service-button {
+    font-size: 20px;
+    min-height: 86px;
+  }
+
+  .kiosk-ticket-number strong {
+    font-size: 54px;
+  }
+
+  .admin-page-grid,
+  .admin-inline-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .kiosk-page,
+  .kiosk-result,
+  .ticket-print-panel {
+    background: #ffffff;
+    border: 0;
+    box-shadow: none;
+    min-height: auto;
+    padding: 0;
+  }
+
+  .kiosk-result > svg,
+  .kiosk-result-label,
+  .kiosk-ticket-number,
+  .ticket-print-button {
+    display: none;
+  }
+
+  .ticket-print-preview {
+    border: 0;
+    margin: 0 auto;
+    max-width: 320px;
+    width: 72mm;
+  }
 }

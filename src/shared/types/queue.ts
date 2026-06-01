@@ -8,7 +8,7 @@ export type TicketStatus =
   | 'no_show'
   | 'redirected'
 
-export type TicketPriority = 'low' | 'normal' | 'high' | 'critical'
+export type TicketPriority = 'low' | 'normal' | 'above_normal' | 'high' | 'critical'
 
 export type ServiceType =
   | 'registration'

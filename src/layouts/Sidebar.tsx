@@ -14,11 +14,36 @@ type SidebarProps = {
 export function Sidebar({ collapsed, onToggle, routes }: SidebarProps) {
   const user = useGlobalStore((state) => state.user)
 
-  // Фильтруем маршруты по ролям пользователя
   const visibleRoutes = routes.filter((route) => {
     if (!route.allowedRoles) return true
     return user ? route.allowedRoles.includes(user.role) : false
   })
+  const ungroupedRoutes = visibleRoutes.filter((route) => !route.groupLabel)
+  const groupedRoutes = visibleRoutes.reduce<Record<string, AppRoute[]>>((groups, route) => {
+    if (!route.groupLabel) {
+      return groups
+    }
+
+    return {
+      ...groups,
+      [route.groupLabel]: [...(groups[route.groupLabel] ?? []), route],
+    }
+  }, {})
+
+  function renderLink(route: AppRoute) {
+    const Icon = route.icon
+
+    if (!Icon) {
+      return null
+    }
+
+    return (
+      <NavLink className="sidebar-link" key={route.path} to={route.path}>
+        <Icon size={19} strokeWidth={2.1} />
+        <span>{route.label}</span>
+      </NavLink>
+    )
+  }
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
@@ -36,20 +61,13 @@ export function Sidebar({ collapsed, onToggle, routes }: SidebarProps) {
       </div>
 
       <nav className="sidebar-nav">
-        {visibleRoutes.map((route) => {
-          const Icon = route.icon
-
-          if (!Icon) {
-            return null
-          }
-
-          return (
-            <NavLink className="sidebar-link" key={route.path} to={route.path}>
-              <Icon size={19} strokeWidth={2.1} />
-              <span>{route.label}</span>
-            </NavLink>
-          )
-        })}
+        {ungroupedRoutes.map(renderLink)}
+        {Object.entries(groupedRoutes).map(([groupLabel, groupRoutes]) => (
+          <div className="sidebar-group" key={groupLabel}>
+            <span className="sidebar-group-label">{groupLabel}</span>
+            {groupRoutes.map(renderLink)}
+          </div>
+        ))}
       </nav>
     </aside>
   )

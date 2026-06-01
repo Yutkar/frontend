@@ -181,6 +181,7 @@ export const ru = {
   priority: {
     low: 'Низкий',
     normal: 'Обычный',
+    above_normal: 'Выше среднего',
     high: 'Высокий',
     critical: 'Критический',
   },

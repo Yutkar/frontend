@@ -1,8 +1,10 @@
 import {
   ticketApi,
+  type TicketCreateSettingsPayload,
   type TicketSettingsOptions,
   type TicketSettingsPayload,
 } from './api'
+import type { Ticket as SharedTicket } from '@shared/types'
 import type {
   CreateTicketInput,
   Ticket,
@@ -33,6 +35,15 @@ export const ticketService = {
       return await ticketApi.createTicket(input)
     } catch (error) {
       console.error('ticketService.createTicket failed', error)
+      throw error
+    }
+  },
+
+  async createTicketWithSettings(input: TicketCreateSettingsPayload): Promise<SharedTicket> {
+    try {
+      return await ticketApi.createTicketWithSettings(input)
+    } catch (error) {
+      console.error('ticketService.createTicketWithSettings failed', error)
       throw error
     }
   },

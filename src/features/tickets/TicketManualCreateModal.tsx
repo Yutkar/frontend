@@ -1,20 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Settings, X } from 'lucide-react'
+import { PlusCircle, X } from 'lucide-react'
 import { ticketService } from '@services/ticketService'
 import type {
+  TicketCreateSettingsPayload,
   TicketSettingsOptions,
-  TicketSettingsPayload,
 } from '@services/api'
 import type {
   Room,
   ServiceType,
-  Ticket,
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
-import {
-  getServiceTypeLabel,
-} from '@shared/utils'
 import { Button } from '@shared/ui/components'
 import {
   getPriorityLabel,
@@ -27,12 +23,11 @@ import {
   ticketStatuses,
 } from './ticketFormOptions'
 
-type TicketSettingsModalProps = {
+type TicketManualCreateModalProps = {
   fallbackRooms: Room[]
   onClose: () => void
   onSaved: () => Promise<void>
   open: boolean
-  ticket?: Ticket
 }
 
 const emptyOptions: TicketSettingsOptions = {
@@ -41,25 +36,14 @@ const emptyOptions: TicketSettingsOptions = {
   specialists: [],
 }
 
-function getFallbackServiceType(ticket: Ticket) {
-  return {
-    code: ticket.serviceType,
-    id: ticket.serviceType,
-    name: getServiceTypeLabel(ticket.serviceType),
-  }
-}
-
-export function TicketSettingsModal({
+export function TicketManualCreateModal({
   fallbackRooms,
   onClose,
   onSaved,
   open,
-  ticket,
-}: TicketSettingsModalProps) {
-  const [comment, setComment] = useState('')
+}: TicketManualCreateModalProps) {
   const [doctorId, setDoctorId] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [etaMinutes, setEtaMinutes] = useState(0)
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [options, setOptions] = useState<TicketSettingsOptions>(emptyOptions)
   const [priority, setPriority] = useState<TicketPriority>('normal')
@@ -69,19 +53,18 @@ export function TicketSettingsModal({
   const [status, setStatus] = useState<TicketStatus>('waiting')
 
   useEffect(() => {
-    if (!open || !ticket) {
+    if (!open) {
       return
     }
 
-    setComment(ticket.notes ?? '')
-    setDoctorId(ticket.assignedTo ?? '')
-    setEtaMinutes(ticket.etaMinutes)
+    setDoctorId('')
     setError(null)
-    setPriority(ticket.priority)
-    setRoomId(ticket.roomId ?? '')
-    setServiceTypeId(ticket.serviceType)
-    setStatus(ticket.status)
-  }, [open, ticket])
+    setPriority('normal')
+    setRoomId('')
+    setSaving(false)
+    setServiceTypeId('')
+    setStatus('waiting')
+  }, [open])
 
   useEffect(() => {
     if (!open) {
@@ -99,7 +82,7 @@ export function TicketSettingsModal({
         }
       })
       .catch((loadError) => {
-        console.error('Ticket settings options load failed', loadError)
+        console.error('Ticket create options load failed', loadError)
         if (active) {
           setOptions(emptyOptions)
         }
@@ -115,69 +98,53 @@ export function TicketSettingsModal({
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open || !ticket || options.serviceTypes.length === 0) {
-      return
-    }
-
-    const currentServiceType = options.serviceTypes.find((item) => item.code === ticket.serviceType)
-
-    if (currentServiceType) {
-      setServiceTypeId(String(currentServiceType.id))
-    }
-  }, [open, options.serviceTypes, ticket])
-
-  const serviceTypes = useMemo(() => {
-    if (!ticket) {
-      return getServiceTypes(options)
-    }
-
-    const availableServiceTypes = getServiceTypes(options)
-    const hasCurrent = availableServiceTypes.some((item) => item.code === ticket.serviceType)
-
-    return hasCurrent ? availableServiceTypes : [getFallbackServiceType(ticket), ...availableServiceTypes]
-  }, [options, ticket])
-
+  const serviceTypes = useMemo(() => getServiceTypes(options), [options])
   const rooms = useMemo(() => getRooms(options, fallbackRooms), [fallbackRooms, options])
+  const specialists = useMemo(() => getSpecialists(options), [options])
 
-  const specialists = useMemo(() => {
-    const availableSpecialists = getSpecialists(options)
+  useEffect(() => {
+    const hasSelectedServiceType = serviceTypes.some(
+      (serviceType) => String(serviceType.id) === serviceTypeId,
+    )
 
-    if (!ticket?.assignedTo || availableSpecialists.some((item) => String(item.id) === ticket.assignedTo)) {
-      return availableSpecialists
+    if (open && serviceTypes[0] && !hasSelectedServiceType) {
+      setServiceTypeId(String(serviceTypes[0].id))
     }
+  }, [open, serviceTypeId, serviceTypes])
 
-    return [
-      {
-        id: ticket.assignedTo,
-        name: 'Текущий специалист',
-      },
-      ...availableSpecialists,
-    ]
-  }, [options, ticket?.assignedTo])
+  useEffect(() => {
+    if (open && !roomId && rooms[0]) {
+      setRoomId(String(rooms[0].id))
+    }
+  }, [open, roomId, rooms])
 
-  if (!open || !ticket) {
+  useEffect(() => {
+    if (open && !doctorId && specialists[0]) {
+      setDoctorId(String(specialists[0].id))
+    }
+  }, [doctorId, open, specialists])
+
+  if (!open) {
     return null
   }
 
-  const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId)
+  const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
   const isBusy = saving || loadingOptions
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!ticket) {
+    if (!selectedServiceType) {
+      setError('Выберите тип услуги.')
       return
     }
 
-    const payload: TicketSettingsPayload = {
-      comment,
+    const payload: TicketCreateSettingsPayload = {
       doctorId: doctorId || undefined,
-      etaMinutes,
       priority,
       roomId: roomId || undefined,
-      serviceType: selectedServiceType?.code ?? (serviceTypeId as ServiceType),
-      serviceTypeId: selectedServiceType?.id ?? serviceTypeId,
+      serviceType: selectedServiceType.code ?? (serviceTypeId as ServiceType),
+      serviceTypeId: selectedServiceType.id,
       status,
     }
 
@@ -185,12 +152,12 @@ export function TicketSettingsModal({
     setSaving(true)
 
     try {
-      await ticketService.updateTicketSettings(ticket.id, payload)
+      await ticketService.createTicketWithSettings(payload)
       await onSaved()
       onClose()
     } catch (saveError) {
-      console.error('Ticket settings save failed', saveError)
-      setError('Не удалось сохранить настройки талона.')
+      console.error('Manual ticket create failed', saveError)
+      setError('Не удалось создать талон.')
     } finally {
       setSaving(false)
     }
@@ -202,10 +169,10 @@ export function TicketSettingsModal({
         <header className="modal-header">
           <div>
             <span className="eyebrow">
-              <Settings size={14} />
+              <PlusCircle size={14} />
               Управление
             </span>
-            <h2>Редактировать талон {ticket.number}</h2>
+            <h2>Создать талон</h2>
           </div>
           <button
             aria-label="Отмена"
@@ -221,11 +188,6 @@ export function TicketSettingsModal({
         {error ? <div className="modal-error">{error}</div> : null}
 
         <div className="settings-form-grid">
-          <label className="field">
-            <span>Номер талона</span>
-            <input readOnly value={ticket.number} />
-          </label>
-
           <label className="field">
             <span>Тип услуги</span>
             <select
@@ -302,27 +264,6 @@ export function TicketSettingsModal({
               ))}
             </select>
           </label>
-
-          <label className="field">
-            <span>Время ожидания</span>
-            <input
-              disabled={isBusy}
-              min={0}
-              onChange={(event) => setEtaMinutes(Number(event.target.value))}
-              type="number"
-              value={etaMinutes}
-            />
-          </label>
-
-          <label className="field settings-comment-field">
-            <span>Комментарий</span>
-            <textarea
-              disabled={isBusy}
-              onChange={(event) => setComment(event.target.value)}
-              rows={4}
-              value={comment}
-            />
-          </label>
         </div>
 
         <footer className="modal-actions">
@@ -330,7 +271,7 @@ export function TicketSettingsModal({
             Отмена
           </Button>
           <Button disabled={isBusy} type="submit" variant="primary">
-            {saving ? 'Сохраняем...' : 'Сохранить'}
+            {saving ? 'Создаём...' : 'Создать'}
           </Button>
         </footer>
       </form>

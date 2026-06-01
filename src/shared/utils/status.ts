@@ -27,6 +27,7 @@ export const ticketStatusMeta: Record<TicketStatus, Meta> = {
 export const priorityMeta: Record<TicketPriority, Meta> = {
   low: { label: t.priority.low, tone: 'neutral' },
   normal: { label: t.priority.normal, tone: 'info' },
+  above_normal: { label: t.priority.above_normal, tone: 'warning' },
   high: { label: t.priority.high, tone: 'warning' },
   critical: { label: t.priority.critical, tone: 'danger' },
 }

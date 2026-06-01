@@ -7,8 +7,10 @@ import {
   getArchitectureTickets,
   getMockServiceTypeOptions,
   getQueueSnapshot,
+  getSharedServiceTypeByOptionId,
   redirectSharedTicket,
   toArchitectureTicket,
+  createSharedTicket,
   updateSharedTicketSettings,
   updateSharedTicketStatus,
 } from './mockState'
@@ -72,6 +74,18 @@ export const mockTicketApi: TicketApi = {
 
   updateTicketStatus(input) {
     return Promise.resolve(updateTicketStatus(input.ticketId, input.status))
+  },
+
+  createTicketWithSettings(payload) {
+    const ticket = createSharedTicket({
+      patientName: 'Посетитель',
+      priority: payload.priority,
+      serviceType: payload.serviceType ?? getSharedServiceTypeByOptionId(payload.serviceTypeId),
+      notes: payload.comment,
+    })
+    const updatedTicket = updateSharedTicketSettings(ticket.id, payload)
+
+    return Promise.resolve(updatedTicket)
   },
 
   getTicketSettingsOptions() {
