@@ -24,7 +24,7 @@ export function getRoomName(room?: AdminRoomRecord): string {
     return 'Кабинет не назначен'
   }
 
-  return room.name ?? room.title ?? room.roomName ?? 'Без названия'
+  return room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия'
 }
 
 export function getRoomActive(room: AdminRoomRecord): boolean {

@@ -105,19 +105,23 @@ export function getServiceTypes(options: TicketSettingsOptions): TicketSettingsS
 }
 
 export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] = []) {
-  const mergedRooms = options.rooms.map((room) => ({
-    id: room.id,
-    name: room.name,
-  }))
+  const mergedRooms = options.rooms
+    .filter((room) => room.isActive !== false)
+    .map((room) => ({
+      id: room.id,
+      name: room.name,
+    }))
 
-  fallbackRooms.forEach((room) => {
-    if (!mergedRooms.some((item) => String(item.id) === room.id)) {
-      mergedRooms.push({
-        id: room.id,
-        name: room.name,
-      })
-    }
-  })
+  fallbackRooms
+    .filter((room) => room.isActive !== false && room.status !== 'paused')
+    .forEach((room) => {
+      if (!mergedRooms.some((item) => String(item.id) === room.id)) {
+        mergedRooms.push({
+          id: room.id,
+          name: room.name,
+        })
+      }
+    })
 
   return mergedRooms
 }

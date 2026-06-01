@@ -34,9 +34,18 @@ export type BackendServiceType = {
 }
 
 export type BackendRoom = {
-  id: number | string
-  name: string
+  _id?: number | string
+  active?: boolean
+  id?: number | string
   isActive?: boolean
+  name?: string
+  roomId?: number | string
+  roomName?: string
+  services?: unknown[]
+  serviceTypeIds?: Array<number | string>
+  serviceTypes?: unknown[]
+  status?: string
+  title?: string
 }
 
 export type BackendTicket = {
@@ -119,6 +128,58 @@ const architectureServiceByBackendName: Record<string, ArchitectureServiceType['
 
 function toId(value?: number | string | null): string {
   return value == null ? '' : String(value)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function getBackendRoomId(room?: BackendRoom | null): string {
+  return toId(room?.id ?? room?.roomId ?? room?._id)
+}
+
+function getBackendRoomName(room?: BackendRoom | null): string {
+  return room?.name ?? room?.title ?? room?.roomName ?? 'Кабинет без названия'
+}
+
+function getBackendRoomActive(room?: BackendRoom | null): boolean {
+  if (!room) {
+    return true
+  }
+
+  if (typeof room.isActive === 'boolean') {
+    return room.isActive
+  }
+
+  if (typeof room.active === 'boolean') {
+    return room.active
+  }
+
+  return room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted'
+}
+
+export function toBackendRooms(value: unknown): BackendRoom[] {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord) as BackendRoom[]
+  }
+
+  if (!isRecord(value)) {
+    return []
+  }
+
+  if (Array.isArray(value.rooms)) {
+    return value.rooms.filter(isRecord) as BackendRoom[]
+  }
+
+  if (Array.isArray(value.data)) {
+    return value.data.filter(isRecord) as BackendRoom[]
+  }
+
+  if (isRecord(value.data)) {
+    return toBackendRooms(value.data)
+  }
+
+  return []
 }
 
 function getBackendServiceName(ticket: BackendTicket): string {
@@ -215,7 +276,7 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     calledAt: ticket.calledAt ?? undefined,
     startedAt: ticket.serviceStartedAt ?? ticket.startedAt ?? undefined,
     completedAt: ticket.completedAt ?? undefined,
-    roomId: toId(ticket.roomId ?? ticket.room?.id) || undefined,
+    roomId: toId(ticket.roomId ?? getBackendRoomId(ticket.room)) || undefined,
     etaMinutes: ticket.etaMinutes ?? 0,
   }
 }
@@ -233,8 +294,8 @@ export function toArchitectureTicket(ticket: BackendTicket): ArchitectureTicket 
     name: serviceName || code,
   }
   const room: ArchitectureRoom = {
-    id: toId(ticket.roomId ?? ticket.room?.id),
-    name: ticket.room?.name ?? 'Не назначен',
+    id: toId(ticket.roomId ?? getBackendRoomId(ticket.room)),
+    name: ticket.room ? getBackendRoomName(ticket.room) : 'Не назначен',
     serviceTypes: [serviceType],
   }
 
@@ -251,6 +312,17 @@ export function toArchitectureTicket(ticket: BackendTicket): ArchitectureTicket 
 
 export function toArchitectureTickets(tickets: BackendTicket[]): ArchitectureTicket[] {
   return tickets.map(toArchitectureTicket)
+}
+
+export function toArchitectureRooms(rooms: BackendRoom[]): ArchitectureRoom[] {
+  return rooms
+    .filter(getBackendRoomActive)
+    .map((room) => ({
+      id: getBackendRoomId(room),
+      name: getBackendRoomName(room),
+      serviceTypes: [],
+    }))
+    .filter((room) => room.id)
 }
 
 export function toBackendTicketCreateInput(input: TicketCreateInput): {
@@ -279,38 +351,77 @@ export function toBackendArchitectureTicketCreateInput(input: {
 export function toSharedRooms(
   tickets: BackendTicket[],
   stats: BackendQueueStats[] = [],
+  backendRooms: BackendRoom[] = [],
 ): Room[] {
   const rooms = new Map<string, Room>()
+  const inactiveRoomIds = new Set(
+    backendRooms
+      .filter((room) => !getBackendRoomActive(room))
+      .map(getBackendRoomId)
+      .filter(Boolean),
+  )
+
+  backendRooms
+    .filter(getBackendRoomActive)
+    .forEach((room) => {
+      const id = getBackendRoomId(room)
+
+      if (!id) {
+        return
+      }
+
+      rooms.set(id, {
+        id,
+        isActive: true,
+        name: getBackendRoomName(room),
+        department: getBackendRoomName(room),
+        specialistName: getBackendRoomName(room),
+        status: 'open',
+        loadPercent: 0,
+        workload: 0,
+      })
+    })
 
   stats.forEach((stat) => {
     const id = toId(stat.roomId)
 
+    if (!id || inactiveRoomIds.has(id)) {
+      return
+    }
+
+    const existingRoom = rooms.get(id)
+    const workload = Math.min(100, Math.max(0, stat.activeTickets * 10))
+
     rooms.set(id, {
+      ...existingRoom,
       id,
-      name: stat.roomName,
-      department: stat.roomName,
-      specialistName: stat.roomName,
+      isActive: existingRoom?.isActive ?? true,
+      name: existingRoom?.name ?? stat.roomName,
+      department: existingRoom?.department ?? stat.roomName,
+      specialistName: existingRoom?.specialistName ?? stat.roomName,
       status: 'open',
-      loadPercent: Math.min(100, Math.max(0, stat.activeTickets * 10)),
-      workload: Math.min(100, Math.max(0, stat.activeTickets * 10)),
+      loadPercent: workload,
+      workload,
     })
   })
 
   tickets.forEach((ticket) => {
-    const roomId = toId(ticket.roomId ?? ticket.room?.id)
+    const roomId = toId(ticket.roomId ?? getBackendRoomId(ticket.room))
 
-    if (!roomId || rooms.has(roomId)) {
+    if (!roomId || rooms.has(roomId) || inactiveRoomIds.has(roomId)) {
       return
     }
 
     const serviceType = toSharedServiceType(ticket)
+    const roomName = getBackendRoomName(ticket.room)
 
     rooms.set(roomId, {
       id: roomId,
-      name: ticket.room?.name ?? `Кабинет ${roomId}`,
+      isActive: getBackendRoomActive(ticket.room),
+      name: roomName,
       department: serviceType,
-      specialistName: ticket.room?.name ?? `Кабинет ${roomId}`,
-      status: ticket.room?.isActive === false ? 'paused' : 'open',
+      specialistName: roomName,
+      status: getBackendRoomActive(ticket.room) ? 'open' : 'paused',
       loadPercent: 0,
       workload: 0,
     })
@@ -318,7 +429,7 @@ export function toSharedRooms(
 
   return Array.from(rooms.values()).map((room) => {
     const currentTicket = tickets.find((ticket) => {
-      const ticketRoomId = toId(ticket.roomId ?? ticket.room?.id)
+      const ticketRoomId = toId(ticket.roomId ?? getBackendRoomId(ticket.room))
 
       return ticketRoomId === room.id && ['called', 'in_service'].includes(ticket.status)
     })
@@ -353,10 +464,11 @@ export function toQueueSnapshot(
   tickets: BackendTicket[],
   stats: BackendQueueStats[] = [],
   overload: BackendOverloadRoom[] = [],
+  rooms: BackendRoom[] = [],
 ): QueueSnapshot {
   return {
     tickets: toSharedTickets(tickets),
-    rooms: toSharedRooms(tickets, stats),
+    rooms: toSharedRooms(tickets, stats, rooms),
     events: [],
     recommendations: [],
     analytics: [],

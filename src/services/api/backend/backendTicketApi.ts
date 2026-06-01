@@ -18,9 +18,14 @@ import type {
 } from '../types'
 
 type BackendRoomOption = {
+  _id?: string | number
+  active?: boolean
   id: string | number
+  isActive?: boolean
   name?: string
+  roomId?: string | number
   roomName?: string
+  title?: string
 }
 
 type BackendServiceTypeOption = {
@@ -76,9 +81,37 @@ async function arriveCreatedTicket(ticket: BackendTicket): Promise<BackendTicket
 
 async function getOrEmpty<T>(path: string): Promise<T[]> {
   try {
-    const response = await apiClient.get<T[]>(path)
+    const response = await apiClient.get<unknown>(path)
 
-    return response.data
+    if (Array.isArray(response.data)) {
+      return response.data as T[]
+    }
+
+    if (response.data && typeof response.data === 'object') {
+      const record = response.data as Record<string, unknown>
+
+      if (Array.isArray(record.data)) {
+        return record.data as T[]
+      }
+
+      if (Array.isArray(record.rooms)) {
+        return record.rooms as T[]
+      }
+
+      if (Array.isArray(record.users)) {
+        return record.users as T[]
+      }
+
+      if (Array.isArray(record.staff)) {
+        return record.staff as T[]
+      }
+
+      if (Array.isArray(record.serviceTypes)) {
+        return record.serviceTypes as T[]
+      }
+    }
+
+    return []
   } catch (error) {
     console.warn(`backendTicketApi: ${path} is not available yet`, error)
 
@@ -100,8 +133,9 @@ function toSettingsOptions(
 ): TicketSettingsOptions {
   return {
     rooms: rooms.map((room) => ({
-      id: String(room.id),
-      name: room.name ?? room.roomName ?? `Кабинет ${room.id}`,
+      id: String(room.id ?? room.roomId ?? room._id),
+      isActive: room.isActive ?? room.active ?? true,
+      name: room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия',
     })),
     serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({
       code: toServiceCode(serviceType),

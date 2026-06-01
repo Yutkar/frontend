@@ -82,7 +82,7 @@ function getText(value: unknown): string | undefined {
 }
 
 function getId(value: UnknownRecord): string | number {
-  const rawId = value.id ?? value._id ?? value.uuid
+  const rawId = value.id ?? value.roomId ?? value._id ?? value.uuid
 
   return typeof rawId === 'string' || typeof rawId === 'number'
     ? rawId
@@ -219,7 +219,7 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
   const name = getText(record.name)
     ?? getText(record.title)
     ?? getText(record.roomName)
-    ?? 'Без названия'
+    ?? 'Кабинет без названия'
   const isActive = typeof record.isActive === 'boolean'
     ? record.isActive
     : typeof record.active === 'boolean'

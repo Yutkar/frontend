@@ -94,6 +94,7 @@ export const mockTicketApi: TicketApi = {
     return Promise.resolve({
       rooms: snapshot.rooms.map((room) => ({
         id: room.id,
+        isActive: room.isActive ?? room.status !== 'paused',
         name: room.name,
       })),
       serviceTypes: getMockServiceTypeOptions(),

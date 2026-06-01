@@ -43,6 +43,7 @@ export type Room = {
   department: string
   specialistName: string
   status: RoomStatus
+  isActive?: boolean
   currentTicketId?: string
   workload?: number
   loadPercent: number

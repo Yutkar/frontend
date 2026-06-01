@@ -36,7 +36,7 @@ export type TicketSettingsUserOption = {
 }
 
 export type TicketSettingsOptions = {
-  rooms: Pick<SharedRoom, 'id' | 'name'>[]
+  rooms: Array<Pick<SharedRoom, 'id' | 'name'> & { isActive?: boolean }>
   serviceTypes: TicketSettingsServiceTypeOption[]
   specialists: TicketSettingsUserOption[]
 }
