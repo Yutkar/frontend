@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Monitor,
   Settings,
-  ShieldCheck,
   Stethoscope,
 } from 'lucide-react'
 import type { AppRoute } from '@shared/types'
@@ -76,8 +75,9 @@ export const smartqBusinessRoutes: AppRoute[] = [
     path: '/board',
     label: t.nav.tvBoard,
     icon: Monitor,
-    fullscreen: true,
-    allowedRoles: ['admin', 'manager'],
+    standalone: true,
+    public: true,
+    hideFromSidebar: true,
     element: <TvBoardPage />,
   },
   {
