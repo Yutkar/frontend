@@ -6,6 +6,7 @@ type GlobalState = {
   user: User | null
   theme: ThemeMode
   sidebarCollapsed: boolean
+  initialized: boolean
   setTheme: (theme: ThemeMode) => void
   toggleSidebar: () => void
   login: (email: string, password: string) => Promise<void>
@@ -19,6 +20,7 @@ export const useGlobalStore = create<GlobalState>((set) => ({
   user: null,
   theme: 'light',
   sidebarCollapsed: false,
+  initialized: false,
 
   setTheme: (theme) => set({ theme }),
   
@@ -27,44 +29,50 @@ export const useGlobalStore = create<GlobalState>((set) => ({
 
   login: async (email, password) => {
     const user = await authApi.login(email, password)
-    set({ user })
+    set({ initialized: true, user })
     localStorage.setItem('currentUser', JSON.stringify(user))
   },
 
   register: async (name, email, password, role) => {
     const user = await authApi.register(name, email, password, role)
-    set({ user })
+    set({ initialized: true, user })
     localStorage.setItem('currentUser', JSON.stringify(user))
   },
 
   loginAsRole: async (role) => {
     const user = await authApi.loginAsRole(role)
-    set({ user })
+    set({ initialized: true, user })
     localStorage.setItem('currentUser', JSON.stringify(user))
   },
 
   logout: () => {
     authApi.logout()
-    set({ user: null })
+    set({ initialized: true, user: null })
     localStorage.removeItem('currentUser')
   },
 
   initializeAuth: async () => {
-    const savedUser = localStorage.getItem('currentUser')
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser)
-        set({ user })
-      } catch (e) {
-        console.error('Failed to parse saved user')
+    try {
+      const savedUser = localStorage.getItem('currentUser')
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser)
+          set({ user })
+        } catch (error) {
+          console.error('Failed to parse saved user', error)
+        }
       }
-    }
 
-    const user = await authApi.getCurrentUser()
+      const user = await authApi.getCurrentUser()
 
-    if (user) {
-      set({ user })
-      localStorage.setItem('currentUser', JSON.stringify(user))
+      if (user) {
+        set({ user })
+        localStorage.setItem('currentUser', JSON.stringify(user))
+      }
+    } catch (error) {
+      console.error('Failed to initialize auth session', error)
+    } finally {
+      set({ initialized: true })
     }
   },
 }))
