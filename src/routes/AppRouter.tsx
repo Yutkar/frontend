@@ -5,7 +5,7 @@ import { t } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { useGlobalStore } from '@store/global'
 import { AppLayout } from '@layouts/AppLayout'
-import { LoginPage } from '@pages/LoginPage'     // ← Изменено на named import
+import { LoginPage } from '@pages/LoginPage'
 
 type AppRouterProps = {
   routes: AppRoute[]
@@ -17,9 +17,13 @@ function routePath(path: string): string {
 
 function GuardedRoute({ route }: { route: AppRoute }) {
   const user = useGlobalStore((state) => state.user)
+  const initialized = useGlobalStore((state) => state.initialized)
   const allowed = !route.allowedRoles || route.allowedRoles.includes(user?.role)
 
-  // Простая проверка
+  if (!initialized) {
+    return null
+  }
+
   if (!user) {
     return <Navigate to="/login" replace />
   }
@@ -39,6 +43,7 @@ function GuardedRoute({ route }: { route: AppRoute }) {
 
   return <>{route.element}</>
 }
+
 export function AppRouter({ routes }: AppRouterProps) {
   const initializeAuth = useGlobalStore((state) => state.initializeAuth)
 
@@ -52,14 +57,12 @@ export function AppRouter({ routes }: AppRouterProps) {
   const shellRoutes = routes.filter((route) => !route.fullscreen && !route.standalone)
   const fullscreenRoutes = routes.filter((route) => route.fullscreen)
   const navigationRoutes = routes.filter((route) => !route.hideFromSidebar && !route.standalone)
-
   const fallbackPath = shellRoutes.find((route) => route.path === '/dashboard')?.path ?? shellRoutes[0]?.path ?? '/'
 
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-
         <Route element={<AppLayout routes={navigationRoutes} />}>
           <Route element={<Navigate replace to={fallbackPath} />} index />
           {shellRoutes.map((route) => (
@@ -70,15 +73,13 @@ export function AppRouter({ routes }: AppRouterProps) {
             />
           ))}
         </Route>
-
-          {fullscreenRoutes.map((route) => (
-            <Route
-              element={<GuardedRoute route={route} />}
-              key={route.path}
-              path={routePath(route.path)}
-            />
-          ))}
-
+        {fullscreenRoutes.map((route) => (
+          <Route
+            element={<GuardedRoute route={route} />}
+            key={route.path}
+            path={routePath(route.path)}
+          />
+        ))}
         {publicStandaloneRoutes.map((route) => (
           <Route
             key={route.path}
@@ -86,7 +87,6 @@ export function AppRouter({ routes }: AppRouterProps) {
             element={route.element}
           />
         ))}
-
         {protectedStandaloneRoutes.map((route) => (
           <Route
             element={<GuardedRoute route={route} />}
@@ -94,7 +94,6 @@ export function AppRouter({ routes }: AppRouterProps) {
             path={routePath(route.path)}
           />
         ))}
-
         <Route element={<Navigate replace to="/login" />} path="*" />
       </Routes>
     </BrowserRouter>

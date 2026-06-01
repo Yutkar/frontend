@@ -6,6 +6,7 @@ type GlobalState = {
   user: User | null
   theme: ThemeMode
   sidebarCollapsed: boolean
+  initialized: boolean
   setTheme: (theme: ThemeMode) => void
   toggleSidebar: () => void
   login: (email: string, password: string) => Promise<void>
@@ -19,44 +20,47 @@ export const useGlobalStore = create<GlobalState>((set) => ({
   user: null,
   theme: 'light',
   sidebarCollapsed: false,
-
+  initialized: false,
   setTheme: (theme) => set({ theme }),
-  
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
-
   login: async (email, password) => {
     const user = await authApi.login(email, password)
     set({ user })
     localStorage.setItem('currentUser', JSON.stringify(user))
   },
-
   register: async (name, email, password, role) => {
     const user = await authApi.register(name, email, password, role)
     set({ user })
     localStorage.setItem('currentUser', JSON.stringify(user))
   },
-
   loginAsRole: async (role) => {
     const user = await authApi.loginAsRole(role)
     set({ user })
     localStorage.setItem('currentUser', JSON.stringify(user))
   },
-
   logout: () => {
     set({ user: null })
     localStorage.removeItem('currentUser')
+    localStorage.removeItem('access_token')
   },
-
   initializeAuth: () => {
     const savedUser = localStorage.getItem('currentUser')
-    if (savedUser) {
+    const token = localStorage.getItem('access_token')
+    if (savedUser && token) {
       try {
         const user = JSON.parse(savedUser)
-        set({ user })
+        set({ user, initialized: true })
       } catch (e) {
         console.error('Failed to parse saved user')
+        localStorage.removeItem('currentUser')
+        localStorage.removeItem('access_token')
+        set({ initialized: true })
       }
+    } else {
+      localStorage.removeItem('currentUser')
+      localStorage.removeItem('access_token')
+      set({ initialized: true })
     }
   },
 }))
