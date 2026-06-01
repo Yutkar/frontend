@@ -76,6 +76,7 @@ export type QueueListener = (tickets: ArchitectureTicket[]) => void
 export type QueueApi = {
   getQueueSnapshot: () => Promise<QueueSnapshot>
   getBoardSnapshot: () => Promise<QueueSnapshot>
+  getRoomQueueSnapshot: (roomId: string | number) => Promise<QueueSnapshot>
   createTicket: (input: SharedTicketCreateInput) => Promise<QueueSnapshot>
   createKioskTicket: (input: SharedTicketCreateInput) => Promise<QueueSnapshot>
   callNextTicket: (roomId: string) => Promise<QueueSnapshot>

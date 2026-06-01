@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
+import { API_MODE } from '@services/api/apiProvider'
 import { useGlobalStore } from '@store/global'
 import { Button } from '@shared/ui/components'
 import { t } from '@shared/locales/useLocale'
@@ -13,6 +14,7 @@ export function LoginPage() {
 
   const login = useGlobalStore((state) => state.login)
   const navigate = useNavigate()
+  const showMockAccounts = API_MODE === 'mock'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,10 +39,10 @@ export function LoginPage() {
           <div>
             <span className="eyebrow">
               <ShieldCheck size={14} />
-              {t.login.mockAuth || 'Авторизация'}
+              Авторизация
             </span>
             <h1>{t.system.smartq}</h1>
-            <p>MVP системы управления медицинской очередью</p>
+            <p>Система управления медицинской очередью</p>
           </div>
         </div>
 
@@ -56,7 +58,7 @@ export function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email
+                Электронная почта
               </label>
               <input
                 type="email"
@@ -91,31 +93,16 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="login-help mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            <p className="font-semibold mb-2">Тестовые учетные записи</p>
-            <ul className="space-y-2 list-disc list-inside">
-              <li>admin@smartq.test / admin123</li>
-              <li>manager@smartq.test / manager123</li>
-              <li>specialist@smartq.test / specialist123</li>
-            </ul>
-          </div>
-
-          <div className="text-center mt-6 space-y-3">
-            <p>
-              <Link to="/forgot-password" className="text-sky-600 hover:text-sky-700 font-medium hover:underline">
-                Забыли пароль?
-              </Link>
-            </p>
-            <p className="text-sm text-gray-600">
-              Нет аккаунта?{' '}
-              <Link 
-                to="/register" 
-                className="text-sky-600 hover:text-sky-700 font-medium hover:underline"
-              >
-                Зарегистрироваться
-              </Link>
-            </p>
-          </div>
+          {showMockAccounts ? (
+            <div className="login-help mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p className="font-semibold mb-2">Тестовые учётные записи</p>
+              <ul className="space-y-2 list-disc list-inside">
+                <li>admin@smartq.test / admin123</li>
+                <li>manager@smartq.test / manager123</li>
+                <li>specialist@smartq.test / specialist123</li>
+              </ul>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>

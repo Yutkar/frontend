@@ -25,6 +25,7 @@ type QueueState = {
   completeService: (ticketId: string) => Promise<void>
   createTicket: (input: TicketCreateInput) => Promise<Ticket | undefined>
   loadQueue: () => Promise<void>
+  loadRoomQueue: (roomId: string | number) => Promise<void>
   redirectTicket: (input: RedirectTicketInput) => Promise<void>
   returnTicket: (ticketId: string) => Promise<void>
   selectTicket: (ticketId?: string) => void
@@ -86,6 +87,12 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
     set({ loading: true })
     const snapshot = await queueApi.getQueueSnapshot()
+    set({ ...snapshot, hydrated: true, loading: false })
+  },
+
+  loadRoomQueue: async (roomId) => {
+    set({ loading: true })
+    const snapshot = await queueApi.getRoomQueueSnapshot(roomId)
     set({ ...snapshot, hydrated: true, loading: false })
   },
 

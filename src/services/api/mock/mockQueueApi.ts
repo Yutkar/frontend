@@ -25,6 +25,17 @@ export const mockQueueApi: QueueApi = {
     return Promise.resolve(getQueueSnapshot())
   },
 
+  getRoomQueueSnapshot(roomId: string | number) {
+    const snapshot = getQueueSnapshot()
+    const roomIdValue = String(roomId)
+
+    return Promise.resolve({
+      ...snapshot,
+      rooms: snapshot.rooms.filter((room) => room.id === roomIdValue),
+      tickets: snapshot.tickets.filter((ticket) => ticket.roomId === roomIdValue),
+    })
+  },
+
   createTicket(input) {
     createSharedTicket(input)
 

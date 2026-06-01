@@ -89,9 +89,14 @@ const backendIdByServiceType: Record<ServiceType, number> = {
 
 const serviceTypeByBackendName: Record<string, ServiceType> = {
   analysis: 'laboratory',
+  billing: 'billing',
   consultation: 'consultation',
+  diagnostics: 'diagnostics',
+  laboratory: 'laboratory',
   other: 'registration',
   payment: 'billing',
+  pharmacy: 'pharmacy',
+  registration: 'registration',
   xray: 'diagnostics',
 }
 
@@ -108,7 +113,7 @@ function toId(value?: number | string | null): string {
 }
 
 function getBackendServiceName(ticket: BackendTicket): string {
-  return ticket.serviceType?.name ?? ''
+  return ticket.serviceType?.name?.trim().toLowerCase() ?? ''
 }
 
 export function toBackendServiceTypeId(serviceType: ServiceType): number {

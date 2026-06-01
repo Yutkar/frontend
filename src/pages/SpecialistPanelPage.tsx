@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { SpecialistControls } from '@features/specialist/SpecialistControls'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
 import { t } from '@shared/locales/useLocale'
@@ -9,8 +10,32 @@ export function SpecialistPanelPage() {
   useQueueBootstrap()
 
   const user = useGlobalStore((state) => state.user)
+  const loadRoomQueue = useQueueStore((state) => state.loadRoomQueue)
   const rooms = useQueueStore((state) => state.rooms)
-  const room = rooms.find((item) => item.id === user?.roomId) ?? rooms[0]
+  const specialistRoomId = user?.roomId
+  const room = rooms.find((item) => item.id === specialistRoomId) ?? (specialistRoomId
+    ? {
+        id: specialistRoomId,
+        name: `Кабинет ${specialistRoomId}`,
+        department: user?.department ?? 'Специалист',
+        specialistName: user?.name ?? 'Специалист',
+        status: 'open' as const,
+        loadPercent: 0,
+      }
+    : undefined)
+
+  useEffect(() => {
+    if (!specialistRoomId) {
+      return
+    }
+
+    void loadRoomQueue(specialistRoomId)
+    const interval = window.setInterval(() => {
+      void loadRoomQueue(specialistRoomId)
+    }, 5_000)
+
+    return () => window.clearInterval(interval)
+  }, [loadRoomQueue, specialistRoomId])
 
   if (!user) {
     return null
@@ -20,7 +45,7 @@ export function SpecialistPanelPage() {
     return (
       <section className="empty-state">
         <span className="eyebrow">{t.specialist.panel}</span>
-        <h1>{t.specialist.noRoomAssigned}</h1>
+        <h1>Кабинет специалиста не назначен</h1>
         <p>{t.specialist.assignRoom}</p>
       </section>
     )

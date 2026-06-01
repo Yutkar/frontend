@@ -48,7 +48,7 @@ export function AppRouter({ routes }: AppRouterProps) {
   const initializeAuth = useGlobalStore((state) => state.initializeAuth)
 
   useEffect(() => {
-    initializeAuth()
+    void initializeAuth()
   }, [initializeAuth])
 
   const standaloneRoutes = routes.filter((route) => route.standalone)

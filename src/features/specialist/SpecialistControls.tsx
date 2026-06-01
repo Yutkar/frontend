@@ -16,6 +16,8 @@ const priorityOrder: Record<TicketPriority, number> = {
   low: 3,
 }
 
+const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+
 export function SpecialistControls({ room }: SpecialistControlsProps) {
   const [redirectRoomId, setRedirectRoomId] = useState('')
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
@@ -27,18 +29,29 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const skipTicket = useQueueStore((state) => state.skipTicket)
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
+  const roomTickets = useMemo(
+    () =>
+      tickets.filter(
+        (ticket) =>
+          ticket.roomId === room.id &&
+          specialistVisibleStatuses.includes(ticket.status as (typeof specialistVisibleStatuses)[number]),
+      ),
+    [room.id, tickets],
+  )
 
   const currentTicket = useMemo<Ticket | undefined>(
-    () => tickets.find((ticket) => ticket.id === room.currentTicketId),
-    [room.currentTicketId, tickets],
+    () =>
+      roomTickets.find((ticket) => ['called', 'in_service'].includes(ticket.status)) ??
+      roomTickets.find((ticket) => ticket.id === room.currentTicketId),
+    [room.currentTicketId, roomTickets],
   )
   const waitingTickets = useMemo(
     () =>
-      tickets
+      roomTickets
         .filter(
           (ticket) =>
-            ticket.status === 'waiting' &&
-            ticket.roomId === room.id,
+            ticket.status === 'waiting' ||
+            ticket.status === 'redirected',
         )
         .sort((left, right) => {
           const priorityDelta = priorityOrder[left.priority] - priorityOrder[right.priority]
@@ -49,14 +62,12 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
 
           return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
         }),
-    [room.id, tickets],
+    [roomTickets],
   )
   const skippedTickets = useMemo(
     () =>
-      tickets.filter(
-        (ticket) => ticket.status === 'no_show' && ticket.roomId === room.id,
-      ),
-    [room.id, tickets],
+      tickets.filter(() => false),
+    [tickets],
   )
   const redirectRooms = rooms.filter(
     (item) => item.id !== room.id && item.status === 'open' && !item.currentTicketId,

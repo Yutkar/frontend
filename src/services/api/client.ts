@@ -8,6 +8,14 @@ export const apiClient = axios.create({
   },
 })
 
+export const publicApiClient = axios.create({
+  baseURL: import.meta.env.VITE_SMARTQ_API_URL || 'http://localhost:3000',
+  timeout: 12_000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
 

@@ -7,7 +7,7 @@ export function ProtectedRoute() {
   const initializeAuth = useGlobalStore((state) => state.initializeAuth)
 
   useEffect(() => {
-    initializeAuth()
+    void initializeAuth()
   }, [initializeAuth])
 
   if (!user) {

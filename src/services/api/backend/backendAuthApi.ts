@@ -2,13 +2,31 @@ import type { Role, User } from '@shared/types'
 import { apiClient } from '../client'
 import type { AuthApi } from '../types'
 
-type BackendAuthResponse = {
+type BackendUser = {
+  assignedRoomId?: number | string | null
+  avatarInitials?: string
+  department?: string
+  id?: number | string
+  name?: string
+  role?: Role
+  room?: {
+    id?: number | string | null
+  } | null
+  roomId?: number | string | null
+}
+
+type BackendAuthResponse = BackendUser & {
   access_token?: string
   accessToken?: string
-  role?: Role
   token?: string
-  user?: Partial<User> & { role?: Role }
+  user?: BackendUser
 }
+
+type BackendMeEnvelope = {
+  user?: BackendUser
+}
+
+type BackendMeResponse = BackendUser | BackendMeEnvelope
 
 const roleDefaults: Record<Role, Pick<User, 'avatarInitials' | 'department' | 'name'>> = {
   admin: {
@@ -47,20 +65,46 @@ function getToken(response: BackendAuthResponse): string | undefined {
   return response.access_token ?? response.accessToken ?? response.token
 }
 
-function toUser(response: BackendAuthResponse, email?: string, name?: string): User {
-  const role = isRole(response.user?.role) ? response.user.role : response.role
-  const resolvedRole = isRole(role) ? role : 'manager'
+function getRoomId(user?: BackendUser): string | undefined {
+  const roomId = user?.roomId ?? user?.assignedRoomId ?? user?.room?.id
+
+  return roomId == null ? undefined : String(roomId)
+}
+
+function toUserFromBackendUser(user: BackendUser, fallbackRole: Role = 'manager'): User {
+  const resolvedRole = isRole(user.role) ? user.role : fallbackRole
   const defaults = roleDefaults[resolvedRole]
-  const resolvedName = response.user?.name ?? name ?? defaults.name
+  const resolvedName = user.name ?? defaults.name
 
   return {
-    id: String(response.user?.id ?? email ?? resolvedRole),
+    id: String(user.id ?? resolvedRole),
     name: resolvedName,
     role: resolvedRole,
-    department: response.user?.department ?? defaults.department,
-    roomId: response.user?.roomId,
-    avatarInitials: response.user?.avatarInitials ?? getAvatarInitials(resolvedName),
+    department: user.department ?? defaults.department,
+    roomId: getRoomId(user),
+    avatarInitials: user.avatarInitials ?? getAvatarInitials(resolvedName),
   }
+}
+
+function toUser(response: BackendAuthResponse, email?: string, name?: string): User {
+  const backendUser = response.user ?? response
+  const role = isRole(backendUser.role) ? backendUser.role : response.role
+  const resolvedRole = isRole(role) ? role : 'manager'
+  const defaults = roleDefaults[resolvedRole]
+  const resolvedName = backendUser.name ?? name ?? defaults.name
+
+  return {
+    id: String(backendUser.id ?? email ?? resolvedRole),
+    name: resolvedName,
+    role: resolvedRole,
+    department: backendUser.department ?? defaults.department,
+    roomId: getRoomId(backendUser),
+    avatarInitials: backendUser.avatarInitials ?? getAvatarInitials(resolvedName),
+  }
+}
+
+function getMeUser(response: BackendMeResponse): BackendUser {
+  return 'user' in response && response.user ? response.user : response as BackendUser
 }
 
 function readStoredUser(): User | null {
@@ -87,22 +131,47 @@ function persistSession(response: BackendAuthResponse, user: User): void {
   localStorage.setItem('currentUser', JSON.stringify(user))
 }
 
+function persistUser(user: User): void {
+  localStorage.setItem('currentUser', JSON.stringify(user))
+}
+
+async function fetchCurrentUser(fallbackRole: Role = 'manager'): Promise<User | null> {
+  try {
+    const response = await apiClient.get<BackendMeResponse>('/auth/me')
+    const user = toUserFromBackendUser(getMeUser(response.data), fallbackRole)
+
+    persistUser(user)
+
+    return user
+  } catch (error) {
+    console.warn('backendAuthApi.getCurrentUser: /auth/me is not available', error)
+
+    return readStoredUser()
+  }
+}
+
 export const backendAuthApi: AuthApi = {
   getDefaultUser(): User | null {
     return null
   },
 
   getCurrentUser(): Promise<User | null> {
-    return Promise.resolve(readStoredUser())
+    const storedUser = readStoredUser()
+
+    if (!localStorage.getItem('access_token')) {
+      return Promise.resolve(storedUser)
+    }
+
+    return fetchCurrentUser(storedUser?.role)
   },
 
   async login(email: string, password: string): Promise<User> {
     const response = await apiClient.post<BackendAuthResponse>('/auth/login', { email, password })
-    const user = toUser(response.data, email)
+    const fallbackUser = toUser(response.data, email)
 
-    persistSession(response.data, user)
+    persistSession(response.data, fallbackUser)
 
-    return user
+    return await fetchCurrentUser(fallbackUser.role) ?? fallbackUser
   },
 
   async register(name: string, email: string, password: string, role: Role): Promise<User> {

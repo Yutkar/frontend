@@ -8,17 +8,23 @@ import {
   type BackendQueueStats,
   type BackendTicket,
 } from '../backendAdapters'
-import { apiClient } from '../client'
+import { apiClient, publicApiClient } from '../client'
 import type { QueueApi, QueueOverloadRoom } from '../types'
 
-async function loadQueueSnapshot() {
+async function loadQueueSnapshot(ticketPath = '/tickets?status=waiting') {
   const [ticketsResponse, statsResponse, overloadResponse] = await Promise.all([
-    apiClient.get<BackendTicket[]>('/tickets'),
+    apiClient.get<BackendTicket[]>(ticketPath),
     apiClient.get<BackendQueueStats[]>('/queue/stats'),
     apiClient.get<BackendOverloadRoom[]>('/queue/overload'),
   ])
 
   return toQueueSnapshot(ticketsResponse.data, statsResponse.data, overloadResponse.data)
+}
+
+async function arriveCreatedTicket(ticket: BackendTicket): Promise<void> {
+  if (ticket.status === 'created') {
+    await apiClient.post<BackendTicket>(`/tickets/${ticket.id}/arrive`)
+  }
 }
 
 function toQueueStats(stats: BackendQueueStats[], overload: BackendOverloadRoom[]): QueueStats {
@@ -54,19 +60,36 @@ export const backendQueueApi: QueueApi = {
   },
 
   async getBoardSnapshot() {
-    const response = await apiClient.get<BackendTicket[]>('/queue/board')
+    const response = await publicApiClient.get<BackendTicket[]>('/queue/board')
 
     return toQueueSnapshot(response.data)
   },
 
+  async getRoomQueueSnapshot(roomId: string | number) {
+    const [ticketsResponse, statsResponse, overloadResponse] = await Promise.all([
+      apiClient.get<BackendTicket[]>(`/queue/room/${roomId}`),
+      apiClient.get<BackendQueueStats[]>('/queue/stats'),
+      apiClient.get<BackendOverloadRoom[]>('/queue/overload'),
+    ])
+
+    return toQueueSnapshot(ticketsResponse.data, statsResponse.data, overloadResponse.data)
+  },
+
   async createTicket(input) {
-    await apiClient.post<BackendTicket>('/tickets', toBackendTicketCreateInput(input))
+    const response = await apiClient.post<BackendTicket>('/tickets', toBackendTicketCreateInput(input))
+
+    await arriveCreatedTicket(response.data)
 
     return loadQueueSnapshot()
   },
 
   async createKioskTicket(input) {
-    await apiClient.post<BackendTicket>('/tickets/kiosk', toBackendTicketCreateInput(input))
+    const response = await apiClient.post<BackendTicket>(
+      '/tickets/kiosk',
+      toBackendTicketCreateInput(input),
+    )
+
+    await arriveCreatedTicket(response.data)
 
     return loadQueueSnapshot()
   },
@@ -154,7 +177,7 @@ export const backendQueueApi: QueueApi = {
   },
 
   async getQueue() {
-    const response = await apiClient.get<BackendTicket[]>('/tickets')
+    const response = await apiClient.get<BackendTicket[]>('/tickets?status=waiting')
 
     return toArchitectureTickets(response.data)
   },
@@ -168,7 +191,7 @@ export const backendQueueApi: QueueApi = {
   subscribeQueue(listener) {
     let active = true
 
-    apiClient
+    publicApiClient
       .get<BackendTicket[]>('/queue/board')
       .then((response) => {
         if (active) {

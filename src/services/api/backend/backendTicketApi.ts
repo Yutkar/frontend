@@ -54,6 +54,16 @@ async function postTicketAction(id: string, action: string) {
   return toArchitectureTicket(response.data)
 }
 
+async function arriveCreatedTicket(ticket: BackendTicket): Promise<BackendTicket> {
+  if (ticket.status !== 'created') {
+    return ticket
+  }
+
+  const response = await apiClient.post<BackendTicket>(`/tickets/${ticket.id}/arrive`)
+
+  return response.data
+}
+
 async function getOrEmpty<T>(path: string): Promise<T[]> {
   try {
     const response = await apiClient.get<T[]>(path)
@@ -170,8 +180,9 @@ export const backendTicketApi: TicketApi = {
       '/tickets',
       toBackendArchitectureTicketCreateInput(input),
     )
+    const ticket = await arriveCreatedTicket(response.data)
 
-    return toArchitectureTicket(response.data)
+    return toArchitectureTicket(ticket)
   },
 
   async createKioskTicket(input) {
@@ -179,8 +190,9 @@ export const backendTicketApi: TicketApi = {
       '/tickets/kiosk',
       toBackendArchitectureTicketCreateInput(input),
     )
+    const ticket = await arriveCreatedTicket(response.data)
 
-    return toArchitectureTicket(response.data)
+    return toArchitectureTicket(ticket)
   },
 
   arriveTicket(id: string) {
