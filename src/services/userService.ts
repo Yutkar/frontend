@@ -1,19 +1,33 @@
-import { apiClient } from './api/client'
-import type { UserRole } from '../types'
+import { adminApi, authApi } from './api'
+import type { User as SharedUser } from '@shared/types'
+import type { User, UserRole } from '../types'
 
 type AuthResponse = {
   access_token: string
   role: UserRole
 }
 
+function toArchitectureUser(user: SharedUser): User {
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+  }
+}
+
+function getStoredToken(): string {
+  return localStorage.getItem('access_token') ?? ''
+}
+
 export const userService = {
   async login(email: string, password: string): Promise<AuthResponse> {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/login', { email, password })
+      const user = await authApi.login(email, password)
 
-      localStorage.setItem('access_token', response.data.access_token)
-
-      return response.data
+      return {
+        access_token: getStoredToken(),
+        role: user.role,
+      }
     } catch (error) {
       console.error('userService.login failed', error)
       throw error
@@ -27,25 +41,43 @@ export const userService = {
     role: UserRole,
   ): Promise<AuthResponse> {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/register', {
-        name,
-        email,
-        password,
-        role,
-      })
+      const user = await authApi.register(name, email, password, role)
 
-      localStorage.setItem('access_token', response.data.access_token)
-
-      return response.data
+      return {
+        access_token: getStoredToken(),
+        role: user.role,
+      }
     } catch (error) {
       console.error('userService.register failed', error)
       throw error
     }
   },
 
+  async getCurrentUser(): Promise<User | undefined> {
+    try {
+      const user = await authApi.getCurrentUser()
+
+      return user ? toArchitectureUser(user) : undefined
+    } catch (error) {
+      console.error('userService.getCurrentUser failed', error)
+      throw error
+    }
+  },
+
+  async getUsers(): Promise<User[]> {
+    try {
+      const users = await adminApi.getUsers()
+
+      return users.map(toArchitectureUser)
+    } catch (error) {
+      console.error('userService.getUsers failed', error)
+      throw error
+    }
+  },
+
   logout() {
     try {
-      localStorage.removeItem('access_token')
+      authApi.logout()
     } catch (error) {
       console.error('userService.logout failed', error)
       throw error

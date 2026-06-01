@@ -1,0 +1,109 @@
+import type {
+  QueueSnapshot,
+  RedirectTicketInput,
+  Ticket as SharedTicket,
+  TicketCreateInput as SharedTicketCreateInput,
+  User as SharedUser,
+} from '@shared/types'
+import type {
+  CreateTicketInput as ArchitectureCreateTicketInput,
+  QueueStats as ArchitectureQueueStats,
+  Room as ArchitectureRoom,
+  Ticket as ArchitectureTicket,
+  UpdateTicketStatusInput,
+} from '../../types'
+
+export type QueueOverloadRoom = {
+  roomId: string
+  roomName: string
+  queueCount: number
+}
+
+export type TicketApi = {
+  getTickets: () => Promise<ArchitectureTicket[]>
+  getTicketById: (id: string) => Promise<ArchitectureTicket | undefined>
+  createTicket: (input: ArchitectureCreateTicketInput) => Promise<ArchitectureTicket>
+  createKioskTicket: (input: ArchitectureCreateTicketInput) => Promise<ArchitectureTicket>
+  arriveTicket: (id: string) => Promise<ArchitectureTicket>
+  callTicket: (id: string) => Promise<ArchitectureTicket>
+  startTicket: (id: string) => Promise<ArchitectureTicket>
+  completeTicket: (id: string) => Promise<ArchitectureTicket>
+  cancelTicket: (id: string) => Promise<ArchitectureTicket>
+  noShowTicket: (id: string) => Promise<ArchitectureTicket>
+  skipTicket: (id: string) => Promise<ArchitectureTicket>
+  returnTicket: (id: string) => Promise<ArchitectureTicket>
+  redirectTicket: (id: string, newRoomId: string | number) => Promise<ArchitectureTicket>
+  updateTicketStatus: (input: UpdateTicketStatusInput) => Promise<ArchitectureTicket | undefined>
+}
+
+export type QueueListener = (tickets: ArchitectureTicket[]) => void
+
+export type QueueApi = {
+  getQueueSnapshot: () => Promise<QueueSnapshot>
+  getBoardSnapshot: () => Promise<QueueSnapshot>
+  createTicket: (input: SharedTicketCreateInput) => Promise<QueueSnapshot>
+  createKioskTicket: (input: SharedTicketCreateInput) => Promise<QueueSnapshot>
+  callNextTicket: (roomId: string) => Promise<QueueSnapshot>
+  startService: (ticketId: string) => Promise<QueueSnapshot>
+  completeService: (ticketId: string) => Promise<QueueSnapshot>
+  skipTicket: (ticketId: string) => Promise<QueueSnapshot>
+  returnTicket: (ticketId: string) => Promise<QueueSnapshot>
+  redirectTicket: (input: RedirectTicketInput) => Promise<QueueSnapshot>
+  recalculateRoom: (roomId: string | number) => Promise<QueueSnapshot>
+  getStats: () => Promise<ArchitectureQueueStats>
+  getQueueByRoom: (roomId: string | number) => Promise<ArchitectureTicket[]>
+  getNextTicket: (roomId: string | number) => Promise<ArchitectureTicket | undefined>
+  getHighPriority: () => Promise<ArchitectureTicket[]>
+  checkOverload: () => Promise<QueueOverloadRoom[]>
+  getQueue: () => Promise<ArchitectureTicket[]>
+  getRooms: () => Promise<ArchitectureRoom[]>
+  subscribeQueue: (listener: QueueListener) => () => void
+  replaceQueue: (nextTickets: ArchitectureTicket[]) => void
+}
+
+export type AuthApi = {
+  getDefaultUser: () => SharedUser | null
+  getCurrentUser: () => Promise<SharedUser | null>
+  login: (email: string, password: string) => Promise<SharedUser>
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    role: SharedUser['role'],
+  ) => Promise<SharedUser>
+  resetPassword: (email: string) => Promise<void>
+  loginAsRole: (role: SharedUser['role']) => Promise<SharedUser>
+  logout: () => void
+}
+
+export type AdminRecord = {
+  id: string | number
+} & Record<string, unknown>
+
+export type AdminRecordInput = Record<string, unknown>
+
+export type AdminUserInput = Partial<SharedUser> & {
+  email?: string
+  name: string
+  password?: string
+  role: SharedUser['role']
+}
+
+export type AdminApi = {
+  getRooms: () => Promise<AdminRecord[]>
+  createRoom: (input: AdminRecordInput) => Promise<AdminRecord>
+  updateRoom: (id: string | number, input: AdminRecordInput) => Promise<AdminRecord>
+  deleteRoom: (id: string | number) => Promise<void>
+  getStaff: () => Promise<AdminRecord[]>
+  createStaff: (input: AdminRecordInput) => Promise<AdminRecord>
+  updateStaff: (id: string | number, input: AdminRecordInput) => Promise<AdminRecord>
+  deleteStaff: (id: string | number) => Promise<void>
+  getUsers: () => Promise<SharedUser[]>
+  createUser: (input: AdminUserInput) => Promise<SharedUser>
+  updateUser: (id: string | number, input: Partial<AdminUserInput>) => Promise<SharedUser>
+  deleteUser: (id: string | number) => Promise<void>
+}
+
+export type KioskApi = {
+  createTicket: (input: SharedTicketCreateInput) => Promise<SharedTicket>
+}
