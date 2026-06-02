@@ -1,5 +1,4 @@
 import {
-  Activity,
   BarChart3,
   ClipboardPlus,
   LayoutDashboard,
@@ -15,7 +14,6 @@ import { AnalyticsPage } from './AnalyticsPage'
 import { AdminPage } from './admin/AdminPage'
 import { DashboardPage } from './DashboardPage'
 import { KioskPage } from './KioskPage'
-import { QueuePage } from './QueuePage'
 import { SettingsPage } from './SettingsPage'
 import { SpecialistPanelPage } from './SpecialistPanelPage'
 import { TicketCreatePage } from './TicketCreatePage'
@@ -31,10 +29,10 @@ export const smartqBusinessRoutes: AppRoute[] = [
   },
   {
     path: '/queue',
-    label: t.nav.queue,
-    icon: Activity,
+    label: t.nav.dashboard,
     allowedRoles: ['admin', 'manager'],
-    element: <QueuePage />,
+    hideFromSidebar: true,
+    element: <Navigate replace to="/dashboard" />,
   },
   {
     path: '/tickets',

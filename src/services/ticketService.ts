@@ -1,9 +1,11 @@
 import {
   ticketApi,
+  toServiceError,
   type TicketCreateSettingsPayload,
   type TicketSettingsOptions,
   type TicketSettingsPayload,
 } from './api'
+import { withOperationalRefresh } from './syncService'
 import type { Ticket as SharedTicket } from '@shared/types'
 import type {
   CreateTicketInput,
@@ -17,7 +19,7 @@ export const ticketService = {
       return await ticketApi.getTickets()
     } catch (error) {
       console.error('ticketService.getTickets failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить талоны')
     }
   },
 
@@ -26,115 +28,151 @@ export const ticketService = {
       return await ticketApi.getTicketById(id)
     } catch (error) {
       console.error('ticketService.getTicketById failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить талон')
     }
   },
 
   async createTicket(input: CreateTicketInput): Promise<Ticket> {
     try {
-      return await ticketApi.createTicket(input)
+      return await withOperationalRefresh(
+        () => ticketApi.createTicket(input),
+        'Талон успешно создан',
+      )
     } catch (error) {
       console.error('ticketService.createTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось создать талон')
     }
   },
 
   async createTicketWithSettings(input: TicketCreateSettingsPayload): Promise<SharedTicket> {
     try {
-      return await ticketApi.createTicketWithSettings(input)
+      return await withOperationalRefresh(
+        () => ticketApi.createTicketWithSettings(input),
+        'Талон успешно создан',
+      )
     } catch (error) {
       console.error('ticketService.createTicketWithSettings failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось создать талон')
     }
   },
 
   async arriveTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketApi.arriveTicket(id)
+      return await withOperationalRefresh(
+        () => ticketApi.arriveTicket(id),
+        'Талон возвращён в очередь',
+      )
     } catch (error) {
       console.error('ticketService.arriveTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось вернуть талон в очередь')
     }
   },
 
   async callTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketApi.callTicket(id)
+      return await withOperationalRefresh(
+        () => ticketApi.callTicket(id),
+        'Пациент вызван',
+      )
     } catch (error) {
       console.error('ticketService.callTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось вызвать пациента')
     }
   },
 
   async startTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketApi.startTicket(id)
+      return await withOperationalRefresh(
+        () => ticketApi.startTicket(id),
+        'Приём начат',
+      )
     } catch (error) {
       console.error('ticketService.startTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось начать приём')
     }
   },
 
   async completeTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketApi.completeTicket(id)
+      return await withOperationalRefresh(
+        () => ticketApi.completeTicket(id),
+        'Приём завершён',
+      )
     } catch (error) {
       console.error('ticketService.completeTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось завершить приём')
     }
   },
 
   async cancelTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketApi.cancelTicket(id)
+      return await withOperationalRefresh(
+        () => ticketApi.cancelTicket(id),
+        'Талон отменён',
+      )
     } catch (error) {
       console.error('ticketService.cancelTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось отменить талон')
     }
   },
 
   async noShowTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketApi.noShowTicket(id)
+      return await withOperationalRefresh(
+        () => ticketApi.noShowTicket(id),
+        'Талон отмечен как неявка',
+      )
     } catch (error) {
       console.error('ticketService.noShowTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось отметить неявку')
     }
   },
 
   async skipTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketApi.skipTicket(id)
+      return await withOperationalRefresh(
+        () => ticketApi.skipTicket(id),
+        'Талон отмечен как неявка',
+      )
     } catch (error) {
       console.error('ticketService.skipTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось отметить неявку')
     }
   },
 
   async returnTicket(id: string): Promise<Ticket> {
     try {
-      return await ticketApi.returnTicket(id)
+      return await withOperationalRefresh(
+        () => ticketApi.returnTicket(id),
+        'Талон возвращён в очередь',
+      )
     } catch (error) {
       console.error('ticketService.returnTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось вернуть талон в очередь')
     }
   },
 
   async redirectTicket(id: string, newRoomId: string | number): Promise<Ticket> {
     try {
-      return await ticketApi.redirectTicket(id, newRoomId)
+      return await withOperationalRefresh(
+        () => ticketApi.redirectTicket(id, newRoomId),
+        'Талон перенаправлен',
+      )
     } catch (error) {
       console.error('ticketService.redirectTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось перенаправить талон')
     }
   },
 
   async updateTicketStatus(input: UpdateTicketStatusInput): Promise<Ticket | undefined> {
     try {
-      return await ticketApi.updateTicketStatus(input)
+      return await withOperationalRefresh(
+        () => ticketApi.updateTicketStatus(input),
+        'Статус талона обновлён',
+      )
     } catch (error) {
       console.error('ticketService.updateTicketStatus failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось обновить статус талона')
     }
   },
 
@@ -143,16 +181,19 @@ export const ticketService = {
       return await ticketApi.getTicketSettingsOptions()
     } catch (error) {
       console.error('ticketService.getTicketSettingsOptions failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить настройки талона')
     }
   },
 
   async updateTicketSettings(id: string, payload: TicketSettingsPayload): Promise<void> {
     try {
-      await ticketApi.updateTicketSettings(id, payload)
+      await withOperationalRefresh(
+        () => ticketApi.updateTicketSettings(id, payload),
+        'Талон успешно сохранён',
+      )
     } catch (error) {
       console.error('ticketService.updateTicketSettings failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось сохранить настройки талона')
     }
   },
 }

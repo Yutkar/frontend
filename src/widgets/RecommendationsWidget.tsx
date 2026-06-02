@@ -28,20 +28,27 @@ export function RecommendationsWidget({ recommendations }: RecommendationsWidget
         </div>
       </div>
 
-      <div className="recommendation-mini-list">
-        {recommendations.slice(0, 4).map((recommendation) => (
-          <article
-            className={`recommendation-mini recommendation-${recommendation.severity}`}
-            key={recommendation.id}
-          >
-            <span>{severityIcon(recommendation.severity)}</span>
-            <div>
-              <strong>{recommendation.message}</strong>
-              <p>{recommendation.action}</p>
-            </div>
-          </article>
-        ))}
-      </div>
+      {recommendations.length > 0 ? (
+        <div className="recommendation-mini-list">
+          {recommendations.slice(0, 4).map((recommendation) => (
+            <article
+              className={`recommendation-mini recommendation-${recommendation.severity}`}
+              key={recommendation.id}
+            >
+              <span>{severityIcon(recommendation.severity)}</span>
+              <div>
+                <strong>{recommendation.message}</strong>
+                <p>{recommendation.action}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-inline">
+          <strong>Рекомендаций нет</strong>
+          <span>Система не видит перегрузки или критичных предупреждений.</span>
+        </div>
+      )}
     </section>
   )
 }

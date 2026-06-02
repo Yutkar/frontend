@@ -1,13 +1,30 @@
-import { queueApi, ticketApi, type QueueListener, type QueueOverloadRoom } from './api'
+import {
+  queueApi,
+  ticketApi,
+  toServiceError,
+  type QueueListener,
+  type QueueOverloadRoom,
+} from './api'
+import type { QueueSnapshot } from '@shared/types'
+import { withOperationalRefresh } from './syncService'
 import type { QueueStats, Room, Ticket } from '../types'
 
 export const queueService = {
+  async getBoardSnapshot(): Promise<QueueSnapshot> {
+    try {
+      return await queueApi.getBoardSnapshot()
+    } catch (error) {
+      console.error('queueService.getBoardSnapshot failed', error)
+      throw toServiceError(error, 'Не удалось получить данные табло')
+    }
+  },
+
   async getStats(): Promise<QueueStats> {
     try {
       return await queueApi.getStats()
     } catch (error) {
       console.error('queueService.getStats failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить статистику')
     }
   },
 
@@ -16,7 +33,7 @@ export const queueService = {
       return await queueApi.getQueueByRoom(roomId)
     } catch (error) {
       console.error('queueService.getQueueByRoom failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить очередь кабинета')
     }
   },
 
@@ -25,7 +42,7 @@ export const queueService = {
       return await queueApi.getNextTicket(roomId)
     } catch (error) {
       console.error('queueService.getNextTicket failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить следующий талон')
     }
   },
 
@@ -34,7 +51,7 @@ export const queueService = {
       return await queueApi.getHighPriority()
     } catch (error) {
       console.error('queueService.getHighPriority failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить приоритетные талоны')
     }
   },
 
@@ -43,7 +60,7 @@ export const queueService = {
       return await queueApi.checkOverload()
     } catch (error) {
       console.error('queueService.checkOverload failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось проверить нагрузку кабинетов')
     }
   },
 
@@ -52,7 +69,7 @@ export const queueService = {
       return await queueApi.getQueue()
     } catch (error) {
       console.error('queueService.getQueue failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить очередь')
     }
   },
 
@@ -61,42 +78,50 @@ export const queueService = {
       return await queueApi.getRooms()
     } catch (error) {
       console.error('queueService.getRooms failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить кабинеты')
     }
   },
 
   async callNext(roomId?: string | number): Promise<Ticket | undefined> {
     try {
-      if (!roomId) {
-        const highPriorityTicket = (await queueApi.getHighPriority())[0]
+      return await withOperationalRefresh(async () => {
+        if (!roomId) {
+          const highPriorityTicket = (await queueApi.getHighPriority())[0]
 
-        return highPriorityTicket ? ticketApi.callTicket(highPriorityTicket.id) : undefined
-      }
+          return highPriorityTicket ? ticketApi.callTicket(highPriorityTicket.id) : undefined
+        }
 
-      const nextTicket = await queueApi.getNextTicket(roomId)
+        const nextTicket = await queueApi.getNextTicket(roomId)
 
-      return nextTicket ? ticketApi.callTicket(nextTicket.id) : undefined
+        return nextTicket ? ticketApi.callTicket(nextTicket.id) : undefined
+      }, 'Пациент вызван')
     } catch (error) {
       console.error('queueService.callNext failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось вызвать следующего пациента')
     }
   },
 
   async startService(ticketId: string): Promise<Ticket | undefined> {
     try {
-      return await ticketApi.startTicket(ticketId)
+      return await withOperationalRefresh(
+        () => ticketApi.startTicket(ticketId),
+        'Приём начат',
+      )
     } catch (error) {
       console.error('queueService.startService failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось начать приём')
     }
   },
 
   async completeService(ticketId: string): Promise<Ticket | undefined> {
     try {
-      return await ticketApi.completeTicket(ticketId)
+      return await withOperationalRefresh(
+        () => ticketApi.completeTicket(ticketId),
+        'Приём завершён',
+      )
     } catch (error) {
       console.error('queueService.completeService failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось завершить приём')
     }
   },
 

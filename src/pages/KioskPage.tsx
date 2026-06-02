@@ -12,6 +12,7 @@ import { ticketService } from '@services/ticketService'
 import type { TicketSettingsOptions } from '@services/api'
 import type { Ticket } from '@shared/types'
 import { Button } from '@shared/ui/components'
+import { useQueueStore } from '@store/queue'
 
 const emptyOptions: TicketSettingsOptions = {
   rooms: [],
@@ -20,6 +21,7 @@ const emptyOptions: TicketSettingsOptions = {
 }
 
 export function KioskPage() {
+  const loadQueue = useQueueStore((state) => state.loadQueue)
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -120,6 +122,7 @@ export function KioskPage() {
       })
 
       setCreatedTicket(ticket)
+      void loadQueue({ force: true, successMessage: 'Данные успешно обновлены' })
     } catch (createError) {
       console.error('Kiosk ticket create failed', createError)
       setError('Не удалось создать талон. Попробуйте ещё раз.')

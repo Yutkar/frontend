@@ -1,7 +1,12 @@
 import { mockUsers } from '@mock/auth.mock'
 import type { User } from '@shared/types'
 import type { AdminApi, AdminRecord, AdminRecordInput, AdminUserInput } from '../types'
-import { getMockServiceTypeOptions, getQueueSnapshot } from './mockState'
+import {
+  deactivateMockQueueRoom,
+  getMockServiceTypeOptions,
+  getQueueSnapshot,
+  upsertMockQueueRoom,
+} from './mockState'
 
 let rooms = getQueueSnapshot().rooms.map<AdminRecord>((room) => ({ ...room }))
 let staff: AdminRecord[] = [
@@ -126,16 +131,22 @@ export const mockAdminApi: AdminApi = {
     }
 
     rooms = [...rooms, room]
+    upsertMockQueueRoom(room)
 
     return Promise.resolve(clone(room))
   },
 
   updateRoom(id, input) {
-    return Promise.resolve(upsertRecord(rooms, id, input))
+    const room = upsertRecord(rooms, id, input)
+
+    upsertMockQueueRoom(room)
+
+    return Promise.resolve(room)
   },
 
   deleteRoom(id) {
     rooms = deleteRecord(rooms, id)
+    deactivateMockQueueRoom(id)
 
     return Promise.resolve()
   },

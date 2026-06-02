@@ -1,4 +1,4 @@
-import { adminApi, authApi } from './api'
+import { adminApi, authApi, toServiceError } from './api'
 import type { User as SharedUser } from '@shared/types'
 import type { User, UserRole } from '../types'
 
@@ -30,7 +30,7 @@ export const userService = {
       }
     } catch (error) {
       console.error('userService.login failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось войти в систему')
     }
   },
 
@@ -49,7 +49,16 @@ export const userService = {
       }
     } catch (error) {
       console.error('userService.register failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось зарегистрироваться')
+    }
+  },
+
+  async resetPassword(email: string): Promise<void> {
+    try {
+      await authApi.resetPassword(email)
+    } catch (error) {
+      console.error('userService.resetPassword failed', error)
+      throw toServiceError(error, 'Не удалось отправить письмо для восстановления пароля')
     }
   },
 
@@ -60,7 +69,7 @@ export const userService = {
       return user ? toArchitectureUser(user) : undefined
     } catch (error) {
       console.error('userService.getCurrentUser failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить текущего пользователя')
     }
   },
 
@@ -71,7 +80,7 @@ export const userService = {
       return users.map(toArchitectureUser)
     } catch (error) {
       console.error('userService.getUsers failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось получить пользователей')
     }
   },
 
@@ -80,7 +89,7 @@ export const userService = {
       authApi.logout()
     } catch (error) {
       console.error('userService.logout failed', error)
-      throw error
+      throw toServiceError(error, 'Не удалось выйти из системы')
     }
   },
 }

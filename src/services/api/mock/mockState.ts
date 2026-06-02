@@ -110,13 +110,32 @@ function findRoom(roomId?: string): SharedRoom | undefined {
   return queueSnapshot.rooms.find((room) => room.id === roomId)
 }
 
+function getRecordText(record: Record<string, unknown>, keys: string[], fallback: string): string {
+  const value = keys.map((key) => record[key]).find((item) => typeof item === 'string' && item.trim())
+
+  return typeof value === 'string' ? value : fallback
+}
+
+function getRecordActive(record: Record<string, unknown>): boolean {
+  if (typeof record.isActive === 'boolean') {
+    return record.isActive
+  }
+
+  if (typeof record.active === 'boolean') {
+    return record.active
+  }
+
+  return record.status !== 'paused' && record.status !== 'inactive' && record.status !== 'deleted'
+}
+
 function refreshQueueSnapshot(): void {
   queueSnapshot.rooms = queueSnapshot.rooms.map((room) => {
+    const isActive = room.isActive !== false && room.status !== 'paused'
     const currentTicket = queueSnapshot.tickets.find(
-      (ticket) => ticket.roomId === room.id && ['called', 'in_service'].includes(ticket.status),
+      (ticket) => isActive && ticket.roomId === room.id && ['called', 'in_service'].includes(ticket.status),
     )
     const waitingCount = queueSnapshot.tickets.filter(
-      (ticket) => ticket.status === 'waiting' && (!ticket.roomId || ticket.roomId === room.id),
+      (ticket) => isActive && ticket.status === 'waiting' && (!ticket.roomId || ticket.roomId === room.id),
     ).length
     const loadPercent = Math.min(100, Math.max(room.workload ?? 0, waitingCount * 12 + (currentTicket ? 30 : 0)))
 
@@ -124,11 +143,54 @@ function refreshQueueSnapshot(): void {
       ...room,
       currentTicketId: currentTicket?.id,
       loadPercent,
-      status: currentTicket ? 'busy' : room.status === 'paused' ? 'paused' : 'open',
+      status: isActive ? currentTicket ? 'busy' : 'open' : 'paused',
       workload: loadPercent,
     }
   })
   queueSnapshot.kpi = calculateQueueKpi(queueSnapshot.tickets, queueSnapshot.rooms)
+}
+
+export function upsertMockQueueRoom(record: { id: string | number } & Record<string, unknown>): void {
+  const id = String(record.id)
+  const currentRoom = queueSnapshot.rooms.find((room) => room.id === id)
+  const isActive = getRecordActive(record)
+  const name = getRecordText(record, ['name', 'title', 'roomName'], currentRoom?.name ?? `Кабинет ${id}`)
+  const nextRoom: SharedRoom = {
+    department: getRecordText(record, ['department'], currentRoom?.department ?? name),
+    id,
+    isActive,
+    loadPercent: currentRoom?.loadPercent ?? 0,
+    name,
+    specialistName: currentRoom?.specialistName ?? name,
+    status: isActive ? currentRoom?.status === 'busy' ? 'busy' : 'open' : 'paused',
+    workload: currentRoom?.workload ?? 0,
+  }
+
+  queueSnapshot.rooms = currentRoom
+    ? queueSnapshot.rooms.map((room) => (room.id === id ? { ...room, ...nextRoom } : room))
+    : [...queueSnapshot.rooms, nextRoom]
+  refreshQueueSnapshot()
+}
+
+export function deactivateMockQueueRoom(id: string | number): void {
+  const roomId = String(id)
+  const currentRoom = queueSnapshot.rooms.find((room) => room.id === roomId)
+
+  if (!currentRoom) {
+    return
+  }
+
+  queueSnapshot.rooms = queueSnapshot.rooms.map((room) => (
+    room.id === roomId
+      ? {
+          ...room,
+          currentTicketId: undefined,
+          isActive: false,
+          status: 'paused',
+        }
+      : room
+  ))
+  refreshQueueSnapshot()
 }
 
 function pushEvent(ticket: SharedTicket, status: SharedTicketStatus): void {

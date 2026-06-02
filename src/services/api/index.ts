@@ -17,6 +17,7 @@ export const adminApi = API_MODE === 'backend' ? backendAdminApi : mockAdminApi
 export const kioskApi = API_MODE === 'backend' ? backendKioskApi : mockKioskApi
 
 export { socketClient } from './socketClient'
+export { getApiErrorMessage, toServiceError } from './errors'
 export type {
   AdminApi,
   AdminRecord,

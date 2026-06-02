@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { CallBoard } from '@features/tv-board/CallBoard'
 import { t } from '@shared/locales/useLocale'
-import { queueApi } from '@services/api'
+import { queueService } from '@services/queueService'
 import type { Room, Ticket } from '@shared/types'
 
 export function TvBoardPage() {
+  const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(new Date())
   const [rooms, setRooms] = useState<Room[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -12,11 +13,13 @@ export function TvBoardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const snapshot = await queueApi.getBoardSnapshot()
+        const snapshot = await queueService.getBoardSnapshot()
+        setError(null)
         setTickets(snapshot.tickets)
         setRooms(snapshot.rooms)
       } catch (error) {
         console.error('Board load failed', error)
+        setError('Не удалось получить данные табло')
       }
     }
 
@@ -47,6 +50,12 @@ export function TvBoardPage() {
           }).format(now)}
         </time>
       </header>
+      {error ? (
+        <section className="empty-state">
+          <h2>{error}</h2>
+          <p>Проверьте подключение к серверу.</p>
+        </section>
+      ) : null}
       <CallBoard rooms={rooms} tickets={tickets} />
     </main>
   )

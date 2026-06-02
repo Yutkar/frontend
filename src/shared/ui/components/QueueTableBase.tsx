@@ -61,7 +61,12 @@ export function QueueTableBase({
                 <td>
                   <StatusBadge priority={ticket.priority} />
                 </td>
-                <td>{room?.name ?? '-'}</td>
+                <td>
+                  {room?.name ?? '-'}
+                  {room?.isActive === false || room?.status === 'paused' ? (
+                    <span className="queue-room-warning">Кабинет закрыт</span>
+                  ) : null}
+                </td>
                 <td>{formatEta(ticket.etaMinutes)}</td>
                 <td>
                   <StatusBadge status={ticket.status} />

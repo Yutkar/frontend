@@ -3,6 +3,7 @@ import { Building2, CheckCircle2, Stethoscope, UsersRound } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import type { Role } from '@shared/types'
 import { useGlobalStore } from '@store/global'
+import { useQueueStore } from '@store/queue'
 import { getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
 import { ManagersSection } from './AdminManagersPage'
 import { RoomsSection } from './AdminRoomsPage'
@@ -38,6 +39,7 @@ const emptySummary: AdminSummary = {
 
 export function AdminPage() {
   const user = useGlobalStore((state) => state.user)
+  const loadQueue = useQueueStore((state) => state.loadQueue)
   const [activeSection, setActiveSection] = useState<AdminSectionId>('rooms')
   const [roomsVersion, setRoomsVersion] = useState(0)
   const [summary, setSummary] = useState<AdminSummary>(emptySummary)
@@ -77,6 +79,7 @@ export function AdminPage() {
   function handleRoomsChange() {
     setRoomsVersion((version) => version + 1)
     void loadSummary()
+    void loadQueue({ force: true, successMessage: 'Данные успешно обновлены' })
   }
 
   function handleAdminDataChange() {

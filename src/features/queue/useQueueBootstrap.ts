@@ -1,13 +1,23 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQueueStore } from '@store/queue'
 
-export function useQueueBootstrap() {
+type QueueBootstrapOptions = {
+  force?: boolean
+}
+
+export function useQueueBootstrap(options: QueueBootstrapOptions = {}) {
   const hydrated = useQueueStore((state) => state.hydrated)
   const loadQueue = useQueueStore((state) => state.loadQueue)
+  const loadedRef = useRef(false)
 
   useEffect(() => {
-    if (!hydrated) {
-      void loadQueue()
+    if (loadedRef.current) {
+      return
     }
-  }, [hydrated, loadQueue])
+
+    if (options.force || !hydrated) {
+      loadedRef.current = true
+      void loadQueue({ force: options.force })
+    }
+  }, [hydrated, loadQueue, options.force])
 }

@@ -42,6 +42,7 @@ export function TicketCard({ actionSlot, compact = false, room, ticket }: Ticket
         <span>
           <small>{t.tickets.room}</small>
           {room?.name ?? t.tickets.unassigned}
+          {room?.isActive === false || room?.status === 'paused' ? ' · Кабинет закрыт' : ''}
         </span>
       </div>
 

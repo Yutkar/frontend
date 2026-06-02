@@ -27,15 +27,13 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
 
-  // ИСПРАВЛЕНО: Убрана фильтрация по roomId, так как метод loadRoomQueue 
-  // уже загружает в стор только талоны текущего кабинета.
-  // Теперь мы фильтруем только по статусу.
   const roomTickets = useMemo(
     () =>
       tickets.filter((ticket) =>
+        String(ticket.roomId) === String(room.id) &&
         specialistVisibleStatuses.includes(ticket.status as (typeof specialistVisibleStatuses)[number]),
       ),
-    [tickets],
+    [room.id, tickets],
   )
 
   const currentTicket = useMemo<Ticket | undefined>(

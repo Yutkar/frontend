@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
-import { authApi } from '@services/api'
+import { userService } from '@services/userService'
 import { Button } from '@shared/ui/components'
 import { t } from '@shared/locales/useLocale'
 
@@ -24,10 +24,10 @@ export function PasswordRecoveryPage() {
     setIsLoading(true)
 
     try {
-      await authApi.resetPassword(email.trim())
+      await userService.resetPassword(email.trim())
       setSuccess(true)
     } catch (err) {
-      setError((err as Error).message || t.auth.invalidEmail)
+      setError('Не удалось отправить письмо. Проверьте подключение к серверу.')
     } finally {
       setIsLoading(false)
     }

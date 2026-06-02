@@ -15,17 +15,24 @@ export function RecentCallsWidget({ events }: RecentCallsWidgetProps) {
           <h2>{t.queue.recentEvents}</h2>
         </div>
       </div>
-      <div className="event-list">
-        {events.slice(0, 7).map((event) => (
-          <article className={`event-row event-${event.type}`} key={event.id}>
-            <span />
-            <div>
-              <strong>{event.message}</strong>
-              <time>{formatTime(event.occurredAt)}</time>
-            </div>
-          </article>
-        ))}
-      </div>
+      {events.length > 0 ? (
+        <div className="event-list">
+          {events.slice(0, 7).map((event) => (
+            <article className={`event-row event-${event.type}`} key={event.id}>
+              <span />
+              <div>
+                <strong>{event.message}</strong>
+                <time>{formatTime(event.occurredAt)}</time>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-inline">
+          <strong>Событий пока нет</strong>
+          <span>Новые действия с очередью появятся здесь.</span>
+        </div>
+      )}
     </section>
   )
 }

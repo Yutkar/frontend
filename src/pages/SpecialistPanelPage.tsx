@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { SpecialistControls } from '@features/specialist/SpecialistControls'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
 import { t } from '@shared/locales/useLocale'
@@ -9,32 +9,44 @@ import { useQueueStore } from '@store/queue'
 export function SpecialistPanelPage() {
   useQueueBootstrap()
 
+  const [roomStatusChecked, setRoomStatusChecked] = useState(false)
   const user = useGlobalStore((state) => state.user)
+  const hydrated = useQueueStore((state) => state.hydrated)
   const loadRoomQueue = useQueueStore((state) => state.loadRoomQueue)
+  const loading = useQueueStore((state) => state.loading)
   const rooms = useQueueStore((state) => state.rooms)
-  const specialistRoomId = user?.roomId
-  const room = rooms.find((item) => item.id === specialistRoomId) ?? (specialistRoomId
-    ? {
-        id: specialistRoomId,
-        name: `Кабинет ${specialistRoomId}`,
-        department: user?.department ?? 'Специалист',
-        specialistName: user?.name ?? 'Специалист',
-        status: 'open' as const,
-        loadPercent: 0,
-      }
-    : undefined)
+  const specialistRoomId = user?.roomId ?? user?.assignedRoomId
+  const room = rooms.find((item) => item.id === specialistRoomId)
+  const roomInactive = room?.isActive === false || room?.status === 'paused'
 
   useEffect(() => {
     if (!specialistRoomId) {
+      setRoomStatusChecked(false)
       return
     }
 
-    void loadRoomQueue(specialistRoomId)
+    let active = true
+    const roomId = specialistRoomId
+
+    setRoomStatusChecked(false)
+
+    async function refreshRoomQueue() {
+      await loadRoomQueue(roomId)
+
+      if (active) {
+        setRoomStatusChecked(true)
+      }
+    }
+
+    void refreshRoomQueue()
     const interval = window.setInterval(() => {
-      void loadRoomQueue(specialistRoomId)
+      void refreshRoomQueue()
     }, 5_000)
 
-    return () => window.clearInterval(interval)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
   }, [loadRoomQueue, specialistRoomId])
 
   if (!user) {
@@ -42,12 +54,41 @@ export function SpecialistPanelPage() {
   }
 
   if (!room) {
+    if (specialistRoomId && (loading || !hydrated || !roomStatusChecked)) {
+      return (
+        <section className="empty-state">
+          <span className="eyebrow">{t.specialist.panel}</span>
+          <h1>Загрузка данных...</h1>
+          <p>Проверяем статус кабинета специалиста.</p>
+        </section>
+      )
+    }
+
     return (
       <section className="empty-state">
         <span className="eyebrow">{t.specialist.panel}</span>
-        <h1>Кабинет специалиста не назначен</h1>
-        <p>{t.specialist.assignRoom}</p>
+        <h1>{specialistRoomId ? 'Кабинет специалиста неактивен' : 'Кабинет специалиста не назначен'}</h1>
+        <p>{specialistRoomId ? 'Ваш кабинет временно закрыт. Обратитесь к администратору.' : t.specialist.assignRoom}</p>
       </section>
+    )
+  }
+
+  if (roomInactive) {
+    return (
+      <div className="page-stack">
+        <section className="specialist-header">
+          <div>
+            <span className="eyebrow">{t.specialist.currentPatientView}</span>
+            <h2>{room.specialistName}</h2>
+          </div>
+          <StatusBadge label="Кабинет закрыт" tone="warning" />
+        </section>
+        <section className="empty-state">
+          <span className="eyebrow">{t.specialist.panel}</span>
+          <h1>Кабинет специалиста неактивен</h1>
+          <p>Ваш кабинет временно закрыт. Управление очередью недоступно.</p>
+        </section>
+      </div>
     )
   }
 

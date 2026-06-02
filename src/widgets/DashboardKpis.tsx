@@ -1,45 +1,67 @@
-import { ClipboardList, Clock3, DoorOpen, Stethoscope } from 'lucide-react'
+import {
+  BellRing,
+  CheckCircle2,
+  ClipboardList,
+  DoorOpen,
+  Hourglass,
+  Stethoscope,
+} from 'lucide-react'
 import { t } from '@shared/locales/useLocale'
 import { KPIWidget } from '@shared/ui/components'
-import { formatEta } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
 export function DashboardKpis() {
-  const kpi = useQueueStore((state) => state.kpi)
   const rooms = useQueueStore((state) => state.rooms)
   const tickets = useQueueStore((state) => state.tickets)
-  const activeRooms = rooms.filter((room) => room.status !== 'paused').length
+  const activeRooms = rooms.filter((room) => room.isActive !== false && room.status !== 'paused').length
+  const waitingTickets = tickets.filter((ticket) => ticket.status === 'waiting').length
+  const calledTickets = tickets.filter((ticket) => ticket.status === 'called').length
+  const inServiceTickets = tickets.filter((ticket) => ticket.status === 'in_service').length
+  const completedTickets = tickets.filter((ticket) => ticket.status === 'completed').length
 
   return (
     <section className="kpi-grid">
       <KPIWidget
-        helper={t.dashboard.totalTicketsHelper}
+        helper="Все талоны в текущей очереди"
         icon={<ClipboardList size={20} />}
-        title={t.dashboard.totalTicketsToday}
+        title="Всего талонов"
         tone="info"
         value={tickets.length}
       />
       <KPIWidget
-        delta="-3m"
-        helper={t.dashboard.averageWaitingHelper}
-        icon={<Clock3 size={20} />}
-        title={t.dashboard.averageWaitingTime}
-        tone={kpi.averageWaitMinutes >= 25 ? 'warning' : 'success'}
-        value={formatEta(kpi.averageWaitMinutes)}
+        helper="Ожидают вызова"
+        icon={<Hourglass size={20} />}
+        title="Ожидают"
+        tone={waitingTickets > 0 ? 'warning' : 'neutral'}
+        value={waitingTickets}
+      />
+      <KPIWidget
+        helper="Пациенты уже вызваны"
+        icon={<BellRing size={20} />}
+        title="Вызваны"
+        tone={calledTickets > 0 ? 'info' : 'neutral'}
+        value={calledTickets}
+      />
+      <KPIWidget
+        helper="Сейчас на приёме"
+        icon={<Stethoscope size={20} />}
+        title="Обслуживаются"
+        tone={inServiceTickets > 0 ? 'success' : 'neutral'}
+        value={inServiceTickets}
       />
       <KPIWidget
         helper={t.dashboard.activeRoomsHelper}
-        icon={<Stethoscope size={20} />}
+        icon={<DoorOpen size={20} />}
         title={t.dashboard.activeRooms}
         tone="success"
         value={activeRooms}
       />
       <KPIWidget
-        helper={t.dashboard.completedTicketsHelper}
-        icon={<DoorOpen size={20} />}
-        title={t.dashboard.completedTickets}
-        tone={kpi.completedToday > 0 ? 'success' : 'neutral'}
-        value={kpi.completedToday}
+        helper="Обслуживание завершено"
+        icon={<CheckCircle2 size={20} />}
+        title="Завершены"
+        tone={completedTickets > 0 ? 'success' : 'neutral'}
+        value={completedTickets}
       />
     </section>
   )

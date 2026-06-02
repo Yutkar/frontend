@@ -350,5 +350,19 @@ export const backendTicketApi: TicketApi = {
 
   async updateTicketSettings(id, payload) {
     await apiClient.patch(`/tickets/${id}`, toBackendSettingsPayload(payload))
+
+    try {
+      await apiClient.get<BackendTicket>(`/tickets/${id}`)
+    } catch (error) {
+      console.warn('backendTicketApi.updateTicketSettings: GET /tickets/:id failed', error)
+    }
+
+    if (payload.roomId) {
+      try {
+        await apiClient.get<BackendTicket[]>(`/queue/room/${payload.roomId}`)
+      } catch (error) {
+        console.warn('backendTicketApi.updateTicketSettings: GET /queue/room/:roomId failed', error)
+      }
+    }
   },
 }

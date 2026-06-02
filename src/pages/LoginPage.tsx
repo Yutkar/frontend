@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
-import { API_MODE } from '@services/api/apiProvider'
+import { appModeService } from '@services/appModeService'
 import { useGlobalStore } from '@store/global'
 import { Button } from '@shared/ui/components'
 import { t } from '@shared/locales/useLocale'
@@ -14,7 +14,7 @@ export function LoginPage() {
 
   const login = useGlobalStore((state) => state.login)
   const navigate = useNavigate()
-  const showMockAccounts = API_MODE === 'mock'
+  const showMockAccounts = appModeService.isMockMode()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

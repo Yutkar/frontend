@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getApiErrorMessage } from '@services/api'
 
 export type ServiceResource<T> = {
   data: T
@@ -28,7 +29,7 @@ export function useServiceResource<T>(
         if (mounted) {
           setResource({
             data: initialData,
-            error: error instanceof Error ? error.message : 'Не удалось загрузить данные',
+            error: getApiErrorMessage(error, 'Не удалось загрузить данные'),
             loading: false,
           })
         }

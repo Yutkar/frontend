@@ -40,7 +40,7 @@ export function RegisterPage() {
       await register(name.trim(), email.trim(), password, role)
       navigate('/dashboard')
     } catch (err) {
-      setError((err as Error).message || t.auth.alreadyRegistered)
+      setError('Не удалось создать аккаунт. Проверьте данные и подключение к серверу.')
     } finally {
       setIsLoading(false)
     }

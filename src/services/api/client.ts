@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { API_BASE_URL } from './apiProvider'
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_SMARTQ_API_URL || 'http://localhost:3000',
+  baseURL: API_BASE_URL,
   timeout: 12_000,
   headers: {
     'Content-Type': 'application/json',
@@ -9,7 +10,7 @@ export const apiClient = axios.create({
 })
 
 export const publicApiClient = axios.create({
-  baseURL: import.meta.env.VITE_SMARTQ_API_URL || 'http://localhost:3000',
+  baseURL: API_BASE_URL,
   timeout: 12_000,
   headers: {
     'Content-Type': 'application/json',

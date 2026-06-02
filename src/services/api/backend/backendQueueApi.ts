@@ -3,9 +3,12 @@ import {
   toArchitectureRooms,
   toArchitectureTickets,
   toBackendRooms,
+  getBackendTicketRoomId,
   toBackendTicketCreateInput,
+  toBackendRecommendations,
   toQueueKpi,
   toQueueSnapshot,
+  type BackendRecommendation,
   type BackendRoom,
   type BackendOverloadRoom,
   type BackendQueueStats,
@@ -14,15 +17,24 @@ import {
 import { apiClient, publicApiClient } from '../client'
 import type { QueueApi, QueueOverloadRoom } from '../types'
 
-async function loadQueueSnapshot(ticketPath = '/tickets?status=waiting') {
-  const [ticketsResponse, statsResponse, overloadResponse, rooms] = await Promise.all([
+const roomVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+
+async function loadQueueSnapshot(ticketPath = '/tickets') {
+  const [ticketsResponse, statsResponse, overloadResponse, rooms, recommendations] = await Promise.all([
     apiClient.get<BackendTicket[]>(ticketPath),
     apiClient.get<BackendQueueStats[]>('/queue/stats'),
     apiClient.get<BackendOverloadRoom[]>('/queue/overload'),
     getBackendRooms(),
+    getBackendRecommendations(),
   ])
 
-  return toQueueSnapshot(ticketsResponse.data, statsResponse.data, overloadResponse.data, rooms)
+  return toQueueSnapshot(
+    ticketsResponse.data,
+    statsResponse.data,
+    overloadResponse.data,
+    rooms,
+    recommendations,
+  )
 }
 
 async function arriveCreatedTicket(ticket: BackendTicket): Promise<void> {
@@ -54,6 +66,61 @@ async function getBackendRooms(): Promise<BackendRoom[]> {
   }
 }
 
+async function getBackendRecommendations(): Promise<BackendRecommendation[]> {
+  try {
+    const response = await apiClient.get<unknown>('/recommendations')
+
+    return toBackendRecommendations(response.data)
+  } catch (error) {
+    console.warn('backendQueueApi: GET /recommendations is not available', error)
+
+    return []
+  }
+}
+
+async function getAllBackendTicketsForRoomFallback(): Promise<BackendTicket[]> {
+  try {
+    const response = await apiClient.get<BackendTicket[]>('/tickets')
+
+    return response.data
+  } catch (error) {
+    console.warn('backendQueueApi: GET /tickets fallback for room queue failed', error)
+
+    return []
+  }
+}
+
+function withImplicitRoomId(ticket: BackendTicket, roomId: string | number): BackendTicket {
+  if (getBackendTicketRoomId(ticket)) {
+    return ticket
+  }
+
+  return {
+    ...ticket,
+    roomId,
+  }
+}
+
+function mergeRoomTickets(roomId: string | number, roomTickets: BackendTicket[], allTickets: BackendTicket[]) {
+  const roomIdValue = String(roomId)
+  const mergedTickets = new Map<string, BackendTicket>()
+
+  allTickets
+    .filter((ticket) => getBackendTicketRoomId(ticket) === roomIdValue)
+    .filter((ticket) => roomVisibleStatuses.includes(ticket.status as (typeof roomVisibleStatuses)[number]))
+    .forEach((ticket) => {
+      mergedTickets.set(String(ticket.id), ticket)
+    })
+
+  roomTickets
+    .map((ticket) => withImplicitRoomId(ticket, roomId))
+    .forEach((ticket) => {
+      mergedTickets.set(String(ticket.id), ticket)
+    })
+
+  return Array.from(mergedTickets.values())
+}
+
 function toRooms(stats: BackendQueueStats[]): Room[] {
   return stats.map((item) => ({
     id: String(item.roomId),
@@ -82,14 +149,17 @@ export const backendQueueApi: QueueApi = {
   },
 
   async getRoomQueueSnapshot(roomId: string | number) {
-    const [ticketsResponse, statsResponse, overloadResponse, rooms] = await Promise.all([
+    const [ticketsResponse, allTickets, statsResponse, overloadResponse, rooms, recommendations] = await Promise.all([
       apiClient.get<BackendTicket[]>(`/queue/room/${roomId}`),
+      getAllBackendTicketsForRoomFallback(),
       apiClient.get<BackendQueueStats[]>('/queue/stats'),
       apiClient.get<BackendOverloadRoom[]>('/queue/overload'),
       getBackendRooms(),
+      getBackendRecommendations(),
     ])
+    const roomTickets = mergeRoomTickets(roomId, ticketsResponse.data, allTickets)
 
-    return toQueueSnapshot(ticketsResponse.data, statsResponse.data, overloadResponse.data, rooms)
+    return toQueueSnapshot(roomTickets, statsResponse.data, overloadResponse.data, rooms, recommendations)
   },
 
   async createTicket(input) {
@@ -148,7 +218,6 @@ export const backendQueueApi: QueueApi = {
   async redirectTicket(input) {
     await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, {
       newRoomId: Number(input.roomId),
-      reason: input.reason,
     })
 
     return loadQueueSnapshot()

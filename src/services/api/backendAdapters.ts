@@ -1,5 +1,6 @@
 import type {
   QueueKpi,
+  QueueRecommendation,
   QueueSnapshot,
   Room,
   ServiceType,
@@ -49,6 +50,8 @@ export type BackendRoom = {
 }
 
 export type BackendTicket = {
+  assignedRoom?: BackendRoom | null
+  assignedRoomId?: number | string | null
   id: number | string
   number: string
   priority?: number
@@ -63,6 +66,7 @@ export type BackendTicket = {
   completedAt?: string | null
   serviceType?: BackendServiceType
   room?: BackendRoom | null
+  roomName?: string | null
 }
 
 export type BackendQueueStats = {
@@ -77,6 +81,24 @@ export type BackendOverloadRoom = {
   roomId: number | string
   roomName: string
   queueCount: number
+}
+
+export type BackendRecommendation = {
+  _id?: number | string
+  action?: string
+  createdAt?: string
+  description?: string
+  id?: number | string
+  isRead?: boolean
+  level?: string
+  message?: string
+  read?: boolean
+  relatedRoomId?: number | string
+  resolved?: boolean
+  roomId?: number | string
+  severity?: string
+  text?: string
+  title?: string
 }
 
 const serviceTypeByBackendId: Record<number, ServiceType> = {
@@ -134,12 +156,88 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function getRecordString(record: Record<string, unknown>, keys: string[], fallback = ''): string {
+  for (const key of keys) {
+    const value = record[key]
+
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+
+    if (typeof value === 'number') {
+      return String(value)
+    }
+  }
+
+  return fallback
+}
+
+function getRecordBoolean(record: Record<string, unknown>, keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = record[key]
+
+    if (typeof value === 'boolean') {
+      return value
+    }
+  }
+
+  return undefined
+}
+
 function getBackendRoomId(room?: BackendRoom | null): string {
   return toId(room?.id ?? room?.roomId ?? room?._id)
 }
 
 function getBackendRoomName(room?: BackendRoom | null): string {
   return room?.name ?? room?.title ?? room?.roomName ?? 'Кабинет без названия'
+}
+
+export function getBackendTicketRoomId(ticket: BackendTicket): string {
+  const roomId = toId(ticket.roomId)
+
+  if (roomId) {
+    return roomId
+  }
+
+  const nestedRoomId = getBackendRoomId(ticket.room)
+
+  if (nestedRoomId) {
+    return nestedRoomId
+  }
+
+  const assignedRoomId = toId(ticket.assignedRoomId)
+
+  if (assignedRoomId) {
+    return assignedRoomId
+  }
+
+  return getBackendRoomId(ticket.assignedRoom)
+}
+
+function getBackendTicketRoomName(ticket: BackendTicket): string {
+  const nestedRoomName = ticket.room?.name ?? ticket.room?.title ?? ticket.room?.roomName
+
+  if (nestedRoomName) {
+    return nestedRoomName
+  }
+
+  const roomName = ticket.roomName?.trim()
+
+  if (roomName) {
+    return roomName
+  }
+
+  const assignedRoomName = ticket.assignedRoom?.name
+    ?? ticket.assignedRoom?.title
+    ?? ticket.assignedRoom?.roomName
+
+  if (assignedRoomName) {
+    return assignedRoomName
+  }
+
+  const roomId = getBackendTicketRoomId(ticket)
+
+  return roomId ? `Кабинет ${roomId}` : 'Не назначен'
 }
 
 function getBackendRoomActive(room?: BackendRoom | null): boolean {
@@ -264,6 +362,7 @@ export function toSharedServiceType(ticket: BackendTicket): ServiceType {
 
 export function toSharedTicket(ticket: BackendTicket): Ticket {
   const serviceType = toSharedServiceType(ticket)
+  const roomId = getBackendTicketRoomId(ticket)
 
   return {
     id: toId(ticket.id),
@@ -276,7 +375,7 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     calledAt: ticket.calledAt ?? undefined,
     startedAt: ticket.serviceStartedAt ?? ticket.startedAt ?? undefined,
     completedAt: ticket.completedAt ?? undefined,
-    roomId: toId(ticket.roomId ?? getBackendRoomId(ticket.room)) || undefined,
+    roomId: roomId || undefined,
     etaMinutes: ticket.etaMinutes ?? 0,
   }
 }
@@ -293,9 +392,10 @@ export function toArchitectureTicket(ticket: BackendTicket): ArchitectureTicket 
     code,
     name: serviceName || code,
   }
+  const roomId = getBackendTicketRoomId(ticket)
   const room: ArchitectureRoom = {
-    id: toId(ticket.roomId ?? getBackendRoomId(ticket.room)),
-    name: ticket.room ? getBackendRoomName(ticket.room) : 'Не назначен',
+    id: roomId,
+    name: getBackendTicketRoomName(ticket),
     serviceTypes: [serviceType],
   }
 
@@ -354,6 +454,7 @@ export function toSharedRooms(
   backendRooms: BackendRoom[] = [],
 ): Room[] {
   const rooms = new Map<string, Room>()
+  const hasBackendRooms = backendRooms.length > 0
   const inactiveRoomIds = new Set(
     backendRooms
       .filter((room) => !getBackendRoomActive(room))
@@ -361,26 +462,26 @@ export function toSharedRooms(
       .filter(Boolean),
   )
 
-  backendRooms
-    .filter(getBackendRoomActive)
-    .forEach((room) => {
-      const id = getBackendRoomId(room)
+  backendRooms.forEach((room) => {
+    const id = getBackendRoomId(room)
 
-      if (!id) {
-        return
-      }
+    if (!id) {
+      return
+    }
 
-      rooms.set(id, {
-        id,
-        isActive: true,
-        name: getBackendRoomName(room),
-        department: getBackendRoomName(room),
-        specialistName: getBackendRoomName(room),
-        status: 'open',
-        loadPercent: 0,
-        workload: 0,
-      })
+    const isActive = getBackendRoomActive(room)
+
+    rooms.set(id, {
+      id,
+      isActive,
+      name: getBackendRoomName(room),
+      department: getBackendRoomName(room),
+      specialistName: getBackendRoomName(room),
+      status: isActive ? 'open' : 'paused',
+      loadPercent: 0,
+      workload: 0,
     })
+  })
 
   stats.forEach((stat) => {
     const id = toId(stat.roomId)
@@ -390,6 +491,11 @@ export function toSharedRooms(
     }
 
     const existingRoom = rooms.get(id)
+
+    if (hasBackendRooms && !existingRoom) {
+      return
+    }
+
     const workload = Math.min(100, Math.max(0, stat.activeTickets * 10))
 
     rooms.set(id, {
@@ -406,14 +512,18 @@ export function toSharedRooms(
   })
 
   tickets.forEach((ticket) => {
-    const roomId = toId(ticket.roomId ?? getBackendRoomId(ticket.room))
+    const roomId = getBackendTicketRoomId(ticket)
 
     if (!roomId || rooms.has(roomId) || inactiveRoomIds.has(roomId)) {
       return
     }
 
+    if (hasBackendRooms) {
+      return
+    }
+
     const serviceType = toSharedServiceType(ticket)
-    const roomName = getBackendRoomName(ticket.room)
+    const roomName = getBackendTicketRoomName(ticket)
 
     rooms.set(roomId, {
       id: roomId,
@@ -429,7 +539,7 @@ export function toSharedRooms(
 
   return Array.from(rooms.values()).map((room) => {
     const currentTicket = tickets.find((ticket) => {
-      const ticketRoomId = toId(ticket.roomId ?? getBackendRoomId(ticket.room))
+      const ticketRoomId = getBackendTicketRoomId(ticket)
 
       return ticketRoomId === room.id && ['called', 'in_service'].includes(ticket.status)
     })
@@ -437,7 +547,7 @@ export function toSharedRooms(
     return {
       ...room,
       currentTicketId: currentTicket ? toId(currentTicket.id) : undefined,
-      status: currentTicket ? 'busy' : room.status,
+      status: currentTicket && room.isActive !== false ? 'busy' : room.status,
     }
   })
 }
@@ -448,7 +558,7 @@ export function toQueueKpi(
   overload: BackendOverloadRoom[] = [],
 ): QueueKpi {
   const activeTickets = tickets.filter((ticket) =>
-    ['created', 'waiting', 'called', 'in_service'].includes(ticket.status),
+    ['created', 'waiting', 'called', 'in_service', 'redirected'].includes(ticket.status),
   ).length
   const totalEta = stats.reduce((sum, item) => sum + item.etaMinutes, 0)
 
@@ -460,17 +570,84 @@ export function toQueueKpi(
   }
 }
 
+function toRecommendationSeverity(
+  value?: string,
+): QueueRecommendation['severity'] {
+  const normalizedValue = value?.toLowerCase()
+
+  if (normalizedValue === 'critical' || normalizedValue === 'danger' || normalizedValue === 'high') {
+    return 'critical'
+  }
+
+  if (normalizedValue === 'warning' || normalizedValue === 'warn' || normalizedValue === 'medium') {
+    return 'warning'
+  }
+
+  return 'info'
+}
+
+function getRecommendationId(recommendation: BackendRecommendation, index: number): string {
+  return toId(recommendation.id ?? recommendation._id) || `recommendation-${index}`
+}
+
+export function toBackendRecommendations(value: unknown): BackendRecommendation[] {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord).map((item) => item as BackendRecommendation)
+  }
+
+  if (isRecord(value) && Array.isArray(value.items)) {
+    return value.items.filter(isRecord).map((item) => item as BackendRecommendation)
+  }
+
+  if (isRecord(value) && Array.isArray(value.recommendations)) {
+    return value.recommendations.filter(isRecord).map((item) => item as BackendRecommendation)
+  }
+
+  return []
+}
+
+export function toSharedRecommendations(
+  recommendations: BackendRecommendation[] = [],
+): QueueRecommendation[] {
+  return recommendations
+    .filter((recommendation) => {
+      const record = recommendation as Record<string, unknown>
+      const resolved = getRecordBoolean(record, ['resolved', 'isResolved'])
+      const read = getRecordBoolean(record, ['read', 'isRead'])
+
+      return resolved !== true && read !== true
+    })
+    .map((recommendation, index) => {
+      const record = recommendation as Record<string, unknown>
+      const message = getRecordString(record, ['message', 'text', 'description'], 'Новое уведомление')
+      const title = getRecordString(record, ['title'], 'Уведомление')
+      const description = getRecordString(record, ['description', 'message', 'text'], message)
+
+      return {
+        action: getRecordString(record, ['action'], 'Проверить очередь'),
+        createdAt: getRecordString(record, ['createdAt'], new Date().toISOString()),
+        description,
+        id: getRecommendationId(recommendation, index),
+        message,
+        relatedRoomId: toId(recommendation.relatedRoomId ?? recommendation.roomId) || undefined,
+        severity: toRecommendationSeverity(recommendation.severity ?? recommendation.level),
+        title,
+      }
+    })
+}
+
 export function toQueueSnapshot(
   tickets: BackendTicket[],
   stats: BackendQueueStats[] = [],
   overload: BackendOverloadRoom[] = [],
   rooms: BackendRoom[] = [],
+  recommendations: BackendRecommendation[] = [],
 ): QueueSnapshot {
   return {
     tickets: toSharedTickets(tickets),
     rooms: toSharedRooms(tickets, stats, rooms),
     events: [],
-    recommendations: [],
+    recommendations: toSharedRecommendations(recommendations),
     analytics: [],
     kpi: toQueueKpi(tickets, stats, overload),
   }
