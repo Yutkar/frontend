@@ -5,19 +5,19 @@ import type { User } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import {
   getAdminErrorMessage,
+  getRoomActive,
   getRoomName,
   getUserEmail,
   getUserRoomId,
   roleLabels,
   type AdminRoomRecord,
 } from './adminPageHelpers'
-import { useGlobalStore } from '@store/global'
 
 type StaffFormState = {
   email: string
   name: string
   password: string
-  role: 'specialist' | 'manager'
+  role: 'specialist'
   roomId: string
 }
 
@@ -29,8 +29,12 @@ const emptyForm: StaffFormState = {
   roomId: '',
 }
 
-export function AdminStaffPage() {
-  const user = useGlobalStore((state) => state.user)
+type StaffSectionProps = {
+  onStaffChange?: () => void
+  refreshKey?: number
+}
+
+export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProps) {
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<StaffFormState>(emptyForm)
@@ -39,7 +43,6 @@ export function AdminStaffPage() {
   const [saving, setSaving] = useState(false)
   const [staff, setStaff] = useState<User[]>([])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const canCreateManagers = user?.role === 'admin'
 
   async function loadData() {
     setLoading(true)
@@ -63,7 +66,7 @@ export function AdminStaffPage() {
 
   useEffect(() => {
     void loadData()
-  }, [])
+  }, [refreshKey])
 
   function resetForm() {
     setEditingUserId(null)
@@ -77,7 +80,7 @@ export function AdminStaffPage() {
       email: staffMember.email ?? '',
       name: staffMember.name,
       password: '',
-      role: staffMember.role === 'manager' ? 'manager' : 'specialist',
+      role: 'specialist',
       roomId: getUserRoomId(staffMember),
     })
     setSuccessMessage(null)
@@ -104,23 +107,21 @@ export function AdminStaffPage() {
       email: form.email.trim(),
       name: form.name.trim(),
       password: form.password.trim() || undefined,
+      role: form.role,
       roomId: form.roomId || undefined,
     }
 
     try {
       const savedUser = editingUserId
         ? await adminService.updateStaff(editingUserId, payload)
-        : form.role === 'manager'
-          ? await adminService.createManager(payload)
-          : await adminService.createDoctor(payload)
+        : await adminService.createDoctor(payload)
 
       setSuccessMessage(savedUser.roomAssignmentPending
         ? 'Врач создан. Кабинет можно назначить после обновления списка.'
-        : form.role === 'manager'
-          ? 'Менеджер успешно сохранён'
-          : 'Врач успешно сохранён')
+        : 'Врач успешно сохранён')
       resetForm()
       await loadData()
+      onStaffChange?.()
     } catch (saveError) {
       console.error('Admin staff save failed', saveError)
       setError(getAdminErrorMessage(
@@ -143,6 +144,7 @@ export function AdminStaffPage() {
       await adminService.deleteStaff(staffMember.id)
       setSuccessMessage('Врач удалён')
       await loadData()
+      onStaffChange?.()
     } catch (deleteError) {
       console.error('Admin staff delete failed', deleteError)
       setError(getAdminErrorMessage(deleteError, 'Не удалось удалить врача'))
@@ -161,9 +163,12 @@ export function AdminStaffPage() {
             <div>
               <span className="eyebrow">
                 <UsersRound size={14} />
-                Администрирование
+                Управление
               </span>
               <h2>Персонал</h2>
+              <p className="admin-section-description">
+                Создание врачей и назначение кабинетов.
+              </p>
             </div>
             <Button icon={<PlusCircle size={17} />} onClick={resetForm} variant="secondary">
               Добавить врача
@@ -177,7 +182,7 @@ export function AdminStaffPage() {
             <div className="empty-state compact-empty">
               <h2>Загружаем персонал</h2>
             </div>
-          ) : (
+          ) : staff.length > 0 ? (
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
@@ -210,6 +215,11 @@ export function AdminStaffPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          ) : (
+            <div className="empty-state compact-empty">
+              <h2>Врачи не найдены</h2>
+              <p>Добавьте врача и назначьте ему кабинет.</p>
             </div>
           )}
         </div>
@@ -255,7 +265,6 @@ export function AdminStaffPage() {
             <label className="field">
               <span>Роль</span>
               <select
-                disabled={Boolean(editingUserId) || !canCreateManagers}
                 onChange={(event) => setForm((current) => ({
                   ...current,
                   role: event.target.value as StaffFormState['role'],
@@ -263,19 +272,17 @@ export function AdminStaffPage() {
                 value={form.role}
               >
                 <option value="specialist">Специалист</option>
-                {canCreateManagers ? <option value="manager">Менеджер</option> : null}
               </select>
             </label>
 
             <label className="field">
               <span>Кабинет</span>
               <select
-                disabled={form.role === 'manager'}
                 onChange={(event) => setForm((current) => ({ ...current, roomId: event.target.value }))}
                 value={form.roomId}
               >
                 <option value="">Не назначен</option>
-                {rooms.map((room) => (
+                {rooms.filter(getRoomActive).map((room) => (
                   <option key={String(room.id)} value={String(room.id)}>
                     {getRoomName(room)}
                   </option>
@@ -296,4 +303,8 @@ export function AdminStaffPage() {
       </section>
     </div>
   )
+}
+
+export function AdminStaffPage() {
+  return <StaffSection />
 }

@@ -1,23 +1,18 @@
 import {
   Activity,
   BarChart3,
-  Building2,
   ClipboardPlus,
-  Link2,
   LayoutDashboard,
   Monitor,
   Settings,
   ShieldCheck,
   Stethoscope,
-  UsersRound,
 } from 'lucide-react'
+import { Navigate } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { AnalyticsPage } from './AnalyticsPage'
-import { AdminDoctorRoomsPage } from './admin/AdminDoctorRoomsPage'
-import { AdminManagersPage } from './admin/AdminManagersPage'
-import { AdminRoomsPage } from './admin/AdminRoomsPage'
-import { AdminStaffPage } from './admin/AdminStaffPage'
+import { AdminPage } from './admin/AdminPage'
 import { DashboardPage } from './DashboardPage'
 import { KioskPage } from './KioskPage'
 import { QueuePage } from './QueuePage'
@@ -56,36 +51,39 @@ export const smartqBusinessRoutes: AppRoute[] = [
     element: <AnalyticsPage />,
   },
   {
+    path: '/admin',
+    label: 'Администрирование',
+    icon: ShieldCheck,
+    allowedRoles: ['admin', 'manager'],
+    element: <AdminPage />,
+  },
+  {
     path: '/admin/rooms',
     label: 'Кабинеты',
-    icon: Building2,
-    groupLabel: 'Администрирование',
     allowedRoles: ['admin', 'manager'],
-    element: <AdminRoomsPage />,
+    hideFromSidebar: true,
+    element: <Navigate replace to="/admin" />,
   },
   {
     path: '/admin/staff',
     label: 'Персонал',
-    icon: UsersRound,
-    groupLabel: 'Администрирование',
     allowedRoles: ['admin', 'manager'],
-    element: <AdminStaffPage />,
+    hideFromSidebar: true,
+    element: <Navigate replace to="/admin" />,
   },
   {
     path: '/admin/doctor-rooms',
-    label: 'Привязка врачей',
-    icon: Link2,
-    groupLabel: 'Администрирование',
+    label: 'Администрирование',
     allowedRoles: ['admin', 'manager'],
-    element: <AdminDoctorRoomsPage />,
+    hideFromSidebar: true,
+    element: <Navigate replace to="/admin" />,
   },
   {
     path: '/admin/managers',
     label: 'Менеджеры',
-    icon: ShieldCheck,
-    groupLabel: 'Администрирование',
-    allowedRoles: ['admin'],
-    element: <AdminManagersPage />,
+    allowedRoles: ['admin', 'manager'],
+    hideFromSidebar: true,
+    element: <Navigate replace to="/admin" />,
   },
   {
     path: '/specialist',

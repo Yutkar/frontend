@@ -17,7 +17,11 @@ const emptyForm: ManagerFormState = {
   password: '',
 }
 
-export function AdminManagersPage() {
+type ManagersSectionProps = {
+  onManagersChange?: () => void
+}
+
+export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
   const [editingManagerId, setEditingManagerId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<ManagerFormState>(emptyForm)
@@ -92,6 +96,7 @@ export function AdminManagersPage() {
       setSuccessMessage('Менеджер успешно сохранён')
       resetForm()
       await loadData()
+      onManagersChange?.()
     } catch (saveError) {
       console.error('Admin manager save failed', saveError)
       setError(getAdminErrorMessage(
@@ -114,6 +119,7 @@ export function AdminManagersPage() {
       await adminService.deleteManager(manager.id)
       setSuccessMessage('Менеджер удалён')
       await loadData()
+      onManagersChange?.()
     } catch (deleteError) {
       console.error('Admin manager delete failed', deleteError)
       setError(getAdminErrorMessage(deleteError, 'Не удалось удалить менеджера'))
@@ -128,9 +134,12 @@ export function AdminManagersPage() {
             <div>
               <span className="eyebrow">
                 <ShieldCheck size={14} />
-                Администрирование
+                Управление
               </span>
               <h2>Менеджеры</h2>
+              <p className="admin-section-description">
+                Управление аккаунтами менеджеров.
+              </p>
             </div>
             <Button icon={<PlusCircle size={17} />} onClick={resetForm} variant="secondary">
               Добавить менеджера
@@ -144,7 +153,7 @@ export function AdminManagersPage() {
             <div className="empty-state compact-empty">
               <h2>Загружаем менеджеров</h2>
             </div>
-          ) : (
+          ) : managers.length > 0 ? (
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
@@ -173,6 +182,11 @@ export function AdminManagersPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          ) : (
+            <div className="empty-state compact-empty">
+              <h2>Менеджеры не найдены</h2>
+              <p>Добавьте менеджера для работы с очередями.</p>
             </div>
           )}
         </div>
@@ -228,4 +242,8 @@ export function AdminManagersPage() {
       </section>
     </div>
   )
+}
+
+export function AdminManagersPage() {
+  return <ManagersSection />
 }

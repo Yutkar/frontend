@@ -2218,6 +2218,7 @@ h3 {
 
   .kpi-grid,
   .room-load-grid,
+  .admin-summary-grid,
   .login-role-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2386,18 +2387,83 @@ h3 {
   padding: 12px 14px;
 }
 
+.admin-page-lead {
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 650;
+  margin-top: -4px;
+}
+
+.admin-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-summary-card {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 5px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 14px;
+}
+
+.admin-summary-card svg {
+  color: var(--primary-strong);
+  grid-row: span 2;
+}
+
+.admin-summary-card span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-summary-card strong {
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.admin-section-switcher {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.admin-section-switcher button {
+  white-space: nowrap;
+}
+
+.admin-section-description {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 650;
+  margin-top: 6px;
+  max-width: 620px;
+}
+
 .admin-page-grid {
   align-items: start;
   display: grid;
-  gap: 18px;
+  gap: 14px;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+}
+
+.admin-page-grid .primary-panel,
+.admin-page-grid .widget-panel {
+  padding: 16px;
 }
 
 .admin-form-panel,
 .admin-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .admin-table-wrap {
@@ -2413,7 +2479,7 @@ h3 {
 .admin-table th,
 .admin-table td {
   border-bottom: 1px solid var(--border);
-  padding: 13px 12px;
+  padding: 10px 12px;
   text-align: left;
   vertical-align: top;
 }
@@ -2635,6 +2701,7 @@ h3 {
   }
 
   .admin-page-grid,
+  .admin-summary-grid,
   .admin-inline-form {
     grid-template-columns: 1fr;
   }

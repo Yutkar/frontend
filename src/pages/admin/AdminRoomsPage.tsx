@@ -24,13 +24,17 @@ const emptyForm: RoomFormState = {
   serviceTypeIds: [],
 }
 
+type RoomsSectionProps = {
+  onRoomsChange?: () => void
+}
+
 function normalizeId(value: string): string | number {
   const numberValue = Number(value)
 
   return Number.isFinite(numberValue) && value.trim() !== '' ? numberValue : value
 }
 
-export function AdminRoomsPage() {
+export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
   const [editingRoomId, setEditingRoomId] = useState<string | number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<RoomFormState>(emptyForm)
@@ -117,6 +121,7 @@ export function AdminRoomsPage() {
       setSuccessMessage('Кабинет успешно сохранён')
       resetForm()
       await loadData()
+      onRoomsChange?.()
     } catch (saveError) {
       console.error('Admin room save failed', saveError)
       setError(getAdminErrorMessage(
@@ -139,6 +144,7 @@ export function AdminRoomsPage() {
       await adminService.deleteRoom(room.id)
       setSuccessMessage('Кабинет удалён')
       await loadData()
+      onRoomsChange?.()
     } catch (deleteError) {
       console.error('Admin room delete failed', deleteError)
       setError(getAdminErrorMessage(deleteError, 'Не удалось удалить кабинет'))
@@ -153,9 +159,12 @@ export function AdminRoomsPage() {
             <div>
               <span className="eyebrow">
                 <Building2 size={14} />
-                Администрирование
+                Управление
               </span>
               <h2>Кабинеты</h2>
+              <p className="admin-section-description">
+                Создание, редактирование и деактивация кабинетов учреждения.
+              </p>
             </div>
             <Button icon={<PlusCircle size={17} />} onClick={resetForm} variant="secondary">
               Добавить кабинет
@@ -169,7 +178,7 @@ export function AdminRoomsPage() {
             <div className="empty-state compact-empty">
               <h2>Загружаем кабинеты</h2>
             </div>
-          ) : (
+          ) : rooms.length > 0 ? (
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
@@ -200,6 +209,11 @@ export function AdminRoomsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          ) : (
+            <div className="empty-state compact-empty">
+              <h2>Кабинеты не найдены</h2>
+              <p>Добавьте первый кабинет учреждения.</p>
             </div>
           )}
         </div>
@@ -258,4 +272,8 @@ export function AdminRoomsPage() {
       </section>
     </div>
   )
+}
+
+export function AdminRoomsPage() {
+  return <RoomsSection />
 }

@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { CheckCircle2, FastForward, Play, RotateCcw, Route, UserX } from 'lucide-react'
+import { useMemo } from 'react'
+import { CheckCircle2, FastForward, Play, UserX } from 'lucide-react'
 import type { Room, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
@@ -20,13 +20,9 @@ const priorityOrder: Record<TicketPriority, number> = {
 const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
 
 export function SpecialistControls({ room }: SpecialistControlsProps) {
-  const [redirectRoomId, setRedirectRoomId] = useState('')
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const completeService = useQueueStore((state) => state.completeService)
   const loading = useQueueStore((state) => state.loading)
-  const redirectTicket = useQueueStore((state) => state.redirectTicket)
-  const returnTicket = useQueueStore((state) => state.returnTicket)
-  const rooms = useQueueStore((state) => state.rooms)
   const skipTicket = useQueueStore((state) => state.skipTicket)
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
@@ -64,25 +60,6 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         }),
     [roomTickets],
   )
-
-  const skippedTickets = useMemo(
-    () => tickets.filter(() => false),
-    [tickets],
-  )
-
-  const redirectRooms = rooms.filter(
-    (item) => String(item.id) !== String(room.id) && item.status === 'open' && !item.currentTicketId,
-  )
-
-  async function handleRedirect() {
-    if (!currentTicket || !redirectRoomId) return
-    await redirectTicket({
-      ticketId: currentTicket.id,
-      roomId: redirectRoomId,
-      reason: `${t.specialist.redirectPatient}: ${room.name}`,
-    })
-    setRedirectRoomId('')
-  }
 
   return (
     <div className="specialist-workspace">
