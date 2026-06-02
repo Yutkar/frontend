@@ -30,14 +30,16 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const skipTicket = useQueueStore((state) => state.skipTicket)
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
+
+  // ИСПРАВЛЕНО: Убрана фильтрация по roomId, так как метод loadRoomQueue 
+  // уже загружает в стор только талоны текущего кабинета.
+  // Теперь мы фильтруем только по статусу.
   const roomTickets = useMemo(
     () =>
-      tickets.filter(
-        (ticket) =>
-          ticket.roomId === room.id &&
-          specialistVisibleStatuses.includes(ticket.status as (typeof specialistVisibleStatuses)[number]),
+      tickets.filter((ticket) =>
+        specialistVisibleStatuses.includes(ticket.status as (typeof specialistVisibleStatuses)[number]),
       ),
-    [room.id, tickets],
+    [tickets],
   )
 
   const currentTicket = useMemo<Ticket | undefined>(
@@ -46,6 +48,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
       roomTickets.find((ticket) => ticket.id === room.currentTicketId),
     [room.currentTicketId, roomTickets],
   )
+
   const waitingTickets = useMemo(
     () =>
       roomTickets
@@ -56,29 +59,23 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         )
         .sort((left, right) => {
           const priorityDelta = priorityOrder[left.priority] - priorityOrder[right.priority]
-
-          if (priorityDelta !== 0) {
-            return priorityDelta
-          }
-
+          if (priorityDelta !== 0) return priorityDelta
           return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
         }),
     [roomTickets],
   )
+
   const skippedTickets = useMemo(
-    () =>
-      tickets.filter(() => false),
+    () => tickets.filter(() => false),
     [tickets],
   )
+
   const redirectRooms = rooms.filter(
-    (item) => item.id !== room.id && item.status === 'open' && !item.currentTicketId,
+    (item) => String(item.id) !== String(room.id) && item.status === 'open' && !item.currentTicketId,
   )
 
   async function handleRedirect() {
-    if (!currentTicket || !redirectRoomId) {
-      return
-    }
-
+    if (!currentTicket || !redirectRoomId) return
     await redirectTicket({
       ticketId: currentTicket.id,
       roomId: redirectRoomId,
@@ -109,37 +106,14 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           <TicketCard
             actionSlot={
               <div className="button-row">
-                <Button
-                  disabled={loading || currentTicket.status !== 'called'}
-                  icon={<Play size={17} />}
-                  onClick={() => void startService(currentTicket.id)}
-                  variant="secondary"
-                >
+                <Button disabled={loading || currentTicket.status !== 'called'} icon={<Play size={17} />} onClick={() => void startService(currentTicket.id)} variant="secondary">
                   {t.specialist.startService}
                 </Button>
-                <Button
-                  disabled={loading || currentTicket.status !== 'in_service'}
-                  icon={<CheckCircle2 size={17} />}
-                  onClick={() => void completeService(currentTicket.id)}
-                  variant="primary"
-                >
+                <Button disabled={loading || currentTicket.status !== 'in_service'} icon={<CheckCircle2 size={17} />} onClick={() => void completeService(currentTicket.id)} variant="primary">
                   {t.specialist.complete}
                 </Button>
-                <Button
-                  disabled={loading || currentTicket.status !== 'in_service'}
-                  icon={<UserX size={17} />}
-                  onClick={() => void skipTicket(currentTicket.id)}
-                  variant="danger"
-                >
+                <Button disabled={loading || currentTicket.status !== 'in_service'} icon={<UserX size={17} />} onClick={() => void skipTicket(currentTicket.id)} variant="danger">
                   Пропустить (неявка)
-                </Button>
-                <Button
-                  disabled={loading || currentTicket.status !== 'no_show'}
-                  icon={<RotateCcw size={17} />}
-                  onClick={() => void returnTicket(currentTicket.id)}
-                  variant="secondary"
-                >
-                  Вернуть пациента
                 </Button>
               </div>
             }
@@ -150,35 +124,8 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           <div className="empty-state compact-empty">
             <span className="eyebrow">{t.specialist.ready}</span>
             <h2>{t.specialist.noActivePatient}</h2>
-            <p>{t.specialist.roomAvailable}</p>
           </div>
         )}
-
-        <div className="redirect-panel">
-          <label className="field">
-            <span>{t.specialist.redirectPatient}</span>
-            <select
-              disabled={!currentTicket}
-              onChange={(event) => setRedirectRoomId(event.target.value)}
-              value={redirectRoomId}
-            >
-              <option value="">{t.specialist.selectDestinationRoom}</option>
-              {redirectRooms.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} - {item.department}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button
-            disabled={!currentTicket || !redirectRoomId || loading}
-            icon={<Route size={17} />}
-            onClick={() => void handleRedirect()}
-            variant="secondary"
-          >
-            {t.specialist.redirect}
-          </Button>
-        </div>
       </section>
 
       <aside className="specialist-panel specialist-waiting-panel">
@@ -198,42 +145,9 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           </div>
         ) : (
           <div className="empty-state compact-empty">
-            <span className="eyebrow">{room.department}</span>
             <h2>{t.specialist.waitingListEmpty}</h2>
-            <p>{t.specialist.roomAvailable}</p>
           </div>
         )}
-
-        <div className="panel-header skipped-header">
-          <div>
-            <span className="eyebrow">Неявка</span>
-            <h2>Пропущенные пациенты</h2>
-          </div>
-          <strong className="waiting-count">{skippedTickets.length}</strong>
-        </div>
-
-        {skippedTickets.length > 0 ? (
-          <div className="specialist-waiting-list">
-            {skippedTickets.map((ticket) => (
-              <TicketCard
-                actionSlot={
-                  <Button
-                    disabled={loading}
-                    icon={<RotateCcw size={17} />}
-                    onClick={() => void returnTicket(ticket.id)}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    Вернуть пациента
-                  </Button>
-                }
-                compact
-                key={ticket.id}
-                ticket={ticket}
-              />
-            ))}
-          </div>
-        ) : null}
       </aside>
     </div>
   )

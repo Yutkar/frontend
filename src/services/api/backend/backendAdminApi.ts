@@ -284,11 +284,13 @@ function getDesiredRoomId(input: Partial<AdminUserInput>): string | number | und
 }
 
 function toRegisterPayload(input: AdminUserInput) {
+  const roomId = getDesiredRoomId(input)
   return {
     email: input.email,
     name: input.name,
     password: input.password,
     role: input.role,
+    roomId: roomId ? Number(roomId) : undefined,
   }
 }
 
@@ -353,12 +355,6 @@ async function getAdminRecords(path: string, keys: string[]) {
   return toArray(response.data, keys)
 }
 
-async function getRooms(path: string) {
-  const records = await getAdminRecords(path, ['rooms'])
-
-  return records.map(toRoomRecord)
-}
-
 async function getUsers(path: string) {
   const records = await getAdminRecords(path, ['users', 'staff'])
 
@@ -403,6 +399,7 @@ async function deleteRecord(path: string, id: string | number) {
 
 async function fetchUsers(): Promise<User[]> {
   return requestFirst([
+    () => getUsers('/auth/users'), 
     () => getUsers('/users'),
     () => getUsers('/staff'),
     () => getUsers('/admin/users'),
@@ -479,9 +476,13 @@ export const backendAdminApi: AdminApi = {
   },
 
   getRooms() {
+    const getRoomsRecords = async (path: string) => {
+      const records = await getAdminRecords(path, ['rooms'])
+      return records.map(toRoomRecord)
+    }
     return requestFirst([
-      () => getRooms('/rooms'),
-      () => getRooms('/admin/rooms'),
+      () => getRoomsRecords('/rooms'),
+      () => getRoomsRecords('/admin/rooms'),
     ])
   },
 
@@ -569,8 +570,11 @@ export const backendAdminApi: AdminApi = {
     const payload = {
       ...input,
       ...(input.password ? { password: input.password } : {}),
+      ...(input.roomId ? { roomId: Number(input.roomId) } : {}),
     }
+    
     const response = await requestFirst([
+      () => apiClient.patch<BackendUserResponse>(`/auth/users/${id}`, payload).then((result) => result.data),
       () => apiClient.patch<BackendUserResponse>(`/users/${id}`, payload).then((result) => result.data),
       () => apiClient.patch<BackendUserResponse>(`/staff/${id}`, payload).then((result) => result.data),
       () => apiClient.put<BackendUserResponse>(`/users/${id}`, payload).then((result) => result.data),

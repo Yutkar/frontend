@@ -92,8 +92,14 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
   loadRoomQueue: async (roomId) => {
     set({ loading: true })
-    const snapshot = await queueApi.getRoomQueueSnapshot(roomId)
-    set({ ...snapshot, hydrated: true, loading: false })
+    try {
+      const snapshot = await queueApi.getRoomQueueSnapshot(roomId)
+      console.log('Снэпшот от API:', snapshot) // <--- ВОТ ЭТОТ ЛОГ СКАЖЕТ ВСЁ
+      set({ ...snapshot, hydrated: true, loading: false })
+    } catch (error) {
+      console.error('Ошибка загрузки очереди:', error)
+      set({ loading: false })
+    }
   },
 
   redirectTicket: async (input) => {
