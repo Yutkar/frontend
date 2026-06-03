@@ -9,6 +9,11 @@ import type {
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
+import {
+  formatWaitingTime,
+  getAverageWaitingMinutes,
+  getWaitingMinutes,
+} from '@shared/utils/time'
 import type {
   Room as ArchitectureRoom,
   ServiceType as ArchitectureServiceType,
@@ -445,12 +450,16 @@ export function toArchitectureTicket(ticket: BackendTicket): ArchitectureTicket 
   }
 
   return {
+    calledAt: getBackendCalledAt(ticket),
+    completedAt: getBackendCompletedAt(ticket),
+    createdAt: getBackendCreatedAt(ticket),
     id: toId(ticket.id),
     number: getBackendTicketNumber(ticket),
     serviceType,
     status: toArchitectureStatus(ticket.status),
     room,
     priority: toArchitecturePriority(ticket.priority),
+    startedAt: getBackendStartedAt(ticket),
     eta: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
   }
 }
@@ -611,14 +620,16 @@ export function toQueueKpi(
   stats: BackendQueueStats[] = [],
   overload: BackendOverloadRoom[] = [],
 ): QueueKpi {
-  const activeTickets = tickets.filter((ticket) =>
+  const activeWaitTickets = tickets.filter((ticket) =>
     ['created', 'waiting', 'called', 'in_service', 'redirected'].includes(ticket.status ?? ''),
-  ).length
+  )
+  const activeTickets = activeWaitTickets.length
+  const averageWaitingFromTickets = getAverageWaitingMinutes(activeWaitTickets.map(toSharedTicket))
   const totalEta = stats.reduce((sum, item) => sum + item.etaMinutes, 0)
 
   return {
     activeTickets,
-    averageWaitMinutes: stats.length > 0 ? Math.round(totalEta / stats.length) : 0,
+    averageWaitMinutes: averageWaitingFromTickets ?? (stats.length > 0 ? Math.round(totalEta / stats.length) : 0),
     completedToday: tickets.filter((ticket) => ticket.status === 'completed').length,
     overloadedRooms: overload.length,
   }
@@ -719,6 +730,7 @@ function findRecommendationTicket(
 
 function createTicketRecommendation(ticket: Ticket, rooms: Room[]): QueueRecommendation {
   const roomName = getTicketRoomName(ticket, rooms)
+  const waitingTime = formatWaitingTime(getWaitingMinutes(ticket))
 
   return {
     action: 'Проверьте маршрут и приоритет талона.',
@@ -726,7 +738,7 @@ function createTicketRecommendation(ticket: Ticket, rooms: Room[]): QueueRecomme
     description: `Услуга: ${ticket.serviceType}. Кабинет: ${roomName ?? 'Не назначен'}.`,
     id: `ticket-${ticket.id}-priority`,
     isResolved: false,
-    message: `Талон ${ticket.number} — высокий приоритет, ожидает ${ticket.etaMinutes} минут`,
+    message: `Талон ${ticket.number} — высокий приоритет, ожидает ${waitingTime}`,
     relatedRoomId: ticket.roomId,
     relatedRoomName: roomName,
     severity: ticket.priority === 'critical' ? 'critical' : 'warning',

@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import type { QueueRecommendation, Room } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import {
-  formatEta,
   formatTime,
+  formatWaitingTime,
   getPriorityMeta,
   getServiceTypeLabel,
   getTicketStatusMeta,
+  getWaitingMinutes,
+  useCurrentTime,
 } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
@@ -28,20 +30,22 @@ function iconForSeverity(severity: QueueRecommendation['severity']) {
   return <Info size={20} />
 }
 
-function getRecommendationTitle(recommendation: QueueRecommendation): string {
+function getRecommendationTitle(recommendation: QueueRecommendation, now: number): string {
   if (!recommendation.ticket) {
     return recommendation.title
   }
 
   const priority = getPriorityMeta(recommendation.ticket.priority).label.toLowerCase()
+  const waitingTime = formatWaitingTime(getWaitingMinutes(recommendation.ticket, now))
 
-  return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${formatEta(recommendation.ticket.etaMinutes)}`
+  return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${waitingTime}`
 }
 
 export function RecommendationPanel({ recommendations, rooms }: RecommendationPanelProps) {
   const navigate = useNavigate()
   const resolveRecommendation = useQueueStore((state) => state.resolveRecommendation)
   const selectTicket = useQueueStore((state) => state.selectTicket)
+  const now = useCurrentTime()
   const activeRecommendations = recommendations.filter((recommendation) => recommendation.isResolved !== true)
 
   const handleOpenTicket = (recommendation: QueueRecommendation) => {
@@ -82,7 +86,7 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
                   <span className="eyebrow">
                     {roomName ?? t.system.systemLabel} / {formatTime(recommendation.createdAt)}
                   </span>
-                  <h2>{getRecommendationTitle(recommendation)}</h2>
+                  <h2>{getRecommendationTitle(recommendation, now)}</h2>
                 </div>
               </header>
               <p>{recommendation.description}</p>
@@ -102,7 +106,7 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
                   </div>
                   <div>
                     <dt>Ожидание</dt>
-                    <dd>{formatEta(recommendation.ticket.etaMinutes)}</dd>
+                    <dd>{formatWaitingTime(getWaitingMinutes(recommendation.ticket, now))}</dd>
                   </div>
                   <div>
                     <dt>Статус</dt>

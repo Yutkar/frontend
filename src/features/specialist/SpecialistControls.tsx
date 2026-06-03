@@ -3,6 +3,7 @@ import { CheckCircle2, FastForward, Play, UserX } from 'lucide-react'
 import type { Room, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
+import { useCurrentTime } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
 type SpecialistControlsProps = {
@@ -26,6 +27,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const skipTicket = useQueueStore((state) => state.skipTicket)
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
+  const now = useCurrentTime()
 
   const roomTickets = useMemo(
     () =>
@@ -92,6 +94,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
                 </Button>
               </div>
             }
+            now={now}
             room={room}
             ticket={currentTicket}
           />
@@ -115,7 +118,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         {waitingTickets.length > 0 ? (
           <div className="specialist-waiting-list">
             {waitingTickets.map((ticket) => (
-              <TicketCard compact key={ticket.id} ticket={ticket} />
+              <TicketCard compact key={ticket.id} now={now} ticket={ticket} />
             ))}
           </div>
         ) : (

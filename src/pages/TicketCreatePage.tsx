@@ -2,6 +2,7 @@ import { TicketCreateForm } from '@features/tickets/TicketCreateForm'
 import type { Room, Ticket, TicketCreateInput } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { TicketCard } from '@shared/ui/components'
+import { useCurrentTime } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
 export function TicketCreatePage() {
@@ -11,6 +12,7 @@ export function TicketCreatePage() {
   const selectedTicketId = useQueueStore((state) => state.selectedTicketId)
   const tickets = useQueueStore((state) => state.tickets)
   const createdTicket = tickets.find((ticket) => ticket.id === selectedTicketId)
+  const now = useCurrentTime()
 
   async function handleCreateTicket(input: TicketCreateInput): Promise<void> {
     await createTicket(input)
@@ -30,14 +32,14 @@ export function TicketCreatePage() {
         </div>
 
         <aside className="side-column">
-          <TicketPreview rooms={rooms} ticket={createdTicket} />
+          <TicketPreview now={now} rooms={rooms} ticket={createdTicket} />
         </aside>
       </section>
     </div>
   )
 }
 
-function TicketPreview({ rooms, ticket }: { rooms: Room[]; ticket?: Ticket }) {
+function TicketPreview({ now, rooms, ticket }: { now: number; rooms: Room[]; ticket?: Ticket }) {
   if (!ticket) {
     return (
       <div className="empty-state compact-empty">
@@ -48,5 +50,5 @@ function TicketPreview({ rooms, ticket }: { rooms: Room[]; ticket?: Ticket }) {
     )
   }
 
-  return <TicketCard room={rooms.find((room) => room.id === ticket.roomId)} ticket={ticket} />
+  return <TicketCard now={now} room={rooms.find((room) => room.id === ticket.roomId)} ticket={ticket} />
 }

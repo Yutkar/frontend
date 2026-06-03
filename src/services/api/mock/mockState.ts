@@ -255,12 +255,16 @@ export function toArchitectureRoom(room?: SharedRoom): ArchitectureRoom {
 
 export function toArchitectureTicket(ticket: SharedTicket): ArchitectureTicket {
   return {
+    calledAt: ticket.calledAt,
+    completedAt: ticket.completedAt,
+    createdAt: ticket.createdAt,
     eta: ticket.etaMinutes,
     id: ticket.id,
     number: ticket.number,
     priority: architecturePriorityBySharedPriority[ticket.priority],
     room: toArchitectureRoom(findRoom(ticket.roomId)),
     serviceType: toArchitectureServiceType(ticket.serviceType),
+    startedAt: ticket.startedAt,
     status: ticket.status,
   }
 }
@@ -271,7 +275,9 @@ export function toArchitectureTickets(tickets: SharedTicket[]): ArchitectureTick
 
 function toSharedTicket(ticket: ArchitectureTicket): SharedTicket {
   return {
-    createdAt: new Date().toISOString(),
+    calledAt: ticket.calledAt,
+    completedAt: ticket.completedAt,
+    createdAt: ticket.createdAt ?? new Date().toISOString(),
     etaMinutes: ticket.eta,
     id: ticket.id,
     number: ticket.number,
@@ -279,6 +285,7 @@ function toSharedTicket(ticket: ArchitectureTicket): SharedTicket {
     priority: sharedPriorityByArchitecturePriority[ticket.priority],
     roomId: ticket.room.id,
     serviceType: sharedServiceTypeByArchitectureCode[ticket.serviceType.code],
+    startedAt: ticket.startedAt,
     status: ticket.status,
   }
 }

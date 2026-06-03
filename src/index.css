@@ -2171,7 +2171,7 @@ h3 {
 }
 
 .wait-row {
-  grid-template-columns: 52px minmax(0, 1fr) 54px;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(76px, auto);
 }
 
 .wait-row div {
@@ -2194,6 +2194,11 @@ h3 {
   flex-direction: column;
   gap: 10px;
   padding: 14px;
+}
+
+.room-load-card small {
+  color: var(--text-muted);
+  font-weight: 750;
 }
 
 .recommendation-card {

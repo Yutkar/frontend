@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Room, Ticket } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { formatEta, formatTime, getServiceTypeLabel } from '@shared/utils'
+import { formatTime, formatWaitingTime, getServiceTypeLabel, getWaitingMinutes } from '@shared/utils'
 import { StatusBadge } from './StatusBadge'
 
 type TicketCardProps = {
@@ -9,9 +9,10 @@ type TicketCardProps = {
   room?: Room
   actionSlot?: ReactNode
   compact?: boolean
+  now?: number
 }
 
-export function TicketCard({ actionSlot, compact = false, room, ticket }: TicketCardProps) {
+export function TicketCard({ actionSlot, compact = false, now, room, ticket }: TicketCardProps) {
   return (
     <article className={`ticket-card ${compact ? 'ticket-card-compact' : ''}`}>
       <header>
@@ -33,7 +34,7 @@ export function TicketCard({ actionSlot, compact = false, room, ticket }: Ticket
         </span>
         <span>
           <small>{t.tickets.eta}</small>
-          {formatEta(ticket.etaMinutes)}
+          {formatWaitingTime(getWaitingMinutes(ticket, now))}
         </span>
         <span>
           <small>{t.tickets.created}</small>

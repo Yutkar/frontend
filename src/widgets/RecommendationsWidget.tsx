@@ -1,6 +1,12 @@
 import { AlertTriangle, Info, Siren } from 'lucide-react'
 import type { QueueRecommendation } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
+import {
+  formatWaitingTime,
+  getPriorityMeta,
+  getWaitingMinutes,
+  useCurrentTime,
+} from '@shared/utils'
 
 type RecommendationsWidgetProps = {
   recommendations: QueueRecommendation[]
@@ -18,7 +24,20 @@ function severityIcon(severity: QueueRecommendation['severity']) {
   return <Info size={18} />
 }
 
+function getRecommendationMessage(recommendation: QueueRecommendation, now: number): string {
+  if (!recommendation.ticket) {
+    return recommendation.message
+  }
+
+  const priority = getPriorityMeta(recommendation.ticket.priority).label.toLowerCase()
+  const waitingTime = formatWaitingTime(getWaitingMinutes(recommendation.ticket, now))
+
+  return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${waitingTime}`
+}
+
 export function RecommendationsWidget({ recommendations }: RecommendationsWidgetProps) {
+  const now = useCurrentTime()
+
   return (
     <section className="widget-panel">
       <div className="panel-header">
@@ -37,7 +56,7 @@ export function RecommendationsWidget({ recommendations }: RecommendationsWidget
             >
               <span>{severityIcon(recommendation.severity)}</span>
               <div>
-                <strong>{recommendation.message}</strong>
+                <strong>{getRecommendationMessage(recommendation, now)}</strong>
                 <p>{recommendation.action}</p>
               </div>
             </article>

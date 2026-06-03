@@ -5,11 +5,13 @@ import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import type { QueueRecommendation } from '@shared/types'
 import {
-  formatEta,
   formatTime,
+  formatWaitingTime,
   getPriorityMeta,
   getServiceTypeLabel,
   getTicketStatusMeta,
+  getWaitingMinutes,
+  useCurrentTime,
 } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
@@ -37,14 +39,15 @@ function severityIcon(severity: QueueRecommendation['severity']) {
   return <Info size={16} />
 }
 
-function getNotificationTitle(recommendation: QueueRecommendation): string {
+function getNotificationTitle(recommendation: QueueRecommendation, now: number): string {
   if (!recommendation.ticket) {
     return recommendation.message
   }
 
   const priority = getPriorityMeta(recommendation.ticket.priority).label.toLowerCase()
+  const waitingTime = formatWaitingTime(getWaitingMinutes(recommendation.ticket, now))
 
-  return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${formatEta(recommendation.ticket.etaMinutes)}`
+  return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${waitingTime}`
 }
 
 export function TopNavbar({ routes }: TopNavbarProps) {
@@ -54,6 +57,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
   const notificationsRequested = useRef(false)
   const [dismissedRecommendationIds, setDismissedRecommendationIds] = useState<string[]>([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const now = useCurrentTime()
 
   const user = useGlobalStore((state) => state.user)
   const logout = useGlobalStore((state) => state.logout)
@@ -193,7 +197,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                         {severityIcon(recommendation.severity)}
                       </span>
                       <div>
-                        <strong>{getNotificationTitle(recommendation)}</strong>
+                        <strong>{getNotificationTitle(recommendation, now)}</strong>
                         <p>{recommendation.description}</p>
                         {recommendation.ticket ? (
                           <dl className="notification-details">
@@ -211,7 +215,9 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                             </div>
                             <div>
                               <dt>Ожидание</dt>
-                              <dd>{formatEta(recommendation.ticket.etaMinutes)}</dd>
+                              <dd>
+                                {formatWaitingTime(getWaitingMinutes(recommendation.ticket, now))}
+                              </dd>
                             </div>
                             <div>
                               <dt>Статус</dt>

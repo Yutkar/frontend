@@ -25,12 +25,16 @@ export interface Room {
 }
 
 export interface Ticket {
+  calledAt?: string
+  completedAt?: string
+  createdAt?: string
   id: string
   number: string
   serviceType: ServiceType
   status: TicketStatus
   room: Room
   priority: TicketPriority
+  startedAt?: string
   eta: number
 }
 
