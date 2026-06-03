@@ -1,7 +1,15 @@
-import { AlertTriangle, Info, Siren } from 'lucide-react'
+import { AlertTriangle, Check, ExternalLink, Info, Siren } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import type { QueueRecommendation, Room } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { formatTime } from '@shared/utils'
+import {
+  formatEta,
+  formatTime,
+  getPriorityMeta,
+  getServiceTypeLabel,
+  getTicketStatusMeta,
+} from '@shared/utils'
+import { useQueueStore } from '@store/queue'
 
 type RecommendationPanelProps = {
   recommendations: QueueRecommendation[]
@@ -20,11 +28,47 @@ function iconForSeverity(severity: QueueRecommendation['severity']) {
   return <Info size={20} />
 }
 
+function getRecommendationTitle(recommendation: QueueRecommendation): string {
+  if (!recommendation.ticket) {
+    return recommendation.title
+  }
+
+  const priority = getPriorityMeta(recommendation.ticket.priority).label.toLowerCase()
+
+  return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${formatEta(recommendation.ticket.etaMinutes)}`
+}
+
 export function RecommendationPanel({ recommendations, rooms }: RecommendationPanelProps) {
+  const navigate = useNavigate()
+  const resolveRecommendation = useQueueStore((state) => state.resolveRecommendation)
+  const selectTicket = useQueueStore((state) => state.selectTicket)
+  const activeRecommendations = recommendations.filter((recommendation) => recommendation.isResolved !== true)
+
+  const handleOpenTicket = (recommendation: QueueRecommendation) => {
+    if (!recommendation.ticketId) {
+      return
+    }
+
+    selectTicket(recommendation.ticketId)
+    navigate('/dashboard')
+  }
+
+  const handleOpenRoom = () => {
+    navigate('/admin')
+  }
+
   return (
     <div className="recommendation-list">
-      {recommendations.map((recommendation) => {
+      {activeRecommendations.length === 0 ? (
+        <div className="empty-state">
+          <h2>Активных уведомлений нет</h2>
+          <p>Новые рекомендации появятся здесь после обновления очереди.</p>
+        </div>
+      ) : null}
+
+      {activeRecommendations.map((recommendation) => {
         const room = rooms.find((item) => item.id === recommendation.relatedRoomId)
+        const roomName = recommendation.relatedRoomName ?? room?.name
 
         return (
           <article
@@ -36,13 +80,62 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
               <header>
                 <div>
                   <span className="eyebrow">
-                    {room?.name ?? t.system.systemLabel} / {formatTime(recommendation.createdAt)}
+                    {roomName ?? t.system.systemLabel} / {formatTime(recommendation.createdAt)}
                   </span>
-                  <h2>{recommendation.title}</h2>
+                  <h2>{getRecommendationTitle(recommendation)}</h2>
                 </div>
               </header>
               <p>{recommendation.description}</p>
+              {recommendation.ticket ? (
+                <dl className="recommendation-details">
+                  <div>
+                    <dt>Услуга</dt>
+                    <dd>{getServiceTypeLabel(recommendation.ticket.serviceType)}</dd>
+                  </div>
+                  <div>
+                    <dt>Кабинет</dt>
+                    <dd>{roomName ?? 'Не назначен'}</dd>
+                  </div>
+                  <div>
+                    <dt>Приоритет</dt>
+                    <dd>{getPriorityMeta(recommendation.ticket.priority).label}</dd>
+                  </div>
+                  <div>
+                    <dt>Ожидание</dt>
+                    <dd>{formatEta(recommendation.ticket.etaMinutes)}</dd>
+                  </div>
+                  <div>
+                    <dt>Статус</dt>
+                    <dd>{getTicketStatusMeta(recommendation.ticket.status).label}</dd>
+                  </div>
+                </dl>
+              ) : roomName ? (
+                <dl className="recommendation-details">
+                  <div>
+                    <dt>Кабинет</dt>
+                    <dd>{roomName}</dd>
+                  </div>
+                </dl>
+              ) : null}
               <strong>{recommendation.action}</strong>
+              <div className="recommendation-actions">
+                {recommendation.ticketId ? (
+                  <button onClick={() => handleOpenTicket(recommendation)} type="button">
+                    <ExternalLink size={14} />
+                    Открыть талон
+                  </button>
+                ) : null}
+                {recommendation.relatedRoomId ? (
+                  <button onClick={handleOpenRoom} type="button">
+                    <ExternalLink size={14} />
+                    Открыть кабинет
+                  </button>
+                ) : null}
+                <button onClick={() => void resolveRecommendation(recommendation.id)} type="button">
+                  <Check size={14} />
+                  Закрыть
+                </button>
+              </div>
             </div>
           </article>
         )

@@ -74,7 +74,11 @@ export type QueueRecommendation = {
   title: string
   description: string
   action: string
+  isResolved?: boolean
   relatedRoomId?: string
+  relatedRoomName?: string
+  ticketId?: string
+  ticket?: Ticket
   createdAt: string
 }
 
@@ -105,6 +109,7 @@ export type TicketCreateInput = {
   patientName: string
   serviceType: ServiceType
   priority: TicketPriority
+  roomId?: string | number
   notes?: string
 }
 

@@ -94,6 +94,7 @@ export type QueueApi = {
   returnTicket: (ticketId: string) => Promise<QueueSnapshot>
   redirectTicket: (input: RedirectTicketInput) => Promise<QueueSnapshot>
   recalculateRoom: (roomId: string | number) => Promise<QueueSnapshot>
+  resolveRecommendation: (id: string) => Promise<QueueSnapshot>
   getStats: () => Promise<ArchitectureQueueStats>
   getQueueByRoom: (roomId: string | number) => Promise<ArchitectureTicket[]>
   getNextTicket: (roomId: string | number) => Promise<ArchitectureTicket | undefined>

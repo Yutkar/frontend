@@ -67,6 +67,7 @@ export function DashboardPage() {
   const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0]
   const dispatchRoom = rooms.find((room) => room.isActive !== false && room.status === 'open')
   const canManageTicketSettings = user?.role === 'admin' || user?.role === 'manager'
+  const canMarkTicketNoShow = user?.role === 'admin' || user?.role === 'specialist'
   const canUseQueueActions = user?.role === 'admin'
   const visibleSuccessMessage = successMessage ?? statusMessage
 
@@ -195,7 +196,7 @@ export function DashboardPage() {
           <QueueTableBase
             actionSlot={(ticket) => {
               const isFinalTicket = closedTicketStatuses.includes(ticket.status)
-              const canMarkNoShow = noShowStatuses.includes(ticket.status)
+              const canMarkNoShow = canMarkTicketNoShow && noShowStatuses.includes(ticket.status)
               const isBusy = busyTicketId === ticket.id || loading
 
               return (
@@ -216,7 +217,7 @@ export function DashboardPage() {
                       Редактировать
                     </Button>
                   ) : null}
-                  {canManageTicketSettings && canMarkNoShow ? (
+                  {canMarkNoShow ? (
                     <Button
                       disabled={isBusy}
                       icon={<UserX size={15} />}

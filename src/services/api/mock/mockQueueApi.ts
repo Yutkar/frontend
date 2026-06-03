@@ -12,6 +12,7 @@ import {
   getQueueStats,
   redirectSharedTicket,
   replaceArchitectureQueue,
+  resolveMockRecommendation,
   toArchitectureTicket,
   updateSharedTicketStatus,
 } from './mockState'
@@ -86,6 +87,10 @@ export const mockQueueApi: QueueApi = {
 
   recalculateRoom() {
     return Promise.resolve(getQueueSnapshot())
+  },
+
+  resolveRecommendation(id: string) {
+    return Promise.resolve(resolveMockRecommendation(id))
   },
 
   getStats() {

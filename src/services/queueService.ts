@@ -82,6 +82,15 @@ export const queueService = {
     }
   },
 
+  async resolveRecommendation(id: string): Promise<QueueSnapshot> {
+    try {
+      return await queueApi.resolveRecommendation(id)
+    } catch (error) {
+      console.error('queueService.resolveRecommendation failed', error)
+      throw toServiceError(error, 'Не удалось закрыть уведомление')
+    }
+  },
+
   async callNext(roomId?: string | number): Promise<Ticket | undefined> {
     try {
       return await withOperationalRefresh(async () => {

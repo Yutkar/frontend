@@ -139,6 +139,11 @@ export function TicketManualCreateModal({
       return
     }
 
+    if (!roomId || !rooms.some((room) => String(room.id) === roomId)) {
+      setError('Выберите кабинет.')
+      return
+    }
+
     const payload: TicketCreateSettingsPayload = {
       doctorId: doctorId || undefined,
       priority,
@@ -206,16 +211,19 @@ export function TicketManualCreateModal({
           <label className="field">
             <span>Кабинет</span>
             <select
-              disabled={isBusy}
+              disabled={isBusy || rooms.length === 0}
               onChange={(event) => setRoomId(event.target.value)}
               value={roomId}
             >
-              <option value="">Не назначен</option>
-              {rooms.map((room) => (
-                <option key={String(room.id)} value={String(room.id)}>
-                  {room.name}
-                </option>
-              ))}
+              {rooms.length > 0 ? (
+                rooms.map((room) => (
+                  <option key={String(room.id)} value={String(room.id)}>
+                    {room.name}
+                  </option>
+                ))
+              ) : (
+                <option value="">Активные кабинеты не найдены</option>
+              )}
             </select>
           </label>
 
@@ -270,7 +278,7 @@ export function TicketManualCreateModal({
           <Button disabled={saving} onClick={onClose} variant="ghost">
             Отмена
           </Button>
-          <Button disabled={isBusy} type="submit" variant="primary">
+          <Button disabled={isBusy || !roomId} type="submit" variant="primary">
             {saving ? 'Создаём...' : 'Создать'}
           </Button>
         </footer>

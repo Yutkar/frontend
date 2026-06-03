@@ -30,6 +30,7 @@ export function createMockTicket(input: TicketCreateInput, queueLength: number):
     patientName: input.patientName,
     serviceType: input.serviceType,
     priority: input.priority,
+    roomId: input.roomId ? String(input.roomId) : undefined,
     status: 'waiting',
     createdAt,
     etaMinutes: Math.max(6, queueLength * 7),

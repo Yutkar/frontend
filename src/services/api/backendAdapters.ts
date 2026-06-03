@@ -29,6 +29,7 @@ export type BackendTicketStatus =
 
 export type BackendServiceType = {
   id: number | string
+  code?: string
   name: string
   averageDurationMinutes?: number
   priorityWeight?: number
@@ -52,19 +53,28 @@ export type BackendRoom = {
 export type BackendTicket = {
   assignedRoom?: BackendRoom | null
   assignedRoomId?: number | string | null
+  called_at?: string | null
   id: number | string
-  number: string
+  number?: string
   priority?: number
-  status: BackendTicketStatus
+  status?: BackendTicketStatus
   etaMinutes?: number | null
+  waitMinutes?: number | null
   serviceTypeId?: number | string
+  serviceTypeName?: string | null
+  serviceName?: string | null
   roomId?: number | string | null
   createdAt?: string
+  created_at?: string
   calledAt?: string | null
   serviceStartedAt?: string | null
+  service_started_at?: string | null
   startedAt?: string | null
   completedAt?: string | null
+  completed_at?: string | null
+  ticketNumber?: string
   serviceType?: BackendServiceType
+  service?: BackendServiceType
   room?: BackendRoom | null
   roomName?: string | null
 }
@@ -87,17 +97,24 @@ export type BackendRecommendation = {
   _id?: number | string
   action?: string
   createdAt?: string
+  created_at?: string
   description?: string
   id?: number | string
   isRead?: boolean
+  isResolved?: boolean
+  is_resolved?: boolean
   level?: string
   message?: string
   read?: boolean
   relatedRoomId?: number | string
   resolved?: boolean
   roomId?: number | string
+  roomName?: string
   severity?: string
   text?: string
+  ticketId?: number | string
+  ticket_id?: number | string
+  ticketNumber?: string
   title?: string
 }
 
@@ -281,7 +298,31 @@ export function toBackendRooms(value: unknown): BackendRoom[] {
 }
 
 function getBackendServiceName(ticket: BackendTicket): string {
-  return ticket.serviceType?.name?.trim().toLowerCase() ?? ''
+  return ticket.serviceType?.name?.trim().toLowerCase()
+    ?? ticket.service?.name?.trim().toLowerCase()
+    ?? ticket.serviceTypeName?.trim().toLowerCase()
+    ?? ticket.serviceName?.trim().toLowerCase()
+    ?? ''
+}
+
+function getBackendTicketNumber(ticket: BackendTicket): string {
+  return ticket.number ?? ticket.ticketNumber ?? `Талон ${toId(ticket.id)}`
+}
+
+function getBackendCreatedAt(ticket: BackendTicket): string {
+  return ticket.createdAt ?? ticket.created_at ?? new Date().toISOString()
+}
+
+function getBackendCalledAt(ticket: BackendTicket): string | undefined {
+  return ticket.calledAt ?? ticket.called_at ?? undefined
+}
+
+function getBackendStartedAt(ticket: BackendTicket): string | undefined {
+  return ticket.serviceStartedAt ?? ticket.service_started_at ?? ticket.startedAt ?? undefined
+}
+
+function getBackendCompletedAt(ticket: BackendTicket): string | undefined {
+  return ticket.completedAt ?? ticket.completed_at ?? undefined
 }
 
 export function toBackendServiceTypeId(serviceType: ServiceType): number {
@@ -340,12 +381,12 @@ export function toArchitecturePriority(priority = 2): ArchitectureTicketPriority
   return 'normal'
 }
 
-export function toSharedStatus(status: BackendTicketStatus): TicketStatus {
-  return status
+export function toSharedStatus(status?: BackendTicketStatus): TicketStatus {
+  return status ?? 'waiting'
 }
 
-export function toArchitectureStatus(status: BackendTicketStatus): ArchitectureTicketStatus {
-  return status
+export function toArchitectureStatus(status?: BackendTicketStatus): ArchitectureTicketStatus {
+  return status ?? 'waiting'
 }
 
 export function toSharedServiceType(ticket: BackendTicket): ServiceType {
@@ -355,7 +396,7 @@ export function toSharedServiceType(ticket: BackendTicket): ServiceType {
     return serviceTypeByBackendName[backendName]
   }
 
-  const serviceTypeId = Number(ticket.serviceTypeId ?? ticket.serviceType?.id)
+  const serviceTypeId = Number(ticket.serviceTypeId ?? ticket.serviceType?.id ?? ticket.service?.id)
 
   return serviceTypeByBackendId[serviceTypeId] ?? 'consultation'
 }
@@ -366,18 +407,22 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
 
   return {
     id: toId(ticket.id),
-    number: ticket.number,
-    patientName: `Пациент ${ticket.number}`,
+    number: getBackendTicketNumber(ticket),
+    patientName: `Пациент ${getBackendTicketNumber(ticket)}`,
     serviceType,
     priority: toSharedPriority(ticket.priority),
     status: toSharedStatus(ticket.status),
-    createdAt: ticket.createdAt ?? new Date().toISOString(),
-    calledAt: ticket.calledAt ?? undefined,
-    startedAt: ticket.serviceStartedAt ?? ticket.startedAt ?? undefined,
-    completedAt: ticket.completedAt ?? undefined,
+    createdAt: getBackendCreatedAt(ticket),
+    calledAt: getBackendCalledAt(ticket),
+    startedAt: getBackendStartedAt(ticket),
+    completedAt: getBackendCompletedAt(ticket),
     roomId: roomId || undefined,
-    etaMinutes: ticket.etaMinutes ?? 0,
+    etaMinutes: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
   }
+}
+
+export function normalizeBoardTicket(ticket: BackendTicket): Ticket {
+  return toSharedTicket(ticket)
 }
 
 export function toSharedTickets(tickets: BackendTicket[]): Ticket[] {
@@ -388,7 +433,7 @@ export function toArchitectureTicket(ticket: BackendTicket): ArchitectureTicket 
   const serviceName = getBackendServiceName(ticket)
   const code = architectureServiceByBackendName[serviceName] ?? 'consultation'
   const serviceType: ArchitectureServiceType = {
-    id: toId(ticket.serviceTypeId ?? ticket.serviceType?.id),
+    id: toId(ticket.serviceTypeId ?? ticket.serviceType?.id ?? ticket.service?.id),
     code,
     name: serviceName || code,
   }
@@ -401,12 +446,12 @@ export function toArchitectureTicket(ticket: BackendTicket): ArchitectureTicket 
 
   return {
     id: toId(ticket.id),
-    number: ticket.number,
+    number: getBackendTicketNumber(ticket),
     serviceType,
     status: toArchitectureStatus(ticket.status),
     room,
     priority: toArchitecturePriority(ticket.priority),
-    eta: ticket.etaMinutes ?? 0,
+    eta: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
   }
 }
 
@@ -427,23 +472,32 @@ export function toArchitectureRooms(rooms: BackendRoom[]): ArchitectureRoom[] {
 
 export function toBackendTicketCreateInput(input: TicketCreateInput): {
   priority: number
+  roomId?: number
   serviceTypeId: number
 } {
+  const roomId = Number(input.roomId)
+
   return {
     priority: toBackendPriority(input.priority),
+    ...(Number.isFinite(roomId) ? { roomId } : {}),
     serviceTypeId: toBackendServiceTypeId(input.serviceType),
   }
 }
 
 export function toBackendArchitectureTicketCreateInput(input: {
   priority?: ArchitectureTicketPriority
+  roomId?: string | number
   serviceTypeId: number | string
 }): {
   priority: number
+  roomId?: number
   serviceTypeId: number
 } {
+  const roomId = Number(input.roomId)
+
   return {
     priority: toBackendPriority(input.priority),
+    ...(Number.isFinite(roomId) ? { roomId } : {}),
     serviceTypeId: Number(input.serviceTypeId),
   }
 }
@@ -541,7 +595,7 @@ export function toSharedRooms(
     const currentTicket = tickets.find((ticket) => {
       const ticketRoomId = getBackendTicketRoomId(ticket)
 
-      return ticketRoomId === room.id && ['called', 'in_service'].includes(ticket.status)
+      return ticketRoomId === room.id && ['called', 'in_service'].includes(ticket.status ?? '')
     })
 
     return {
@@ -558,7 +612,7 @@ export function toQueueKpi(
   overload: BackendOverloadRoom[] = [],
 ): QueueKpi {
   const activeTickets = tickets.filter((ticket) =>
-    ['created', 'waiting', 'called', 'in_service', 'redirected'].includes(ticket.status),
+    ['created', 'waiting', 'called', 'in_service', 'redirected'].includes(ticket.status ?? ''),
   ).length
   const totalEta = stats.reduce((sum, item) => sum + item.etaMinutes, 0)
 
@@ -606,34 +660,153 @@ export function toBackendRecommendations(value: unknown): BackendRecommendation[
   return []
 }
 
+function getRecommendationTicketId(recommendation: BackendRecommendation): string {
+  return toId(recommendation.ticketId ?? recommendation.ticket_id)
+}
+
+function getRecommendationRoomId(recommendation: BackendRecommendation): string {
+  return toId(recommendation.relatedRoomId ?? recommendation.roomId)
+}
+
+function getRecommendationCreatedAt(recommendation: BackendRecommendation): string {
+  return recommendation.createdAt ?? recommendation.created_at ?? new Date().toISOString()
+}
+
+function getTicketRoomName(ticket?: Ticket, rooms: Room[] = []): string | undefined {
+  if (!ticket?.roomId) {
+    return undefined
+  }
+
+  return rooms.find((room) => room.id === ticket.roomId)?.name ?? `Кабинет ${ticket.roomId}`
+}
+
+function findRecommendationTicket(
+  recommendation: BackendRecommendation,
+  tickets: Ticket[],
+  highPriorityTickets: Ticket[],
+): Ticket | undefined {
+  const ticketId = getRecommendationTicketId(recommendation)
+
+  if (ticketId) {
+    return tickets.find((ticket) => ticket.id === ticketId)
+      ?? highPriorityTickets.find((ticket) => ticket.id === ticketId)
+  }
+
+  const ticketNumber = recommendation.ticketNumber?.trim()
+
+  if (ticketNumber) {
+    return tickets.find((ticket) => ticket.number === ticketNumber)
+      ?? highPriorityTickets.find((ticket) => ticket.number === ticketNumber)
+  }
+
+  const roomId = getRecommendationRoomId(recommendation)
+
+  if (roomId) {
+    return highPriorityTickets.find((ticket) => ticket.roomId === roomId)
+      ?? tickets.find((ticket) =>
+        ticket.roomId === roomId &&
+        ['critical', 'high'].includes(ticket.priority) &&
+        ['created', 'waiting', 'called', 'redirected'].includes(ticket.status),
+      )
+  }
+
+  return highPriorityTickets[0]
+    ?? tickets.find((ticket) =>
+      ['critical', 'high'].includes(ticket.priority) &&
+      ['created', 'waiting', 'called', 'redirected'].includes(ticket.status),
+    )
+}
+
+function createTicketRecommendation(ticket: Ticket, rooms: Room[]): QueueRecommendation {
+  const roomName = getTicketRoomName(ticket, rooms)
+
+  return {
+    action: 'Проверьте маршрут и приоритет талона.',
+    createdAt: ticket.createdAt,
+    description: `Услуга: ${ticket.serviceType}. Кабинет: ${roomName ?? 'Не назначен'}.`,
+    id: `ticket-${ticket.id}-priority`,
+    isResolved: false,
+    message: `Талон ${ticket.number} — высокий приоритет, ожидает ${ticket.etaMinutes} минут`,
+    relatedRoomId: ticket.roomId,
+    relatedRoomName: roomName,
+    severity: ticket.priority === 'critical' ? 'critical' : 'warning',
+    ticket,
+    ticketId: ticket.id,
+    title: 'Приоритетный талон ожидает',
+  }
+}
+
+function createOverloadRecommendation(room: BackendOverloadRoom): QueueRecommendation {
+  return {
+    action: 'Проверьте распределение врачей и кабинетов.',
+    createdAt: new Date().toISOString(),
+    description: `В кабинете сейчас ${room.queueCount} активных талонов.`,
+    id: `room-${room.roomId}-overload`,
+    isResolved: false,
+    message: `${room.roomName}: высокая нагрузка`,
+    relatedRoomId: toId(room.roomId),
+    relatedRoomName: room.roomName,
+    severity: room.queueCount >= 8 ? 'critical' : 'warning',
+    title: 'Перегрузка кабинета',
+  }
+}
+
 export function toSharedRecommendations(
   recommendations: BackendRecommendation[] = [],
+  tickets: Ticket[] = [],
+  rooms: Room[] = [],
+  highPriorityTickets: Ticket[] = [],
+  overload: BackendOverloadRoom[] = [],
 ): QueueRecommendation[] {
-  return recommendations
+  const baseRecommendations = recommendations
     .filter((recommendation) => {
       const record = recommendation as Record<string, unknown>
-      const resolved = getRecordBoolean(record, ['resolved', 'isResolved'])
+      const resolved = getRecordBoolean(record, ['resolved', 'isResolved', 'is_resolved'])
       const read = getRecordBoolean(record, ['read', 'isRead'])
 
       return resolved !== true && read !== true
     })
     .map((recommendation, index) => {
       const record = recommendation as Record<string, unknown>
+      const ticket = findRecommendationTicket(recommendation, tickets, highPriorityTickets)
+      const roomId = getRecommendationRoomId(recommendation) || ticket?.roomId
+      const roomName = recommendation.roomName
+        ?? getTicketRoomName(ticket, rooms)
+        ?? rooms.find((room) => room.id === roomId)?.name
+        ?? (roomId ? `Кабинет ${roomId}` : undefined)
       const message = getRecordString(record, ['message', 'text', 'description'], 'Новое уведомление')
       const title = getRecordString(record, ['title'], 'Уведомление')
       const description = getRecordString(record, ['description', 'message', 'text'], message)
+      const fallbackTicketId = getRecommendationTicketId(recommendation)
 
       return {
         action: getRecordString(record, ['action'], 'Проверить очередь'),
-        createdAt: getRecordString(record, ['createdAt'], new Date().toISOString()),
+        createdAt: getRecommendationCreatedAt(recommendation),
         description,
         id: getRecommendationId(recommendation, index),
+        isResolved: false,
         message,
-        relatedRoomId: toId(recommendation.relatedRoomId ?? recommendation.roomId) || undefined,
+        relatedRoomId: roomId || undefined,
+        relatedRoomName: roomName,
         severity: toRecommendationSeverity(recommendation.severity ?? recommendation.level),
+        ticket,
+        ticketId: (ticket?.id ?? fallbackTicketId) || undefined,
         title,
       }
     })
+  const existingIds = new Set(baseRecommendations.map((recommendation) => recommendation.id))
+  const existingTicketIds = new Set(baseRecommendations.map((recommendation) => recommendation.ticketId).filter(Boolean))
+  const highPriorityRecommendations = highPriorityTickets
+    .filter((ticket) => !existingTicketIds.has(ticket.id))
+    .map((ticket) => createTicketRecommendation(ticket, rooms))
+    .filter((recommendation) => !existingIds.has(recommendation.id))
+  const existingRoomIds = new Set(baseRecommendations.map((recommendation) => recommendation.relatedRoomId).filter(Boolean))
+  const overloadRecommendations = overload
+    .filter((room) => !existingRoomIds.has(toId(room.roomId)))
+    .map(createOverloadRecommendation)
+    .filter((recommendation) => !existingIds.has(recommendation.id))
+
+  return [...baseRecommendations, ...highPriorityRecommendations, ...overloadRecommendations]
 }
 
 export function toQueueSnapshot(
@@ -642,13 +815,35 @@ export function toQueueSnapshot(
   overload: BackendOverloadRoom[] = [],
   rooms: BackendRoom[] = [],
   recommendations: BackendRecommendation[] = [],
+  highPriorityTickets: BackendTicket[] = [],
 ): QueueSnapshot {
+  const sharedTickets = toSharedTickets(tickets)
+  const sharedRooms = toSharedRooms(tickets, stats, rooms)
+  const sharedHighPriorityTickets = toSharedTickets(highPriorityTickets)
+
   return {
-    tickets: toSharedTickets(tickets),
-    rooms: toSharedRooms(tickets, stats, rooms),
+    tickets: sharedTickets,
+    rooms: sharedRooms,
     events: [],
-    recommendations: toSharedRecommendations(recommendations),
+    recommendations: toSharedRecommendations(
+      recommendations,
+      sharedTickets,
+      sharedRooms,
+      sharedHighPriorityTickets,
+      overload,
+    ),
     analytics: [],
     kpi: toQueueKpi(tickets, stats, overload),
+  }
+}
+
+export function toBoardQueueSnapshot(tickets: BackendTicket[]): QueueSnapshot {
+  return {
+    tickets: tickets.map(normalizeBoardTicket),
+    rooms: toSharedRooms(tickets),
+    events: [],
+    recommendations: [],
+    analytics: [],
+    kpi: toQueueKpi(tickets),
   }
 }

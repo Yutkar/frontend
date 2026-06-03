@@ -148,6 +148,30 @@ function refreshQueueSnapshot(): void {
     }
   })
   queueSnapshot.kpi = calculateQueueKpi(queueSnapshot.tickets, queueSnapshot.rooms)
+  queueSnapshot.recommendations = queueSnapshot.recommendations.map((recommendation) => {
+    const ticket = recommendation.ticket
+      ?? (recommendation.ticketId
+        ? queueSnapshot.tickets.find((item) => item.id === recommendation.ticketId)
+        : undefined)
+      ?? (recommendation.relatedRoomId
+        ? queueSnapshot.tickets.find((item) =>
+          item.roomId === recommendation.relatedRoomId &&
+          ['critical', 'high'].includes(item.priority) &&
+          ['created', 'waiting', 'called', 'redirected'].includes(item.status),
+        )
+        : undefined)
+    const roomId = recommendation.relatedRoomId ?? ticket?.roomId
+    const room = roomId ? queueSnapshot.rooms.find((item) => item.id === roomId) : undefined
+
+    return {
+      ...recommendation,
+      isResolved: recommendation.isResolved ?? false,
+      relatedRoomId: roomId,
+      relatedRoomName: recommendation.relatedRoomName ?? room?.name,
+      ticket,
+      ticketId: recommendation.ticketId ?? ticket?.id,
+    }
+  })
 }
 
 export function upsertMockQueueRoom(record: { id: string | number } & Record<string, unknown>): void {
@@ -265,6 +289,14 @@ export function getQueueSnapshot(): QueueSnapshot {
   return clone(queueSnapshot)
 }
 
+export function resolveMockRecommendation(id: string): QueueSnapshot {
+  queueSnapshot.recommendations = queueSnapshot.recommendations.filter(
+    (recommendation) => recommendation.id !== id,
+  )
+
+  return getQueueSnapshot()
+}
+
 export function getArchitectureTickets(): ArchitectureTicket[] {
   return toArchitectureTickets(getQueueSnapshot().tickets)
 }
@@ -288,6 +320,7 @@ export function createArchitectureTicket(input: ArchitectureCreateTicketInput): 
   const ticket = createSharedTicket({
     patientName: `Patient ${Date.now().toString().slice(-4)}`,
     priority: sharedPriorityByArchitecturePriority[input.priority],
+    roomId: input.roomId,
     serviceType,
   })
 

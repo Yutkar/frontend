@@ -50,6 +50,7 @@ export interface QueueStats {
 export type CreateTicketInput = {
   serviceTypeId: string
   priority: TicketPriority
+  roomId?: string | number
 }
 
 export type UpdateTicketStatusInput = {

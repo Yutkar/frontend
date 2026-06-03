@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bell, Check, Info, LogOut, Radio, ShieldCheck, Siren } from 'lucide-react'
+import { AlertTriangle, Bell, Check, ExternalLink, Info, LogOut, Radio, ShieldCheck, Siren } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import type { QueueRecommendation } from '@shared/types'
-import { formatTime } from '@shared/utils'
+import {
+  formatEta,
+  formatTime,
+  getPriorityMeta,
+  getServiceTypeLabel,
+  getTicketStatusMeta,
+} from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 import { ThemeToggle } from '@shared/ui/core-components'
@@ -31,6 +37,16 @@ function severityIcon(severity: QueueRecommendation['severity']) {
   return <Info size={16} />
 }
 
+function getNotificationTitle(recommendation: QueueRecommendation): string {
+  if (!recommendation.ticket) {
+    return recommendation.message
+  }
+
+  const priority = getPriorityMeta(recommendation.ticket.priority).label.toLowerCase()
+
+  return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${formatEta(recommendation.ticket.etaMinutes)}`
+}
+
 export function TopNavbar({ routes }: TopNavbarProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -45,6 +61,8 @@ export function TopNavbar({ routes }: TopNavbarProps) {
   const loadQueue = useQueueStore((state) => state.loadQueue)
   const loading = useQueueStore((state) => state.loading)
   const recommendations = useQueueStore((state) => state.recommendations)
+  const resolveRecommendation = useQueueStore((state) => state.resolveRecommendation)
+  const selectTicket = useQueueStore((state) => state.selectTicket)
 
   const currentRoute = routes.find((route) => route.path === location.pathname)
   const visibleRecommendations = useMemo(
@@ -54,7 +72,9 @@ export function TopNavbar({ routes }: TopNavbarProps) {
       }
 
       return recommendations.filter(
-        (recommendation) => !dismissedRecommendationIds.includes(recommendation.id),
+        (recommendation) =>
+          recommendation.isResolved !== true &&
+          !dismissedRecommendationIds.includes(recommendation.id),
       )
     },
     [dismissedRecommendationIds, recommendations, user?.role],
@@ -108,6 +128,28 @@ export function TopNavbar({ routes }: TopNavbarProps) {
     navigate('/login', { replace: true })
   }
 
+  const handleOpenTicket = (recommendation: QueueRecommendation) => {
+    if (!recommendation.ticketId) {
+      return
+    }
+
+    selectTicket(recommendation.ticketId)
+    setNotificationsOpen(false)
+    navigate('/dashboard')
+  }
+
+  const handleOpenRoom = () => {
+    setNotificationsOpen(false)
+    navigate('/admin')
+  }
+
+  const handleResolveRecommendation = async (recommendation: QueueRecommendation) => {
+    setDismissedRecommendationIds((ids) => (
+      ids.includes(recommendation.id) ? ids : [...ids, recommendation.id]
+    ))
+    await resolveRecommendation(recommendation.id)
+  }
+
   return (
     <header className="top-navbar">
       <div>
@@ -151,26 +193,66 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                         {severityIcon(recommendation.severity)}
                       </span>
                       <div>
-                        <strong>{recommendation.message}</strong>
+                        <strong>{getNotificationTitle(recommendation)}</strong>
                         <p>{recommendation.description}</p>
+                        {recommendation.ticket ? (
+                          <dl className="notification-details">
+                            <div>
+                              <dt>Услуга</dt>
+                              <dd>{getServiceTypeLabel(recommendation.ticket.serviceType)}</dd>
+                            </div>
+                            <div>
+                              <dt>Кабинет</dt>
+                              <dd>{recommendation.relatedRoomName ?? 'Не назначен'}</dd>
+                            </div>
+                            <div>
+                              <dt>Приоритет</dt>
+                              <dd>{getPriorityMeta(recommendation.ticket.priority).label}</dd>
+                            </div>
+                            <div>
+                              <dt>Ожидание</dt>
+                              <dd>{formatEta(recommendation.ticket.etaMinutes)}</dd>
+                            </div>
+                            <div>
+                              <dt>Статус</dt>
+                              <dd>{getTicketStatusMeta(recommendation.ticket.status).label}</dd>
+                            </div>
+                          </dl>
+                        ) : recommendation.relatedRoomName ? (
+                          <dl className="notification-details">
+                            <div>
+                              <dt>Кабинет</dt>
+                              <dd>{recommendation.relatedRoomName}</dd>
+                            </div>
+                          </dl>
+                        ) : null}
                         <footer>
                           <span>{severityLabel[recommendation.severity]}</span>
                           <time>{formatTime(recommendation.createdAt)}</time>
                         </footer>
                       </div>
-                      <button
-                        aria-label="Отметить уведомление прочитанным"
-                        onClick={() =>
-                          setDismissedRecommendationIds((ids) => [
-                            ...ids,
-                            recommendation.id,
-                          ])
-                        }
-                        type="button"
-                      >
-                        <Check size={14} />
-                        Прочитано
-                      </button>
+                      <div className="notification-actions">
+                        {recommendation.ticketId ? (
+                          <button onClick={() => handleOpenTicket(recommendation)} type="button">
+                            <ExternalLink size={14} />
+                            Открыть талон
+                          </button>
+                        ) : null}
+                        {recommendation.relatedRoomId ? (
+                          <button onClick={handleOpenRoom} type="button">
+                            <ExternalLink size={14} />
+                            Открыть кабинет
+                          </button>
+                        ) : null}
+                        <button
+                          aria-label="Закрыть уведомление"
+                          onClick={() => void handleResolveRecommendation(recommendation)}
+                          type="button"
+                        >
+                          <Check size={14} />
+                          Закрыть
+                        </button>
+                      </div>
                     </article>
                   ))}
                 </div>

@@ -1,6 +1,9 @@
 import type { Room, Ticket } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
-import { formatTime, getServiceTypeLabel } from '@shared/utils'
+import {
+  formatTime,
+  getServiceTypeLabel,
+  getTicketStatusMeta,
+} from '@shared/utils'
 
 type CallBoardProps = {
   rooms: Room[]
@@ -8,9 +11,12 @@ type CallBoardProps = {
 }
 
 export function CallBoard({ rooms, tickets }: CallBoardProps) {
-  const activeCalls = tickets.filter((ticket) =>
-    ['called', 'in_service'].includes(ticket.status),
-  )
+  const activeCalls = tickets
+    .filter((ticket) => ['called', 'in_service'].includes(ticket.status) || Boolean(ticket.calledAt))
+    .sort((left, right) => (
+      new Date(right.calledAt ?? right.createdAt).getTime() -
+      new Date(left.calledAt ?? left.createdAt).getTime()
+    ))
   const currentCall = activeCalls[0]
   const secondaryCalls = activeCalls.slice(1, 5)
   const recentCalls = tickets
@@ -21,11 +27,11 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
   return (
     <div className="tv-grid">
       <section className="tv-current">
-        <span className="eyebrow">{t.queue.currentCalls}</span>
+        <span className="tv-section-label">Сейчас вызывается</span>
         {currentCall ? (
           <TvCallCard featured rooms={rooms} ticket={currentCall} />
         ) : (
-          <div className="tv-empty-call">{t.queue.waitingForCall}</div>
+          <div className="tv-empty-call">Ожидайте вызова</div>
         )}
 
         {secondaryCalls.map((ticket) => (
@@ -34,18 +40,23 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
       </section>
 
       <section className="tv-recent">
-        <span className="eyebrow">{t.queue.recentCalls}</span>
-        {recentCalls.map((ticket) => {
-          const room = rooms.find((item) => item.id === ticket.roomId)
+        <span className="tv-section-label">Последние вызовы</span>
+        {recentCalls.length > 0 ? (
+          recentCalls.map((ticket) => {
+            const room = rooms.find((item) => item.id === ticket.roomId)
 
-          return (
-            <div className="tv-recent-row" key={ticket.id}>
-              <strong>{ticket.number}</strong>
-              <span>{room?.name ?? '-'}</span>
-              <time>{ticket.calledAt ? formatTime(ticket.calledAt) : '-'}</time>
-            </div>
-          )
-        })}
+            return (
+              <div className="tv-recent-row" key={ticket.id}>
+                <strong>{ticket.number}</strong>
+                <span>{room?.name ?? 'Кабинет не назначен'}</span>
+                <small>{getServiceTypeLabel(ticket.serviceType)}</small>
+                <time>{ticket.calledAt ? formatTime(ticket.calledAt) : '-'}</time>
+              </div>
+            )
+          })
+        ) : (
+          <div className="tv-empty-recent">Последних вызовов нет</div>
+        )}
       </section>
     </div>
   )
@@ -61,12 +72,32 @@ function TvCallCard({
   ticket: Ticket
 }) {
   const room = rooms.find((item) => item.id === ticket.roomId)
+  const status = getTicketStatusMeta(ticket.status).label
 
   return (
     <article className={`tv-call-card ${featured ? 'tv-call-featured' : ''}`}>
+      <span className="tv-card-kicker">Талон</span>
       <strong>{ticket.number}</strong>
-      <span>{room?.name ?? t.queue.routing}</span>
-      <small>{getServiceTypeLabel(ticket.serviceType)}</small>
+      <dl>
+        <div>
+          <dt>Кабинет</dt>
+          <dd>{room?.name ?? 'Кабинет не назначен'}</dd>
+        </div>
+        <div>
+          <dt>Услуга</dt>
+          <dd>{getServiceTypeLabel(ticket.serviceType)}</dd>
+        </div>
+        <div>
+          <dt>Статус</dt>
+          <dd>{status}</dd>
+        </div>
+        {ticket.calledAt ? (
+          <div>
+            <dt>Время вызова</dt>
+            <dd>{formatTime(ticket.calledAt)}</dd>
+          </div>
+        ) : null}
+      </dl>
     </article>
   )
 }

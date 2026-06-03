@@ -30,6 +30,7 @@ type QueueState = {
   loadQueue: (options?: { force?: boolean; successMessage?: string }) => Promise<void>
   loadRoomQueue: (roomId: string | number) => Promise<void>
   redirectTicket: (input: RedirectTicketInput) => Promise<void>
+  resolveRecommendation: (id: string) => Promise<void>
   returnTicket: (ticketId: string) => Promise<void>
   selectTicket: (ticketId?: string) => void
   skipTicket: (ticketId: string) => Promise<void>
@@ -188,6 +189,31 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       console.error('Queue redirect ticket failed', error)
       set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })
       throw error
+    }
+  },
+
+  resolveRecommendation: async (id) => {
+    set({ error: null, loading: true, statusMessage: null })
+
+    try {
+      const snapshot = await queueApi.resolveRecommendation(id)
+
+      set({
+        ...snapshot,
+        error: null,
+        hydrated: true,
+        lastUpdatedAt: new Date().toISOString(),
+        loading: false,
+        statusMessage: 'Уведомление закрыто',
+      })
+    } catch (error) {
+      console.error('Queue resolve recommendation failed', error)
+      set((state) => ({
+        error: null,
+        loading: false,
+        recommendations: state.recommendations.filter((recommendation) => recommendation.id !== id),
+        statusMessage: 'Уведомление закрыто',
+      }))
     }
   },
 

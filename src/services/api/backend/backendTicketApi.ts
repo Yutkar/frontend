@@ -63,10 +63,50 @@ const serviceCodeByBackendName: Record<string, SharedServiceType> = {
   рентген: 'diagnostics',
 }
 
+type TicketCreateBody = {
+  priority: number
+  roomId?: number
+  serviceTypeId: number
+}
+
 async function postTicketAction(id: string, action: string) {
   const response = await apiClient.post<BackendTicket>(`/tickets/${id}/${action}`)
 
   return toArchitectureTicket(response.data)
+}
+
+function withoutRoomId(payload: TicketCreateBody) {
+  return {
+    priority: payload.priority,
+    serviceTypeId: payload.serviceTypeId,
+  }
+}
+
+async function createBackendTicket(path: string, payload: TicketCreateBody): Promise<BackendTicket> {
+  try {
+    const response = await apiClient.post<BackendTicket>(path, payload)
+
+    return response.data
+  } catch (error) {
+    if (payload.roomId === undefined) {
+      throw error
+    }
+
+    console.warn('backendTicketApi: POST /tickets with roomId failed, retrying without roomId', error)
+    const response = await apiClient.post<BackendTicket>(path, withoutRoomId(payload))
+
+    try {
+      const patchResponse = await apiClient.patch<BackendTicket>(`/tickets/${response.data.id}`, {
+        roomId: payload.roomId,
+      })
+
+      return patchResponse.data ?? response.data
+    } catch (patchError) {
+      console.warn('backendTicketApi: PATCH /tickets/:id roomId fallback failed', patchError)
+
+      return response.data
+    }
+  }
 }
 
 async function arriveCreatedTicket(ticket: BackendTicket): Promise<BackendTicket> {
@@ -207,8 +247,11 @@ function toBackendSettingsPayload(payload: TicketSettingsPayload) {
 }
 
 function toBackendCreateSettingsPayload(payload: TicketSettingsPayload & { priority: TicketPriority }) {
+  const roomId = toNumberOrUndefined(payload.roomId)
+
   return {
     priority: toBackendPriority(payload.priority),
+    ...(roomId !== undefined ? { roomId } : {}),
     serviceTypeId: Number(payload.serviceTypeId),
   }
 }
@@ -227,23 +270,23 @@ export const backendTicketApi: TicketApi = {
   },
 
   async createTicket(input) {
-    const response = await apiClient.post<BackendTicket>(
+    const ticket = await createBackendTicket(
       '/tickets',
       toBackendArchitectureTicketCreateInput(input),
     )
-    const ticket = await arriveCreatedTicket(response.data)
+    const arrivedTicket = await arriveCreatedTicket(ticket)
 
-    return toArchitectureTicket(ticket)
+    return toArchitectureTicket(arrivedTicket)
   },
 
   async createKioskTicket(input) {
-    const response = await apiClient.post<BackendTicket>(
+    const ticket = await createBackendTicket(
       '/tickets/kiosk',
       toBackendArchitectureTicketCreateInput(input),
     )
-    const ticket = await arriveCreatedTicket(response.data)
+    const arrivedTicket = await arriveCreatedTicket(ticket)
 
-    return toArchitectureTicket(ticket)
+    return toArchitectureTicket(arrivedTicket)
   },
 
   arriveTicket(id: string) {
@@ -301,11 +344,11 @@ export const backendTicketApi: TicketApi = {
   },
 
   async createTicketWithSettings(payload) {
-    const createResponse = await apiClient.post<BackendTicket>(
+    const createdTicket = await createBackendTicket(
       '/tickets',
       toBackendCreateSettingsPayload(payload),
     )
-    const arrivedTicket = await arriveCreatedTicket(createResponse.data)
+    const arrivedTicket = await arriveCreatedTicket(createdTicket)
     let resolvedTicket = arrivedTicket
 
     try {

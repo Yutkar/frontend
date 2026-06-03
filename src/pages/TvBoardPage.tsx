@@ -19,7 +19,7 @@ export function TvBoardPage() {
         setRooms(snapshot.rooms)
       } catch (error) {
         console.error('Board load failed', error)
-        setError('Не удалось получить данные табло')
+        setError('Не удалось загрузить табло')
       }
     }
 
@@ -40,7 +40,7 @@ export function TvBoardPage() {
       <header className="tv-header">
         <div>
           <span>{t.system.smartq}</span>
-          <strong>{t.queue.patientCallBoard}</strong>
+          <strong>Табло вызова</strong>
         </div>
         <time>
           {new Intl.DateTimeFormat('ru-RU', {
