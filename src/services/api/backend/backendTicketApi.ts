@@ -219,7 +219,7 @@ function toSettingsOptions(
       id: String(room.id ?? room.roomId ?? room._id),
       isActive: room.isActive ?? room.active ?? true,
       name: room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия',
-      serviceTypeIds: room.serviceTypeIds,
+      serviceTypeIds: room.serviceTypeIds ?? (room.serviceTypes as any[])?.map((s: any) => s.serviceTypeId ?? s.id).filter(Boolean),
       serviceTypes: room.serviceTypes,
       services: room.services,
     })),

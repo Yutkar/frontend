@@ -89,7 +89,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
     setRoomId((currentRoomId) => (
       currentRoomId && rooms.some((room) => String(room.id) === currentRoomId)
         ? currentRoomId
-        : ''
+        : String(rooms[0]?.id ?? '')
     ))
   }, [rooms])
 
