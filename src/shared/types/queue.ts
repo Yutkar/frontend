@@ -31,7 +31,9 @@ export type Ticket = {
   calledAt?: string
   startedAt?: string
   completedAt?: string
+  updatedAt?: string
   roomId?: string
+  roomName?: string
   assignedTo?: string
   etaMinutes: number
   notes?: string

@@ -71,6 +71,8 @@ export type BackendTicket = {
   roomId?: number | string | null
   createdAt?: string
   created_at?: string
+  updatedAt?: string | null
+  updated_at?: string | null
   calledAt?: string | null
   serviceStartedAt?: string | null
   service_started_at?: string | null
@@ -322,6 +324,14 @@ function getBackendCalledAt(ticket: BackendTicket): string | undefined {
   return ticket.calledAt ?? ticket.called_at ?? undefined
 }
 
+function getBackendUpdatedAt(ticket: BackendTicket): string | undefined {
+  return ticket.updatedAt ?? ticket.updated_at ?? undefined
+}
+
+function getBackendBoardCalledAt(ticket: BackendTicket): string | undefined {
+  return getBackendCalledAt(ticket) ?? getBackendUpdatedAt(ticket) ?? getBackendCreatedAt(ticket)
+}
+
 function getBackendStartedAt(ticket: BackendTicket): string | undefined {
   return ticket.serviceStartedAt ?? ticket.service_started_at ?? ticket.startedAt ?? undefined
 }
@@ -421,13 +431,22 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     calledAt: getBackendCalledAt(ticket),
     startedAt: getBackendStartedAt(ticket),
     completedAt: getBackendCompletedAt(ticket),
+    updatedAt: getBackendUpdatedAt(ticket),
     roomId: roomId || undefined,
+    roomName: getBackendTicketRoomName(ticket),
     etaMinutes: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
   }
 }
 
 export function normalizeBoardTicket(ticket: BackendTicket): Ticket {
-  return toSharedTicket(ticket)
+  const sharedTicket = toSharedTicket(ticket)
+
+  return {
+    ...sharedTicket,
+    calledAt: getBackendBoardCalledAt(ticket),
+    roomName: getBackendTicketRoomName(ticket),
+    updatedAt: getBackendUpdatedAt(ticket),
+  }
 }
 
 export function toSharedTickets(tickets: BackendTicket[]): Ticket[] {
@@ -671,6 +690,34 @@ export function toBackendRecommendations(value: unknown): BackendRecommendation[
   return []
 }
 
+function toBackendTickets(value: unknown): BackendTicket[] {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord).map((item) => item as BackendTicket)
+  }
+
+  if (!isRecord(value)) {
+    return []
+  }
+
+  if (Array.isArray(value.tickets)) {
+    return value.tickets.filter(isRecord).map((item) => item as BackendTicket)
+  }
+
+  if (Array.isArray(value.items)) {
+    return value.items.filter(isRecord).map((item) => item as BackendTicket)
+  }
+
+  if (Array.isArray(value.data)) {
+    return value.data.filter(isRecord).map((item) => item as BackendTicket)
+  }
+
+  if (isRecord(value.data)) {
+    return toBackendTickets(value.data)
+  }
+
+  return []
+}
+
 function getRecommendationTicketId(recommendation: BackendRecommendation): string {
   return toId(recommendation.ticketId ?? recommendation.ticket_id)
 }
@@ -849,9 +896,20 @@ export function toQueueSnapshot(
   }
 }
 
-export function toBoardQueueSnapshot(tickets: BackendTicket[]): QueueSnapshot {
+function getBoardTicketSortTime(ticket: Ticket): number {
+  return Date.parse(ticket.calledAt ?? ticket.updatedAt ?? ticket.createdAt)
+}
+
+export function toBoardQueueSnapshot(value: unknown): QueueSnapshot {
+  const tickets = toBackendTickets(value)
+  const boardTickets = tickets
+    .map(normalizeBoardTicket)
+    .filter((ticket) => ticket.status === 'called')
+    .sort((left, right) => getBoardTicketSortTime(right) - getBoardTicketSortTime(left))
+    .slice(0, 10)
+
   return {
-    tickets: tickets.map(normalizeBoardTicket),
+    tickets: boardTickets,
     rooms: toSharedRooms(tickets),
     events: [],
     recommendations: [],

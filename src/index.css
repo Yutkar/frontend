@@ -2320,8 +2320,9 @@ h3 {
 .tv-header {
   align-items: center;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   margin-bottom: 28px;
+  text-align: center;
 }
 
 .tv-header div {
@@ -2349,7 +2350,7 @@ h3 {
 .tv-grid {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-columns: minmax(0, 1fr) 460px;
 }
 
 .tv-current,
@@ -2362,9 +2363,11 @@ h3 {
 }
 
 .tv-current {
-  display: grid;
-  gap: 18px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  justify-content: center;
+  min-height: calc(100svh - 160px);
 }
 
 .tv-section-label {
@@ -2376,64 +2379,44 @@ h3 {
 }
 
 .tv-call-card {
-  background: #eaf5ff;
-  border: 1px solid #bad7ed;
+  align-items: center;
+  background: #ffffff;
+  border: 0;
   border-radius: var(--radius);
   color: #0c3557;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  min-height: 190px;
-  padding: 22px;
+  gap: 28px;
+  justify-content: center;
+  min-height: 460px;
+  padding: 42px;
+  text-align: center;
 }
 
 .tv-call-featured {
-  background: #ffffff;
-  border: 3px solid #1769aa;
-  grid-column: 1 / -1;
-  min-height: 290px;
+  min-height: 520px;
 }
 
 .tv-call-card strong {
-  font-size: 68px;
+  font-size: clamp(120px, 16vw, 260px);
   line-height: 1;
 }
 
 .tv-call-featured strong {
-  font-size: 108px;
+  font-size: clamp(140px, 18vw, 300px);
 }
 
-.tv-card-kicker {
-  color: #1769aa;
-  font-size: 20px;
-  font-weight: 820;
-}
-
-.tv-call-card dl {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: auto 0 0;
-}
-
-.tv-call-card div {
-  background: #f4f9fd;
-  border-radius: var(--radius);
-  padding: 12px;
-}
-
-.tv-call-card dt {
-  color: #55738c;
-  font-size: 14px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.tv-call-card dd {
+.tv-call-card > span {
   color: #102033;
-  font-size: 26px;
+  font-size: clamp(42px, 5vw, 82px);
   font-weight: 900;
-  margin: 4px 0 0;
+  line-height: 1.05;
+}
+
+.tv-call-card time {
+  color: #1769aa;
+  font-size: clamp(38px, 4vw, 68px);
+  font-weight: 900;
 }
 
 .tv-empty-call {
@@ -2465,7 +2448,7 @@ h3 {
   border-radius: var(--radius);
   display: grid;
   gap: 10px;
-  grid-template-columns: 110px minmax(0, 1fr) minmax(120px, 0.8fr) 70px;
+  grid-template-columns: 110px minmax(0, 1fr) 76px;
   padding: 14px;
 }
 
@@ -2475,7 +2458,6 @@ h3 {
 }
 
 .tv-recent-row span,
-.tv-recent-row small,
 .tv-recent-row time {
   color: #496b86;
   font-weight: 800;

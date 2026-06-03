@@ -242,7 +242,7 @@ export const backendQueueApi: QueueApi = {
   },
 
   async getBoardSnapshot() {
-    const response = await publicApiClient.get<BackendTicket[]>('/queue/board')
+    const response = await publicApiClient.get<unknown>('/queue/board')
 
     return toBoardQueueSnapshot(response.data)
   },
