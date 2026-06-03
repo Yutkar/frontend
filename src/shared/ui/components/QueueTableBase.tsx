@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Room, Ticket } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { formatEta, getServiceTypeLabel } from '@shared/utils'
+import { formatWaitingTime, getServiceTypeLabel, getWaitingMinutes } from '@shared/utils'
 import { StatusBadge } from './StatusBadge'
 
 type QueueTableBaseProps = {
@@ -9,12 +9,14 @@ type QueueTableBaseProps = {
   rooms: Room[]
   actionSlot?: (ticket: Ticket) => ReactNode
   emptyTitle?: string
+  now?: number
   onSelectTicket?: (ticket: Ticket) => void
 }
 
 export function QueueTableBase({
   actionSlot,
   emptyTitle = t.queue.emptyTitle,
+  now,
   onSelectTicket,
   rooms,
   tickets,
@@ -67,7 +69,7 @@ export function QueueTableBase({
                     <span className="queue-room-warning">Кабинет закрыт</span>
                   ) : null}
                 </td>
-                <td>{formatEta(ticket.etaMinutes)}</td>
+                <td>{formatWaitingTime(getWaitingMinutes(ticket, now))}</td>
                 <td>
                   <StatusBadge status={ticket.status} />
                 </td>

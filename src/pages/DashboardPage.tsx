@@ -14,6 +14,7 @@ import { ticketService } from '@services/ticketService'
 import { t } from '@shared/locales/useLocale'
 import type { Ticket, TicketPriority, TicketStatus } from '@shared/types'
 import { Button, QueueTableBase, TicketCard } from '@shared/ui/components'
+import { getWaitingMinutes, useCurrentTime } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 import { DashboardKpis, RecentCallsWidget, RoomLoadWidget } from '@widgets'
@@ -50,6 +51,7 @@ export function DashboardPage() {
   const [settingsTicket, setSettingsTicket] = useState<Ticket | undefined>()
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [busyTicketId, setBusyTicketId] = useState<string | null>(null)
+  const now = useCurrentTime()
 
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const error = useQueueStore((state) => state.error)
@@ -74,7 +76,7 @@ export function DashboardPage() {
   const sortedTickets = useMemo(() => {
     return [...tickets].sort((left, right) => {
       if (sortBy === 'eta') {
-        return left.etaMinutes - right.etaMinutes
+        return (getWaitingMinutes(left, now) ?? 0) - (getWaitingMinutes(right, now) ?? 0)
       }
 
       if (sortBy === 'status') {
@@ -83,7 +85,7 @@ export function DashboardPage() {
 
       return priorityOrder[left.priority] - priorityOrder[right.priority]
     })
-  }, [sortBy, tickets])
+  }, [now, sortBy, tickets])
 
   async function handleTicketSaved() {
     await loadQueue({ force: true, successMessage: 'Талон успешно сохранён' })
@@ -255,6 +257,7 @@ export function DashboardPage() {
               )
             }}
             onSelectTicket={(ticket) => selectTicket(ticket.id)}
+            now={now}
             rooms={rooms}
             tickets={sortedTickets}
           />
@@ -279,10 +282,11 @@ export function DashboardPage() {
                 ) : null
               }
               room={rooms.find((room) => room.id === selectedTicket.roomId)}
+              now={now}
               ticket={selectedTicket}
             />
           ) : null}
-          <RoomLoadWidget rooms={rooms} tickets={tickets} />
+          <RoomLoadWidget now={now} rooms={rooms} tickets={tickets} />
           <RecentCallsWidget events={events} />
         </aside>
       </section>

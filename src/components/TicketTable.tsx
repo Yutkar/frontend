@@ -1,4 +1,5 @@
 import type { Ticket } from '../types'
+import { formatWaitingTime, getWaitingMinutes, useCurrentTime } from '@shared/utils'
 import { StatusBadge } from './StatusBadge'
 
 const priorityLabels: Record<Ticket['priority'], string> = {
@@ -16,6 +17,8 @@ export function TicketTable({
   emptyText = 'Данные появятся после подключения серверной части.',
   tickets,
 }: TicketTableProps) {
+  const now = useCurrentTime()
+
   if (tickets.length === 0) {
     return <div className="architecture-empty">{emptyText}</div>
   }
@@ -29,7 +32,7 @@ export function TicketTable({
             <th>Услуга</th>
             <th>Кабинет</th>
             <th>Приоритет</th>
-            <th>ETA</th>
+            <th>Ожидание</th>
             <th>Статус</th>
           </tr>
         </thead>
@@ -42,7 +45,7 @@ export function TicketTable({
               <td>{ticket.serviceType.name}</td>
               <td>{ticket.room.name}</td>
               <td>{priorityLabels[ticket.priority]}</td>
-              <td>{ticket.eta > 0 ? `${ticket.eta} мин` : 'Сейчас'}</td>
+              <td>{formatWaitingTime(getWaitingMinutes(ticket, now))}</td>
               <td>
                 <StatusBadge status={ticket.status} />
               </td>

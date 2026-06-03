@@ -8,7 +8,7 @@ import type {
   Ticket,
 } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { createQueueEvent, isActiveTicket } from '@shared/utils'
+import { createQueueEvent, getAverageWaitingMinutes, isActiveTicket } from '@shared/utils'
 
 function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString()
@@ -230,12 +230,7 @@ export const mockAnalytics: AnalyticsPoint[] = [
 export function calculateQueueKpi(tickets: Ticket[], rooms: Room[]): QueueKpi {
   const activeTickets = tickets.filter(isActiveTicket).length
   const activeWait = tickets.filter((ticket) => ticket.status === 'waiting')
-  const averageWaitMinutes =
-    activeWait.length > 0
-      ? Math.round(
-          activeWait.reduce((total, ticket) => total + ticket.etaMinutes, 0) / activeWait.length,
-        )
-      : 0
+  const averageWaitMinutes = getAverageWaitingMinutes(activeWait) ?? 0
 
   return {
     activeTickets,

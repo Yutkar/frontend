@@ -1,12 +1,15 @@
-import type { AnalyticsPoint, Room } from '@shared/types'
+import type { AnalyticsPoint, Room, Ticket } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
+import { formatWaitingTime, getAverageWaitingMinutes } from '@shared/utils'
 
 type AnalyticsChartsProps = {
   analytics: AnalyticsPoint[]
+  now?: number
   rooms: Room[]
+  tickets: Ticket[]
 }
 
-export function AnalyticsCharts({ analytics, rooms }: AnalyticsChartsProps) {
+export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsChartsProps) {
   const maxWaiting = Math.max(...analytics.map((point) => point.waiting), 1)
 
   return (
@@ -49,7 +52,7 @@ export function AnalyticsCharts({ analytics, rooms }: AnalyticsChartsProps) {
               <div>
                 <i style={{ width: `${Math.min(100, point.avgWaitMinutes * 2)}%` }} />
               </div>
-              <strong>{point.avgWaitMinutes} мин</strong>
+              <strong>{formatWaitingTime(point.avgWaitMinutes)}</strong>
             </div>
           ))}
         </div>
@@ -63,15 +66,25 @@ export function AnalyticsCharts({ analytics, rooms }: AnalyticsChartsProps) {
           </div>
         </div>
         <div className="room-load-grid">
-          {rooms.map((room) => (
-            <article className="room-load-card" key={room.id}>
-              <span>{room.name}</span>
-              <strong>{room.loadPercent}%</strong>
-              <div className="load-track">
-                <i style={{ width: `${room.loadPercent}%` }} />
-              </div>
-            </article>
-          ))}
+          {rooms.map((room) => {
+            const roomTickets = tickets.filter((ticket) => ticket.roomId === room.id)
+            const averageWaitingMinutes = getAverageWaitingMinutes(roomTickets, now)
+
+            return (
+              <article className="room-load-card" key={room.id}>
+                <span>{room.name}</span>
+                <strong>{room.loadPercent}%</strong>
+                <small>
+                  {averageWaitingMinutes === null
+                    ? 'Нет очереди'
+                    : `Среднее ожидание: ${formatWaitingTime(averageWaitingMinutes)}`}
+                </small>
+                <div className="load-track">
+                  <i style={{ width: `${room.loadPercent}%` }} />
+                </div>
+              </article>
+            )
+          })}
         </div>
       </section>
     </div>

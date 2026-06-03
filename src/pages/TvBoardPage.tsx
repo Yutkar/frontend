@@ -10,22 +10,34 @@ export function TvBoardPage() {
   const [searchParams] = useSearchParams()
   const roomId = searchParams.get('roomId')
   const [error, setError] = useState<string | null>(null)
-  const [now, setNow] = useState(new Date())
   const [rooms, setRooms] = useState<Room[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [roomName, setRoomName] = useState<string>('')
+  const [now, setNow] = useState(new Date())
+
+  useEffect(() => {
+    const clockInterval = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(clockInterval)
+  }, [])
 
   useEffect(() => {
     const url = roomId ? `/queue/board/${roomId}` : '/queue/board'
+    let active = true
+    let requestId = 0
 
     const load = async () => {
+      const currentRequestId = requestId + 1
+      requestId = currentRequestId
+
       try {
         const response = await publicApiClient.get(url)
         const data = response.data
         const converted = toArchitectureTickets(data)
+
+        if (!active || currentRequestId !== requestId) return
+
         setTickets(converted)
 
-        // Получаем уникальные кабинеты из талонов
         const uniqueRooms = new Map()
         data.forEach((t: any) => {
           if (t.room) {
@@ -43,19 +55,21 @@ export function TvBoardPage() {
         setError(null)
       } catch (error) {
         console.error('Board load failed', error)
+        if (!active || currentRequestId !== requestId) return
         setError('Не удалось загрузить табло')
+        setTickets([])
+        setRooms([])
       }
     }
 
     void load()
-    const interval = window.setInterval(load, 2000)
-    return () => window.clearInterval(interval)
-  }, [roomId])
+    const interval = window.setInterval(load, 3000)
 
-  useEffect(() => {
-    const timerId = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(timerId)
-  }, [])
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [roomId])
 
   return (
     <main className="tv-board">
@@ -75,7 +89,6 @@ export function TvBoardPage() {
       {error ? (
         <section className="empty-state">
           <h2>{error}</h2>
-          <p>Проверьте подключение к серверу.</p>
         </section>
       ) : null}
       <CallBoard rooms={rooms} tickets={tickets} />

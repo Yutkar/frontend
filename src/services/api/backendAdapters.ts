@@ -9,6 +9,11 @@ import type {
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
+import {
+  formatWaitingTime,
+  getAverageWaitingMinutes,
+  getWaitingMinutes,
+} from '@shared/utils/time'
 import type {
   Room as ArchitectureRoom,
   ServiceType as ArchitectureServiceType,
@@ -66,6 +71,8 @@ export type BackendTicket = {
   roomId?: number | string | null
   createdAt?: string
   created_at?: string
+  updatedAt?: string | null
+  updated_at?: string | null
   calledAt?: string | null
   serviceStartedAt?: string | null
   service_started_at?: string | null
@@ -317,6 +324,14 @@ function getBackendCalledAt(ticket: BackendTicket): string | undefined {
   return ticket.calledAt ?? ticket.called_at ?? undefined
 }
 
+function getBackendUpdatedAt(ticket: BackendTicket): string | undefined {
+  return ticket.updatedAt ?? ticket.updated_at ?? undefined
+}
+
+function getBackendBoardCalledAt(ticket: BackendTicket): string | undefined {
+  return getBackendCalledAt(ticket) ?? getBackendUpdatedAt(ticket) ?? getBackendCreatedAt(ticket)
+}
+
 function getBackendStartedAt(ticket: BackendTicket): string | undefined {
   return ticket.serviceStartedAt ?? ticket.service_started_at ?? ticket.startedAt ?? undefined
 }
@@ -416,13 +431,22 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     calledAt: getBackendCalledAt(ticket),
     startedAt: getBackendStartedAt(ticket),
     completedAt: getBackendCompletedAt(ticket),
+    updatedAt: getBackendUpdatedAt(ticket),
     roomId: roomId || undefined,
+    roomName: getBackendTicketRoomName(ticket),
     etaMinutes: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
   }
 }
 
 export function normalizeBoardTicket(ticket: BackendTicket): Ticket {
-  return toSharedTicket(ticket)
+  const sharedTicket = toSharedTicket(ticket)
+
+  return {
+    ...sharedTicket,
+    calledAt: getBackendBoardCalledAt(ticket),
+    roomName: getBackendTicketRoomName(ticket),
+    updatedAt: getBackendUpdatedAt(ticket),
+  }
 }
 
 export function toSharedTickets(tickets: BackendTicket[]): Ticket[] {
@@ -445,12 +469,16 @@ export function toArchitectureTicket(ticket: BackendTicket): ArchitectureTicket 
   }
 
   return {
+    calledAt: getBackendCalledAt(ticket),
+    completedAt: getBackendCompletedAt(ticket),
+    createdAt: getBackendCreatedAt(ticket),
     id: toId(ticket.id),
     number: getBackendTicketNumber(ticket),
     serviceType,
     status: toArchitectureStatus(ticket.status),
     room,
     priority: toArchitecturePriority(ticket.priority),
+    startedAt: getBackendStartedAt(ticket),
     eta: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
   }
 }
@@ -611,14 +639,16 @@ export function toQueueKpi(
   stats: BackendQueueStats[] = [],
   overload: BackendOverloadRoom[] = [],
 ): QueueKpi {
-  const activeTickets = tickets.filter((ticket) =>
+  const activeWaitTickets = tickets.filter((ticket) =>
     ['created', 'waiting', 'called', 'in_service', 'redirected'].includes(ticket.status ?? ''),
-  ).length
+  )
+  const activeTickets = activeWaitTickets.length
+  const averageWaitingFromTickets = getAverageWaitingMinutes(activeWaitTickets.map(toSharedTicket))
   const totalEta = stats.reduce((sum, item) => sum + item.etaMinutes, 0)
 
   return {
     activeTickets,
-    averageWaitMinutes: stats.length > 0 ? Math.round(totalEta / stats.length) : 0,
+    averageWaitMinutes: averageWaitingFromTickets ?? (stats.length > 0 ? Math.round(totalEta / stats.length) : 0),
     completedToday: tickets.filter((ticket) => ticket.status === 'completed').length,
     overloadedRooms: overload.length,
   }
@@ -655,6 +685,34 @@ export function toBackendRecommendations(value: unknown): BackendRecommendation[
 
   if (isRecord(value) && Array.isArray(value.recommendations)) {
     return value.recommendations.filter(isRecord).map((item) => item as BackendRecommendation)
+  }
+
+  return []
+}
+
+function toBackendTickets(value: unknown): BackendTicket[] {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord).map((item) => item as BackendTicket)
+  }
+
+  if (!isRecord(value)) {
+    return []
+  }
+
+  if (Array.isArray(value.tickets)) {
+    return value.tickets.filter(isRecord).map((item) => item as BackendTicket)
+  }
+
+  if (Array.isArray(value.items)) {
+    return value.items.filter(isRecord).map((item) => item as BackendTicket)
+  }
+
+  if (Array.isArray(value.data)) {
+    return value.data.filter(isRecord).map((item) => item as BackendTicket)
+  }
+
+  if (isRecord(value.data)) {
+    return toBackendTickets(value.data)
   }
 
   return []
@@ -719,6 +777,7 @@ function findRecommendationTicket(
 
 function createTicketRecommendation(ticket: Ticket, rooms: Room[]): QueueRecommendation {
   const roomName = getTicketRoomName(ticket, rooms)
+  const waitingTime = formatWaitingTime(getWaitingMinutes(ticket))
 
   return {
     action: 'Проверьте маршрут и приоритет талона.',
@@ -726,7 +785,7 @@ function createTicketRecommendation(ticket: Ticket, rooms: Room[]): QueueRecomme
     description: `Услуга: ${ticket.serviceType}. Кабинет: ${roomName ?? 'Не назначен'}.`,
     id: `ticket-${ticket.id}-priority`,
     isResolved: false,
-    message: `Талон ${ticket.number} — высокий приоритет, ожидает ${ticket.etaMinutes} минут`,
+    message: `Талон ${ticket.number} — высокий приоритет, ожидает ${waitingTime}`,
     relatedRoomId: ticket.roomId,
     relatedRoomName: roomName,
     severity: ticket.priority === 'critical' ? 'critical' : 'warning',
@@ -837,9 +896,20 @@ export function toQueueSnapshot(
   }
 }
 
-export function toBoardQueueSnapshot(tickets: BackendTicket[]): QueueSnapshot {
+function getBoardTicketSortTime(ticket: Ticket): number {
+  return Date.parse(ticket.calledAt ?? ticket.updatedAt ?? ticket.createdAt)
+}
+
+export function toBoardQueueSnapshot(value: unknown): QueueSnapshot {
+  const tickets = toBackendTickets(value)
+  const boardTickets = tickets
+    .map(normalizeBoardTicket)
+    .filter((ticket) => ticket.status === 'called')
+    .sort((left, right) => getBoardTicketSortTime(right) - getBoardTicketSortTime(left))
+    .slice(0, 10)
+
   return {
-    tickets: tickets.map(normalizeBoardTicket),
+    tickets: boardTickets,
     rooms: toSharedRooms(tickets),
     events: [],
     recommendations: [],

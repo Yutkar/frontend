@@ -13,7 +13,10 @@ import type {
   TicketStatus,
 } from '@shared/types'
 import {
+  formatWaitingTime,
   getServiceTypeLabel,
+  getWaitingMinutes,
+  useCurrentTime,
 } from '@shared/utils'
 import { Button } from '@shared/ui/components'
 import {
@@ -67,6 +70,7 @@ export function TicketSettingsModal({
   const [saving, setSaving] = useState(false)
   const [serviceTypeId, setServiceTypeId] = useState('')
   const [status, setStatus] = useState<TicketStatus>('waiting')
+  const now = useCurrentTime()
 
   useEffect(() => {
     if (!open || !ticket) {
@@ -304,7 +308,12 @@ export function TicketSettingsModal({
           </label>
 
           <label className="field">
-            <span>Время ожидания</span>
+            <span>Фактическое ожидание</span>
+            <input readOnly value={formatWaitingTime(getWaitingMinutes(ticket, now))} />
+          </label>
+
+          <label className="field">
+            <span>Плановое ожидание, мин</span>
             <input
               disabled={isBusy}
               min={0}
