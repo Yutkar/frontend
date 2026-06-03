@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import type { Role, ServiceType, User } from '@shared/types'
 import { apiClient } from '../client'
+import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
 import type {
   AdminApi,
   AdminRecord,
@@ -45,13 +46,29 @@ const serviceCodeByBackendName: Record<string, ServiceType> = {
   xray: 'diagnostics',
   анализы: 'laboratory',
   аптека: 'pharmacy',
+  вакцинация: 'consultation',
+  'забор крови': 'laboratory',
   диагностика: 'diagnostics',
   другое: 'registration',
+  'консультация кардиолога': 'consultation',
+  'консультация невролога': 'consultation',
+  'консультация педиатра': 'consultation',
+  'консультация терапевта': 'consultation',
+  'консультация хирурга': 'consultation',
   консультация: 'consultation',
+  кт: 'diagnostics',
   лаборатория: 'laboratory',
+  'лабораторные анализы': 'laboratory',
+  мрт: 'diagnostics',
   оплата: 'billing',
+  'оплата услуг': 'billing',
+  'получение справки': 'registration',
+  'приём документов': 'registration',
+  'процедурный кабинет': 'consultation',
   регистрация: 'registration',
   рентген: 'diagnostics',
+  узи: 'diagnostics',
+  экг: 'diagnostics',
 }
 
 const serviceLabelByCode: Record<ServiceType, string> = {
@@ -177,7 +194,11 @@ function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOp
   return {
     code,
     id: getId(option),
-    name: serviceLabelByCode[code],
+    name: getText(option.name)
+      ?? getText(option.title)
+      ?? getText(option.label)
+      ?? getText(option.code)
+      ?? serviceLabelByCode[code],
   }
 }
 
@@ -399,10 +420,8 @@ async function deleteRecord(path: string, id: string | number) {
 
 async function fetchUsers(): Promise<User[]> {
   return requestFirst([
-    () => getUsers('/auth/users'), 
     () => getUsers('/users'),
     () => getUsers('/staff'),
-    () => getUsers('/admin/users'),
   ])
 }
 
@@ -446,9 +465,6 @@ async function assignUserToRoom(userId: string | number, roomId: string | number
     () => apiClient
       .patch<BackendUserResponse>(`/staff/${userId}`, { roomId: normalizedRoomId })
       .then((result) => result.data),
-    () => apiClient
-      .post<BackendUserResponse>(`/users/${userId}/assign-room`, { roomId: normalizedRoomId })
-      .then((result) => result.data),
   ])
 
   return toUser(unwrapUser(response), 'specialist')
@@ -470,9 +486,17 @@ function getDeleteUserError(error: unknown): Error {
 
 export const backendAdminApi: AdminApi = {
   async getServiceTypes() {
-    const response = await apiClient.get<unknown>('/service-types')
+    try {
+      const response = await apiClient.get<unknown>('/service-types')
 
-    return toArray(response.data, ['serviceTypes', 'services']).map(toServiceTypeOption)
+      const serviceTypes = toArray(response.data, ['serviceTypes', 'services']).map(toServiceTypeOption)
+
+      return serviceTypes.length > 0 ? serviceTypes : fallbackServiceTypeOptions
+    } catch (error) {
+      console.warn('backendAdminApi: GET /service-types is not available, using fallback services', error)
+
+      return fallbackServiceTypeOptions
+    }
   },
 
   getRooms() {
@@ -480,31 +504,19 @@ export const backendAdminApi: AdminApi = {
       const records = await getAdminRecords(path, ['rooms'])
       return records.map(toRoomRecord)
     }
-    return requestFirst([
-      () => getRoomsRecords('/rooms'),
-      () => getRoomsRecords('/admin/rooms'),
-    ])
+    return getRoomsRecords('/rooms')
   },
 
   createRoom(input) {
-    return requestFirst([
-      () => createRoom('/rooms', input),
-      () => createRoom('/admin/rooms', input),
-    ])
+    return createRoom('/rooms', input)
   },
 
   updateRoom(id, input) {
-    return requestFirst([
-      () => updateRoom('/rooms', id, input),
-      () => updateRoom('/admin/rooms', id, input),
-    ])
+    return updateRoom('/rooms', id, input)
   },
 
   deleteRoom(id) {
-    return requestFirst([
-      () => deleteRecord('/rooms', id),
-      () => deleteRecord('/admin/rooms', id),
-    ])
+    return deleteRecord('/rooms', id)
   },
 
   async getStaff() {
@@ -516,24 +528,19 @@ export const backendAdminApi: AdminApi = {
   },
 
   createStaff(input) {
-    return requestFirst([
-      () => apiClient.post<unknown>('/staff', input).then((response) => toRoomRecord(isRecord(response.data) ? response.data : {})),
-      () => apiClient.post<unknown>('/admin/staff', input).then((response) => toRoomRecord(isRecord(response.data) ? response.data : {})),
-    ])
+    return apiClient
+      .post<unknown>('/staff', input)
+      .then((response) => toRoomRecord(isRecord(response.data) ? response.data : {}))
   },
 
   updateStaff(id, input) {
-    return requestFirst([
-      () => apiClient.patch<unknown>(`/staff/${id}`, input).then((response) => toRoomRecord(isRecord(response.data) ? response.data : { id, ...input })),
-      () => apiClient.patch<unknown>(`/admin/staff/${id}`, input).then((response) => toRoomRecord(isRecord(response.data) ? response.data : { id, ...input })),
-    ])
+    return apiClient
+      .patch<unknown>(`/staff/${id}`, input)
+      .then((response) => toRoomRecord(isRecord(response.data) ? response.data : { id, ...input }))
   },
 
   deleteStaff(id) {
-    return requestFirst([
-      () => deleteRecord('/staff', id),
-      () => deleteRecord('/admin/staff', id),
-    ])
+    return deleteRecord('/staff', id)
   },
 
   getUsers() {
@@ -545,7 +552,6 @@ export const backendAdminApi: AdminApi = {
     const response = await requestFirst([
       () => apiClient.post<BackendUserResponse>('/auth/register', toRegisterPayload(input)).then((result) => result.data),
       () => apiClient.post<BackendUserResponse>('/users', toUserPayload(input)).then((result) => result.data),
-      () => apiClient.post<BackendUserResponse>('/admin/users', toUserPayload(input)).then((result) => result.data),
     ])
 
     const createdUser = await resolveCreatedUser(input, response)
@@ -574,11 +580,8 @@ export const backendAdminApi: AdminApi = {
     }
     
     const response = await requestFirst([
-      () => apiClient.patch<BackendUserResponse>(`/auth/users/${id}`, payload).then((result) => result.data),
       () => apiClient.patch<BackendUserResponse>(`/users/${id}`, payload).then((result) => result.data),
       () => apiClient.patch<BackendUserResponse>(`/staff/${id}`, payload).then((result) => result.data),
-      () => apiClient.put<BackendUserResponse>(`/users/${id}`, payload).then((result) => result.data),
-      () => apiClient.put<BackendUserResponse>(`/admin/users/${id}`, payload).then((result) => result.data),
     ])
 
     return toUser(unwrapUser(response), input.role)
@@ -589,7 +592,6 @@ export const backendAdminApi: AdminApi = {
       await requestFirst([
         () => deleteRecord('/users', id),
         () => deleteRecord('/staff', id),
-        () => deleteRecord('/admin/users', id),
       ])
     } catch (error) {
       throw getDeleteUserError(error)

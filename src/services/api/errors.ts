@@ -1,5 +1,3 @@
-import { isAxiosError } from 'axios'
-
 const defaultMessage = 'Не удалось получить данные'
 const technicalMessageParts = [
   'axios',
@@ -11,6 +9,22 @@ const technicalMessageParts = [
   'cannot ',
 ]
 
+type ApiErrorResponse = {
+  data?: unknown
+  status?: number
+}
+
+type AxiosErrorLike = {
+  isAxiosError?: boolean
+  response?: ApiErrorResponse
+}
+
+function isAxiosErrorLike(error: unknown): error is AxiosErrorLike {
+  return typeof error === 'object'
+    && error !== null
+    && (error as AxiosErrorLike).isAxiosError === true
+}
+
 function isUserFacingMessage(message: string): boolean {
   const normalizedMessage = message.trim().toLowerCase()
 
@@ -18,7 +32,7 @@ function isUserFacingMessage(message: string): boolean {
 }
 
 function getBackendMessage(error: unknown): string | undefined {
-  if (!isAxiosError(error)) {
+  if (!isAxiosErrorLike(error)) {
     return undefined
   }
 
@@ -41,11 +55,11 @@ function getBackendMessage(error: unknown): string | undefined {
 }
 
 export function getApiErrorMessage(error: unknown, fallbackMessage = defaultMessage): string {
-  if (isAxiosError(error) && !error.response) {
+  if (isAxiosErrorLike(error) && !error.response) {
     return 'Сервис временно недоступен. Проверьте подключение к серверу.'
   }
 
-  if (isAxiosError(error)) {
+  if (isAxiosErrorLike(error)) {
     const status = error.response?.status
 
     if (status === 401) {

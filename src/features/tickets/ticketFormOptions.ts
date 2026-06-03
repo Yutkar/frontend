@@ -1,11 +1,12 @@
 import type {
   TicketSettingsOptions,
+  TicketSettingsRoomOption,
   TicketSettingsServiceTypeOption,
   TicketSettingsUserOption,
 } from '@services/api'
+import { fallbackServiceTypeOptions } from '@services/api/serviceTypeCatalog'
 import type {
   Room,
-  ServiceType,
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
@@ -33,49 +34,14 @@ export const ticketStatuses: TicketStatus[] = [
   'cancelled',
 ]
 
-export const fallbackServiceTypes: TicketSettingsServiceTypeOption[] = [
-  { id: 1, code: 'consultation', name: 'Консультация' },
-  { id: 2, code: 'billing', name: 'Оплата' },
-  { id: 3, code: 'diagnostics', name: 'Рентген' },
-  { id: 4, code: 'laboratory', name: 'Анализы' },
-  { id: 5, code: 'registration', name: 'Другое' },
-]
-
-const serviceLabelsByCode: Record<ServiceType, string> = {
-  billing: 'Оплата',
-  consultation: 'Консультация',
-  diagnostics: 'Рентген',
-  laboratory: 'Анализы',
-  pharmacy: 'Другое',
-  registration: 'Другое',
-}
-
-const serviceLabelsByName: Record<string, string> = {
-  analysis: 'Анализы',
-  billing: 'Оплата',
-  consultation: 'Консультация',
-  diagnostics: 'Рентген',
-  laboratory: 'Анализы',
-  other: 'Другое',
-  payment: 'Оплата',
-  registration: 'Другое',
-  xray: 'Рентген',
-  анализы: 'Анализы',
-  другое: 'Другое',
-  диагностика: 'Рентген',
-  консультация: 'Консультация',
-  лаборатория: 'Анализы',
-  оплата: 'Оплата',
-  регистрация: 'Другое',
-  рентген: 'Рентген',
-}
+export const fallbackServiceTypes = fallbackServiceTypeOptions
 
 export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption): string {
   if (!option) {
-    return 'Консультация'
+    return 'Услуга не выбрана'
   }
 
-  return serviceLabelsByName[option.name.trim().toLowerCase()] ?? serviceLabelsByCode[option.code]
+  return option.name
 }
 
 export function getPriorityLabel(priority: TicketPriority): string {
@@ -91,25 +57,63 @@ export function getStatusLabel(status: TicketStatus): string {
 }
 
 export function getServiceTypes(options: TicketSettingsOptions): TicketSettingsServiceTypeOption[] {
-  const availableServiceTypes = options.serviceTypes.length > 0
-    ? options.serviceTypes
-    : fallbackServiceTypes
-
-  return fallbackServiceTypes.map((fallbackServiceType) => {
-    const fallbackLabel = getServiceOptionLabel(fallbackServiceType)
-
-    return availableServiceTypes.find(
-      (serviceType) => getServiceOptionLabel(serviceType) === fallbackLabel,
-    ) ?? fallbackServiceType
-  })
+  return options.serviceTypes.length > 0 ? options.serviceTypes : fallbackServiceTypes
 }
 
-export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] = []) {
-  const mergedRooms = options.rooms
-    .filter((room) => room.isActive !== false)
+function normalizeServiceId(value?: string | number | null): string {
+  return value == null ? '' : String(value)
+}
+
+function getFallbackRoomServiceIds(room: Room): string[] {
+  const record = room as Room & {
+    serviceTypeIds?: Array<string | number>
+    serviceTypes?: Array<string | number | { id?: string | number; serviceTypeId?: string | number }>
+    services?: Array<string | number | { id?: string | number; serviceTypeId?: string | number }>
+  }
+
+  return getRoomServiceIds(record)
+}
+
+export function getRoomServiceIds(room: TicketSettingsRoomOption): string[] {
+  const explicitIds = Array.isArray(room.serviceTypeIds)
+    ? room.serviceTypeIds.map(normalizeServiceId)
+    : []
+  const nestedServices = [...(room.serviceTypes ?? []), ...(room.services ?? [])]
+    .map((service) => {
+      if (typeof service === 'string' || typeof service === 'number') {
+        return normalizeServiceId(service)
+      }
+
+      return normalizeServiceId(service.id ?? service.serviceTypeId ?? service.name ?? service.title)
+    })
+
+  return Array.from(new Set([...explicitIds, ...nestedServices].filter(Boolean)))
+}
+
+export function roomSupportsService(
+  room: TicketSettingsRoomOption,
+  serviceTypeId?: string | number,
+): boolean {
+  const serviceId = normalizeServiceId(serviceTypeId)
+
+  if (!serviceId) {
+    return true
+  }
+
+  return getRoomServiceIds(room).includes(serviceId)
+}
+
+export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] = []): TicketSettingsRoomOption[] {
+  const mergedRooms: TicketSettingsRoomOption[] = options.rooms
+    .filter((room) => room.isActive !== false && room.active !== false)
     .map((room) => ({
+      active: room.active,
       id: room.id,
+      isActive: room.isActive,
       name: room.name,
+      serviceTypeIds: room.serviceTypeIds,
+      serviceTypes: room.serviceTypes,
+      services: room.services,
     }))
 
   fallbackRooms
@@ -119,6 +123,7 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
         mergedRooms.push({
           id: room.id,
           name: room.name,
+          serviceTypeIds: getFallbackRoomServiceIds(room),
         })
       }
     })
@@ -126,6 +131,30 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
   return mergedRooms
 }
 
+export function getRoomsForService(
+  options: TicketSettingsOptions,
+  serviceTypeId?: string | number,
+  fallbackRooms: Room[] = [],
+): TicketSettingsRoomOption[] {
+  return getRooms(options, fallbackRooms).filter((room) => roomSupportsService(room, serviceTypeId))
+}
+
 export function getSpecialists(options: TicketSettingsOptions): TicketSettingsUserOption[] {
   return options.specialists
+}
+
+export function getSpecialistsForRoom(
+  options: TicketSettingsOptions,
+  roomId?: string | number,
+): TicketSettingsUserOption[] {
+  const selectedRoomId = normalizeServiceId(roomId)
+  const specialists = getSpecialists(options)
+
+  if (!selectedRoomId) {
+    return specialists
+  }
+
+  return specialists.filter((specialist) => (
+    normalizeServiceId(specialist.roomId ?? specialist.assignedRoomId) === selectedRoomId
+  ))
 }

@@ -46,6 +46,9 @@ export type Room = {
   specialistName: string
   status: RoomStatus
   isActive?: boolean
+  serviceTypeIds?: Array<string | number>
+  serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   currentTicketId?: string
   workload?: number
   loadPercent: number
@@ -110,6 +113,7 @@ export type QueueSnapshot = {
 export type TicketCreateInput = {
   patientName: string
   serviceType: ServiceType
+  serviceTypeId?: string | number
   priority: TicketPriority
   roomId?: string | number
   notes?: string

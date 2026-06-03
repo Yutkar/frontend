@@ -6,9 +6,9 @@ export type AdminRoomRecord = AdminRecord & {
   isActive?: boolean
   name?: string
   roomName?: string
-  services?: Array<string | number | { id?: string | number; name?: string; title?: string }>
+  services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   serviceTypeIds?: Array<string | number>
-  serviceTypes?: Array<string | number | { id?: string | number; name?: string; title?: string }>
+  serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   status?: string
   title?: string
 }
@@ -41,7 +41,7 @@ export function getRoomServiceTypeIds(room: AdminRoomRecord): string[] {
   if (Array.isArray(services)) {
     return services.map((serviceType) => {
       if (typeof serviceType === 'object' && serviceType !== null) {
-        return String(serviceType.id ?? serviceType.name ?? serviceType.title ?? '')
+        return String(serviceType.id ?? serviceType.serviceTypeId ?? serviceType.name ?? serviceType.title ?? '')
       }
 
       return String(serviceType)

@@ -3,7 +3,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { TicketPrintPreview, type TicketPrintData } from '@features/tickets/TicketPrintPreview'
 import {
   getPriorityLabel,
-  getRooms,
+  getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
 } from '@features/tickets/ticketFormOptions'
@@ -58,10 +58,14 @@ export function KioskPage() {
   }, [])
 
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
-  const rooms = useMemo(() => getRooms(options), [options])
   const selectedServiceType = serviceTypes.find(
     (serviceType) => String(serviceType.id) === selectedServiceTypeId,
   ) ?? serviceTypes[0]
+  const rooms = useMemo(
+    () => getRoomsForService(options, selectedServiceType?.id),
+    [options, selectedServiceType?.id],
+  )
+  const selectedRoom = rooms[0]
 
   useEffect(() => {
     if (!selectedServiceTypeId && serviceTypes[0]) {
@@ -106,7 +110,7 @@ export function KioskPage() {
   }
 
   async function handleCreateTicket() {
-    if (!selectedServiceType || loading) {
+    if (!selectedServiceType || !selectedRoom || loading) {
       return
     }
 
@@ -116,6 +120,7 @@ export function KioskPage() {
     try {
       const ticket = await kioskService.createTicketForKiosk({
         priority: 'normal',
+        roomId: selectedRoom.id,
         serviceType: selectedServiceType.code,
         serviceTypeId: selectedServiceType.id,
         status: 'waiting',
@@ -156,6 +161,9 @@ export function KioskPage() {
         </div>
 
         {error ? <div className="modal-error">{error}</div> : null}
+        {selectedServiceType && rooms.length === 0 ? (
+          <div className="modal-error">Нет доступных кабинетов для выбранной услуги</div>
+        ) : null}
 
         <div className="kiosk-service-grid">
           {serviceTypes.map((serviceType) => {
@@ -178,7 +186,7 @@ export function KioskPage() {
 
         <Button
           className="kiosk-submit"
-          disabled={loading || loadingOptions || !selectedServiceType}
+          disabled={loading || loadingOptions || !selectedServiceType || !selectedRoom}
           onClick={handleCreateTicket}
           size="lg"
           variant="primary"

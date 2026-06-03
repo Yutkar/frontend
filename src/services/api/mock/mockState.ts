@@ -1,5 +1,6 @@
 import { createInitialQueueSnapshot, calculateQueueKpi } from '@mock/queue.mock'
 import { createMockTicket, createQueueEvent, getServiceTypeLabel } from '@shared/utils'
+import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
 import type {
   QueueSnapshot,
   Room as SharedRoom,
@@ -23,13 +24,9 @@ import type {
   TicketSettingsServiceTypeOption,
 } from '../types'
 
-const sharedServiceTypeByArchitectureId: Record<string, SharedServiceType> = {
-  '1': 'consultation',
-  '2': 'billing',
-  '3': 'diagnostics',
-  '4': 'laboratory',
-  '5': 'registration',
-}
+const sharedServiceTypeByArchitectureId: Record<string, SharedServiceType> = Object.fromEntries(
+  fallbackServiceTypeOptions.map((serviceType) => [String(serviceType.id), serviceType.code]),
+) as Record<string, SharedServiceType>
 
 const architectureCodeByServiceType: Record<SharedServiceType, ArchitectureServiceType['code']> = {
   billing: 'consultation',
@@ -77,18 +74,7 @@ const priorityWeight: Record<SharedTicketPriority, number> = {
   low: 1,
 }
 
-const serviceTypeOptions: TicketSettingsServiceTypeOption[] = [
-  'registration',
-  'consultation',
-  'diagnostics',
-  'laboratory',
-  'pharmacy',
-  'billing',
-].map((serviceType) => ({
-  code: serviceType as SharedServiceType,
-  id: Object.entries(sharedServiceTypeByArchitectureId).find(([, value]) => value === serviceType)?.[0] ?? serviceType,
-  name: getServiceTypeLabel(serviceType as SharedServiceType),
-}))
+const serviceTypeOptions: TicketSettingsServiceTypeOption[] = fallbackServiceTypeOptions
 
 let queueSnapshot = createInitialQueueSnapshot()
 
@@ -185,6 +171,15 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
     isActive,
     loadPercent: currentRoom?.loadPercent ?? 0,
     name,
+    serviceTypeIds: Array.isArray(record.serviceTypeIds)
+      ? record.serviceTypeIds
+      : currentRoom?.serviceTypeIds,
+    serviceTypes: Array.isArray(record.serviceTypes)
+      ? record.serviceTypes as SharedRoom['serviceTypes']
+      : currentRoom?.serviceTypes,
+    services: Array.isArray(record.services)
+      ? record.services as SharedRoom['services']
+      : currentRoom?.services,
     specialistName: currentRoom?.specialistName ?? name,
     status: isActive ? currentRoom?.status === 'busy' ? 'busy' : 'open' : 'paused',
     workload: currentRoom?.workload ?? 0,

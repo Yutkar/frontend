@@ -31,18 +31,18 @@ type BackendMeResponse = BackendUser | BackendMeEnvelope
 const roleDefaults: Record<Role, Pick<User, 'avatarInitials' | 'department' | 'name'>> = {
   admin: {
     avatarInitials: 'AD',
-    department: 'Administration',
-    name: 'Administrator',
+    department: 'Администрирование',
+    name: 'Администратор',
   },
   manager: {
     avatarInitials: 'MG',
-    department: 'Queue management',
-    name: 'Manager',
+    department: 'Управление очередью',
+    name: 'Менеджер',
   },
   specialist: {
     avatarInitials: 'SP',
-    department: 'Consultation',
-    name: 'Specialist',
+    department: 'Приём пациентов',
+    name: 'Специалист',
   },
 }
 

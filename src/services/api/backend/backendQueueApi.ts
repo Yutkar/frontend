@@ -5,11 +5,13 @@ import {
   toBackendRooms,
   getBackendTicketRoomId,
   toBoardQueueSnapshot,
+  toBackendAnalyticsPoints,
   toBackendTicketCreateInput,
   toBackendRecommendations,
   toQueueKpi,
   toQueueSnapshot,
   type BackendRecommendation,
+  type BackendAnalyticsPoint,
   type BackendRoom,
   type BackendOverloadRoom,
   type BackendQueueStats,
@@ -19,21 +21,36 @@ import { apiClient, publicApiClient } from '../client'
 import type { QueueApi, QueueOverloadRoom } from '../types'
 
 const roomVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+const analyticsPaths = [
+  '/analytics/dashboard',
+  '/analytics/rooms',
+  '/queue/analytics/service-time',
+  '/queue/analytics/period',
+] as const
 
 type TicketCreateBody = {
   priority: number
   roomId?: number
-  serviceTypeId: number
+  serviceTypeId: number | string
 }
 
 async function loadQueueSnapshot(ticketPath = '/tickets') {
-  const [ticketsResponse, statsResponse, overloadResponse, rooms, recommendations, highPriorityTickets] = await Promise.all([
+  const [
+    ticketsResponse,
+    statsResponse,
+    overloadResponse,
+    rooms,
+    recommendations,
+    highPriorityTickets,
+    analytics,
+  ] = await Promise.all([
     apiClient.get<BackendTicket[]>(ticketPath),
     apiClient.get<BackendQueueStats[]>('/queue/stats'),
     apiClient.get<BackendOverloadRoom[]>('/queue/overload'),
     getBackendRooms(),
     getBackendRecommendations(),
     getBackendHighPriorityTickets(),
+    getBackendAnalyticsPoints(),
   ])
   const referencedTickets = await getRecommendationTickets(recommendations, [
     ...ticketsResponse.data,
@@ -48,12 +65,27 @@ async function loadQueueSnapshot(ticketPath = '/tickets') {
     rooms,
     recommendations,
     highPriorityTickets,
+    analytics,
   )
 }
 
-async function arriveCreatedTicket(ticket: BackendTicket): Promise<void> {
+async function arriveCreatedTicket(
+  ticket: BackendTicket,
+  client = apiClient,
+  optional = false,
+): Promise<void> {
   if (ticket.status === 'created') {
-    await apiClient.post<BackendTicket>(`/tickets/${ticket.id}/arrive`)
+    try {
+      await client.post<BackendTicket>(`/tickets/${ticket.id}/arrive`)
+    } catch (error) {
+      if (optional) {
+        console.warn('backendQueueApi: public POST /tickets/:id/arrive is not available', error)
+
+        return
+      }
+
+      throw error
+    }
   }
 }
 
@@ -64,9 +96,13 @@ function withoutRoomId(payload: TicketCreateBody) {
   }
 }
 
-async function createBackendTicket(path: string, payload: TicketCreateBody): Promise<BackendTicket> {
+async function createBackendTicket(
+  path: string,
+  payload: TicketCreateBody,
+  client = apiClient,
+): Promise<BackendTicket> {
   try {
-    const response = await apiClient.post<BackendTicket>(path, payload)
+    const response = await client.post<BackendTicket>(path, payload)
 
     return response.data
   } catch (error) {
@@ -75,10 +111,10 @@ async function createBackendTicket(path: string, payload: TicketCreateBody): Pro
     }
 
     console.warn('backendQueueApi: POST /tickets with roomId failed, retrying without roomId', error)
-    const response = await apiClient.post<BackendTicket>(path, withoutRoomId(payload))
+    const response = await client.post<BackendTicket>(path, withoutRoomId(payload))
 
     try {
-      const patchResponse = await apiClient.patch<BackendTicket>(`/tickets/${response.data.id}`, {
+      const patchResponse = await client.patch<BackendTicket>(`/tickets/${response.data.id}`, {
         roomId: payload.roomId,
       })
 
@@ -136,6 +172,22 @@ async function getBackendHighPriorityTickets(): Promise<BackendTicket[]> {
 
     return []
   }
+}
+
+async function getBackendAnalyticsPoints(): Promise<BackendAnalyticsPoint[]> {
+  const results = await Promise.allSettled(
+    analyticsPaths.map((path) => apiClient.get<unknown>(path)),
+  )
+
+  return results.flatMap((result, index) => {
+    if (result.status === 'fulfilled') {
+      return toBackendAnalyticsPoints(result.value.data)
+    }
+
+    console.warn(`backendQueueApi: GET ${analyticsPaths[index]} is not available`, result.reason)
+
+    return []
+  })
 }
 
 function getRecommendationTicketIds(recommendations: BackendRecommendation[]): string[] {
@@ -248,7 +300,16 @@ export const backendQueueApi: QueueApi = {
   },
 
   async getRoomQueueSnapshot(roomId: string | number) {
-    const [ticketsResponse, allTickets, statsResponse, overloadResponse, rooms, recommendations, highPriorityTickets] = await Promise.all([
+    const [
+      ticketsResponse,
+      allTickets,
+      statsResponse,
+      overloadResponse,
+      rooms,
+      recommendations,
+      highPriorityTickets,
+      analytics,
+    ] = await Promise.all([
       apiClient.get<BackendTicket[]>(`/queue/room/${roomId}`),
       getAllBackendTicketsForRoomFallback(),
       apiClient.get<BackendQueueStats[]>('/queue/stats'),
@@ -256,6 +317,7 @@ export const backendQueueApi: QueueApi = {
       getBackendRooms(),
       getBackendRecommendations(),
       getBackendHighPriorityTickets(),
+      getBackendAnalyticsPoints(),
     ])
     const referencedTickets = await getRecommendationTickets(recommendations, [
       ...ticketsResponse.data,
@@ -264,7 +326,15 @@ export const backendQueueApi: QueueApi = {
     ])
     const roomTickets = mergeRoomTickets(roomId, ticketsResponse.data, mergeBackendTickets(allTickets, referencedTickets))
 
-    return toQueueSnapshot(roomTickets, statsResponse.data, overloadResponse.data, rooms, recommendations, highPriorityTickets)
+    return toQueueSnapshot(
+      roomTickets,
+      statsResponse.data,
+      overloadResponse.data,
+      rooms,
+      recommendations,
+      highPriorityTickets,
+      analytics,
+    )
   },
 
   async createTicket(input) {
@@ -279,9 +349,10 @@ export const backendQueueApi: QueueApi = {
     const ticket = await createBackendTicket(
       '/tickets/kiosk',
       toBackendTicketCreateInput(input),
+      publicApiClient,
     )
 
-    await arriveCreatedTicket(ticket)
+    await arriveCreatedTicket(ticket, publicApiClient, true)
 
     return loadQueueSnapshot()
   },

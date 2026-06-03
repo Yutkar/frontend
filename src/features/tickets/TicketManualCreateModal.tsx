@@ -14,10 +14,10 @@ import type {
 import { Button } from '@shared/ui/components'
 import {
   getPriorityLabel,
-  getRooms,
+  getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
-  getSpecialists,
+  getSpecialistsForRoom,
   getStatusLabel,
   ticketPriorities,
   ticketStatuses,
@@ -99,8 +99,15 @@ export function TicketManualCreateModal({
   }, [open])
 
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
-  const rooms = useMemo(() => getRooms(options, fallbackRooms), [fallbackRooms, options])
-  const specialists = useMemo(() => getSpecialists(options), [options])
+  const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
+  const rooms = useMemo(
+    () => getRoomsForService(options, selectedServiceType?.id, fallbackRooms),
+    [fallbackRooms, options, selectedServiceType?.id],
+  )
+  const specialists = useMemo(
+    () => getSpecialistsForRoom(options, roomId),
+    [options, roomId],
+  )
 
   useEffect(() => {
     const hasSelectedServiceType = serviceTypes.some(
@@ -113,22 +120,33 @@ export function TicketManualCreateModal({
   }, [open, serviceTypeId, serviceTypes])
 
   useEffect(() => {
-    if (open && !roomId && rooms[0]) {
-      setRoomId(String(rooms[0].id))
+    if (!open) {
+      return
     }
-  }, [open, roomId, rooms])
+
+    setRoomId((currentRoomId) => (
+      currentRoomId && rooms.some((room) => String(room.id) === currentRoomId)
+        ? currentRoomId
+        : ''
+    ))
+  }, [open, rooms])
 
   useEffect(() => {
-    if (open && !doctorId && specialists[0]) {
-      setDoctorId(String(specialists[0].id))
+    if (!open) {
+      return
     }
-  }, [doctorId, open, specialists])
+
+    setDoctorId((currentDoctorId) => (
+      currentDoctorId && specialists.some((specialist) => String(specialist.id) === currentDoctorId)
+        ? currentDoctorId
+        : ''
+    ))
+  }, [open, specialists])
 
   if (!open) {
     return null
   }
 
-  const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
   const isBusy = saving || loadingOptions
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -193,11 +211,15 @@ export function TicketManualCreateModal({
         {error ? <div className="modal-error">{error}</div> : null}
 
         <div className="settings-form-grid">
-          <label className="field">
+          <label className="field service-type-field">
             <span>Тип услуги</span>
             <select
               disabled={isBusy}
-              onChange={(event) => setServiceTypeId(event.target.value)}
+              onChange={(event) => {
+                setServiceTypeId(event.target.value)
+                setRoomId('')
+                setDoctorId('')
+              }}
               value={serviceTypeId}
             >
               {serviceTypes.map((serviceType) => (
@@ -212,7 +234,10 @@ export function TicketManualCreateModal({
             <span>Кабинет</span>
             <select
               disabled={isBusy || rooms.length === 0}
-              onChange={(event) => setRoomId(event.target.value)}
+              onChange={(event) => {
+                setRoomId(event.target.value)
+                setDoctorId('')
+              }}
               value={roomId}
             >
               {rooms.length > 0 ? (
@@ -222,9 +247,12 @@ export function TicketManualCreateModal({
                   </option>
                 ))
               ) : (
-                <option value="">Активные кабинеты не найдены</option>
+                <option value="">Нет доступных кабинетов</option>
               )}
             </select>
+            {selectedServiceType && rooms.length === 0 ? (
+              <small className="field-hint">Нет доступных кабинетов для выбранной услуги</small>
+            ) : null}
           </label>
 
           <label className="field">

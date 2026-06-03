@@ -32,6 +32,7 @@ export type {
   TicketCreateSettingsPayload,
   TicketSettingsOptions,
   TicketSettingsPayload,
+  TicketSettingsRoomOption,
   TicketSettingsServiceTypeOption,
   TicketSettingsUserOption,
 } from './types'

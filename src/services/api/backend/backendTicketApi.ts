@@ -8,7 +8,7 @@ import {
   toSharedTicket,
   type BackendTicket,
 } from '../backendAdapters'
-import { apiClient } from '../client'
+import { apiClient, publicApiClient } from '../client'
 import type {
   TicketApi,
   TicketSettingsOptions,
@@ -25,6 +25,9 @@ type BackendRoomOption = {
   name?: string
   roomId?: string | number
   roomName?: string
+  serviceTypeIds?: Array<string | number>
+  serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   title?: string
 }
 
@@ -35,8 +38,10 @@ type BackendServiceTypeOption = {
 }
 
 type BackendUserOption = {
+  assignedRoomId?: string | number
   id: string | number
   name?: string
+  roomId?: string | number
   role?: TicketSettingsUserOption['role']
   fullName?: string
 }
@@ -54,19 +59,35 @@ const serviceCodeByBackendName: Record<string, SharedServiceType> = {
   xray: 'diagnostics',
   анализы: 'laboratory',
   аптека: 'pharmacy',
+  вакцинация: 'consultation',
+  'забор крови': 'laboratory',
   диагностика: 'diagnostics',
   другое: 'registration',
+  'консультация кардиолога': 'consultation',
+  'консультация невролога': 'consultation',
+  'консультация педиатра': 'consultation',
+  'консультация терапевта': 'consultation',
+  'консультация хирурга': 'consultation',
   консультация: 'consultation',
+  кт: 'diagnostics',
   лаборатория: 'laboratory',
+  'лабораторные анализы': 'laboratory',
+  мрт: 'diagnostics',
   оплата: 'billing',
+  'оплата услуг': 'billing',
+  'получение справки': 'registration',
+  'приём документов': 'registration',
+  'процедурный кабинет': 'consultation',
   регистрация: 'registration',
   рентген: 'diagnostics',
+  узи: 'diagnostics',
+  экг: 'diagnostics',
 }
 
 type TicketCreateBody = {
   priority: number
   roomId?: number
-  serviceTypeId: number
+  serviceTypeId: number | string
 }
 
 async function postTicketAction(id: string, action: string) {
@@ -82,9 +103,13 @@ function withoutRoomId(payload: TicketCreateBody) {
   }
 }
 
-async function createBackendTicket(path: string, payload: TicketCreateBody): Promise<BackendTicket> {
+async function createBackendTicket(
+  path: string,
+  payload: TicketCreateBody,
+  client = apiClient,
+): Promise<BackendTicket> {
   try {
-    const response = await apiClient.post<BackendTicket>(path, payload)
+    const response = await client.post<BackendTicket>(path, payload)
 
     return response.data
   } catch (error) {
@@ -93,10 +118,10 @@ async function createBackendTicket(path: string, payload: TicketCreateBody): Pro
     }
 
     console.warn('backendTicketApi: POST /tickets with roomId failed, retrying without roomId', error)
-    const response = await apiClient.post<BackendTicket>(path, withoutRoomId(payload))
+    const response = await client.post<BackendTicket>(path, withoutRoomId(payload))
 
     try {
-      const patchResponse = await apiClient.patch<BackendTicket>(`/tickets/${response.data.id}`, {
+      const patchResponse = await client.patch<BackendTicket>(`/tickets/${response.data.id}`, {
         roomId: payload.roomId,
       })
 
@@ -109,14 +134,32 @@ async function createBackendTicket(path: string, payload: TicketCreateBody): Pro
   }
 }
 
-async function arriveCreatedTicket(ticket: BackendTicket): Promise<BackendTicket> {
+async function arriveCreatedTicketWithClient(
+  ticket: BackendTicket,
+  client = apiClient,
+  optional = false,
+): Promise<BackendTicket> {
   if (ticket.status !== 'created') {
     return ticket
   }
 
-  const response = await apiClient.post<BackendTicket>(`/tickets/${ticket.id}/arrive`)
+  try {
+    const response = await client.post<BackendTicket>(`/tickets/${ticket.id}/arrive`)
 
-  return response.data
+    return response.data
+  } catch (error) {
+    if (optional) {
+      console.warn('backendTicketApi: public POST /tickets/:id/arrive is not available', error)
+
+      return ticket
+    }
+
+    throw error
+  }
+}
+
+async function arriveCreatedTicket(ticket: BackendTicket): Promise<BackendTicket> {
+  return arriveCreatedTicketWithClient(ticket)
 }
 
 async function getOrEmpty<T>(path: string): Promise<T[]> {
@@ -176,6 +219,9 @@ function toSettingsOptions(
       id: String(room.id ?? room.roomId ?? room._id),
       isActive: room.isActive ?? room.active ?? true,
       name: room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия',
+      serviceTypeIds: room.serviceTypeIds,
+      serviceTypes: room.serviceTypes,
+      services: room.services,
     })),
     serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({
       code: toServiceCode(serviceType),
@@ -183,9 +229,11 @@ function toSettingsOptions(
       name: serviceType.name ?? serviceType.code ?? `Услуга ${serviceType.id}`,
     })),
     specialists: users.map((user) => ({
+      assignedRoomId: user.assignedRoomId,
       id: user.id,
       name: user.name ?? user.fullName ?? `Специалист ${user.id}`,
       role: user.role,
+      roomId: user.roomId,
     })),
   }
 }
@@ -207,7 +255,7 @@ function toBackendSettingsPayload(payload: TicketSettingsPayload) {
     etaMinutes?: number
     priority?: number
     roomId?: number
-    serviceTypeId?: number
+    serviceTypeId?: number | string
     status?: string
   } = {}
 
@@ -217,6 +265,8 @@ function toBackendSettingsPayload(payload: TicketSettingsPayload) {
 
   if (serviceTypeId !== undefined) {
     body.serviceTypeId = serviceTypeId
+  } else if (payload.serviceTypeId !== undefined && payload.serviceTypeId !== '') {
+    body.serviceTypeId = payload.serviceTypeId
   }
 
   if (roomId !== undefined) {
@@ -248,11 +298,12 @@ function toBackendSettingsPayload(payload: TicketSettingsPayload) {
 
 function toBackendCreateSettingsPayload(payload: TicketSettingsPayload & { priority: TicketPriority }) {
   const roomId = toNumberOrUndefined(payload.roomId)
+  const serviceTypeId = toNumberOrUndefined(payload.serviceTypeId)
 
   return {
     priority: toBackendPriority(payload.priority),
     ...(roomId !== undefined ? { roomId } : {}),
-    serviceTypeId: Number(payload.serviceTypeId),
+    serviceTypeId: serviceTypeId ?? payload.serviceTypeId ?? 1,
   }
 }
 
@@ -283,8 +334,9 @@ export const backendTicketApi: TicketApi = {
     const ticket = await createBackendTicket(
       '/tickets/kiosk',
       toBackendArchitectureTicketCreateInput(input),
+      publicApiClient,
     )
-    const arrivedTicket = await arriveCreatedTicket(ticket)
+    const arrivedTicket = await arriveCreatedTicketWithClient(ticket, publicApiClient, true)
 
     return toArchitectureTicket(arrivedTicket)
   },

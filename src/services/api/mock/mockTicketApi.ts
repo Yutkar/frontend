@@ -96,13 +96,18 @@ export const mockTicketApi: TicketApi = {
         id: room.id,
         isActive: room.isActive ?? room.status !== 'paused',
         name: room.name,
+        serviceTypeIds: room.serviceTypeIds,
+        serviceTypes: room.serviceTypes,
+        services: room.services,
       })),
       serviceTypes: getMockServiceTypeOptions(),
       specialists: Object.values(mockUsers)
         .filter((user) => user.role === 'specialist')
         .map((user) => ({
+          assignedRoomId: user.assignedRoomId,
           id: user.id,
           name: user.name,
+          roomId: user.roomId,
           role: user.role,
         })),
     })

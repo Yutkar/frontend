@@ -21,10 +21,10 @@ import {
 import { Button } from '@shared/ui/components'
 import {
   getPriorityLabel,
-  getRooms,
+  getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
-  getSpecialists,
+  getSpecialistsForRoom,
   getStatusLabel,
   ticketPriorities,
   ticketStatuses,
@@ -119,18 +119,6 @@ export function TicketSettingsModal({
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open || !ticket || options.serviceTypes.length === 0) {
-      return
-    }
-
-    const currentServiceType = options.serviceTypes.find((item) => item.code === ticket.serviceType)
-
-    if (currentServiceType) {
-      setServiceTypeId(String(currentServiceType.id))
-    }
-  }, [open, options.serviceTypes, ticket])
-
   const serviceTypes = useMemo(() => {
     if (!ticket) {
       return getServiceTypes(options)
@@ -142,10 +130,27 @@ export function TicketSettingsModal({
     return hasCurrent ? availableServiceTypes : [getFallbackServiceType(ticket), ...availableServiceTypes]
   }, [options, ticket])
 
-  const rooms = useMemo(() => getRooms(options, fallbackRooms), [fallbackRooms, options])
+  useEffect(() => {
+    if (!open || !ticket || serviceTypes.length === 0) {
+      return
+    }
+
+    const currentServiceType = serviceTypes.find((item) => String(item.id) === ticket.serviceType)
+      ?? serviceTypes.find((item) => item.code === ticket.serviceType)
+
+    if (currentServiceType) {
+      setServiceTypeId(String(currentServiceType.id))
+    }
+  }, [open, serviceTypes, ticket])
+
+  const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId)
+  const rooms = useMemo(
+    () => getRoomsForService(options, selectedServiceType?.id, fallbackRooms),
+    [fallbackRooms, options, selectedServiceType?.id],
+  )
 
   const specialists = useMemo(() => {
-    const availableSpecialists = getSpecialists(options)
+    const availableSpecialists = getSpecialistsForRoom(options, roomId)
 
     if (!ticket?.assignedTo || availableSpecialists.some((item) => String(item.id) === ticket.assignedTo)) {
       return availableSpecialists
@@ -158,13 +163,36 @@ export function TicketSettingsModal({
       },
       ...availableSpecialists,
     ]
-  }, [options, ticket?.assignedTo])
+  }, [options, roomId, ticket?.assignedTo])
+
+  useEffect(() => {
+    if (!open || !ticket) {
+      return
+    }
+
+    setRoomId((currentRoomId) => (
+      currentRoomId && rooms.some((room) => String(room.id) === currentRoomId)
+        ? currentRoomId
+        : ''
+    ))
+  }, [open, rooms, ticket])
+
+  useEffect(() => {
+    if (!open || !ticket) {
+      return
+    }
+
+    setDoctorId((currentDoctorId) => (
+      currentDoctorId && specialists.some((specialist) => String(specialist.id) === currentDoctorId)
+        ? currentDoctorId
+        : ''
+    ))
+  }, [open, specialists, ticket])
 
   if (!open || !ticket) {
     return null
   }
 
-  const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId)
   const isBusy = saving || loadingOptions
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -225,7 +253,7 @@ export function TicketSettingsModal({
         {error ? <div className="modal-error">{error}</div> : null}
 
         <div className="settings-form-grid">
-          <label className="field">
+          <label className="field service-type-field">
             <span>Номер талона</span>
             <input readOnly value={ticket.number} />
           </label>
@@ -234,7 +262,11 @@ export function TicketSettingsModal({
             <span>Тип услуги</span>
             <select
               disabled={isBusy}
-              onChange={(event) => setServiceTypeId(event.target.value)}
+              onChange={(event) => {
+                setServiceTypeId(event.target.value)
+                setRoomId('')
+                setDoctorId('')
+              }}
               value={serviceTypeId}
             >
               {serviceTypes.map((serviceType) => (
@@ -248,8 +280,11 @@ export function TicketSettingsModal({
           <label className="field">
             <span>Кабинет</span>
             <select
-              disabled={isBusy}
-              onChange={(event) => setRoomId(event.target.value)}
+              disabled={isBusy || rooms.length === 0}
+              onChange={(event) => {
+                setRoomId(event.target.value)
+                setDoctorId('')
+              }}
               value={roomId}
             >
               <option value="">Не назначен</option>
@@ -259,6 +294,9 @@ export function TicketSettingsModal({
                 </option>
               ))}
             </select>
+            {selectedServiceType && rooms.length === 0 ? (
+              <small className="field-hint">Нет доступных кабинетов для выбранной услуги</small>
+            ) : null}
           </label>
 
           <label className="field">

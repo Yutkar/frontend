@@ -1,4 +1,5 @@
 import type {
+  AnalyticsPoint,
   QueueKpi,
   QueueRecommendation,
   QueueSnapshot,
@@ -125,6 +126,29 @@ export type BackendRecommendation = {
   title?: string
 }
 
+export type BackendAnalyticsPoint = {
+  averageWaitMinutes?: number | string | null
+  average_wait_minutes?: number | string | null
+  avgServiceMinutes?: number | string | null
+  avgWaitMinutes?: number | string | null
+  avg_wait_minutes?: number | string | null
+  completed?: number | string | null
+  completedCount?: number | string | null
+  completed_count?: number | string | null
+  completedTickets?: number | string | null
+  date?: string | number | null
+  hour?: string | number | null
+  label?: string | number | null
+  period?: string | number | null
+  roomName?: string | number | null
+  serviceName?: string | number | null
+  time?: string | number | null
+  waiting?: number | string | null
+  waitingCount?: number | string | null
+  waiting_count?: number | string | null
+  waitingTickets?: number | string | null
+}
+
 const serviceTypeByBackendId: Record<number, ServiceType> = {
   1: 'consultation',
   2: 'billing',
@@ -206,6 +230,26 @@ function getRecordBoolean(record: Record<string, unknown>, keys: string[]): bool
   }
 
   return undefined
+}
+
+function getRecordNumber(record: Record<string, unknown>, keys: string[], fallback = 0): number {
+  for (const key of keys) {
+    const value = record[key]
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+
+    if (typeof value === 'string') {
+      const numberValue = Number(value)
+
+      if (Number.isFinite(numberValue)) {
+        return numberValue
+      }
+    }
+  }
+
+  return fallback
 }
 
 function getBackendRoomId(room?: BackendRoom | null): string {
@@ -501,14 +545,17 @@ export function toArchitectureRooms(rooms: BackendRoom[]): ArchitectureRoom[] {
 export function toBackendTicketCreateInput(input: TicketCreateInput): {
   priority: number
   roomId?: number
-  serviceTypeId: number
+  serviceTypeId: number | string
 } {
   const roomId = Number(input.roomId)
+  const serviceTypeId = Number(input.serviceTypeId)
 
   return {
     priority: toBackendPriority(input.priority),
     ...(Number.isFinite(roomId) ? { roomId } : {}),
-    serviceTypeId: toBackendServiceTypeId(input.serviceType),
+    serviceTypeId: Number.isFinite(serviceTypeId)
+      ? serviceTypeId
+      : input.serviceTypeId ?? toBackendServiceTypeId(input.serviceType),
   }
 }
 
@@ -558,6 +605,9 @@ export function toSharedRooms(
       isActive,
       name: getBackendRoomName(room),
       department: getBackendRoomName(room),
+      serviceTypeIds: room.serviceTypeIds,
+      serviceTypes: room.serviceTypes as Room['serviceTypes'],
+      services: room.services as Room['services'],
       specialistName: getBackendRoomName(room),
       status: isActive ? 'open' : 'paused',
       loadPercent: 0,
@@ -586,6 +636,9 @@ export function toSharedRooms(
       isActive: existingRoom?.isActive ?? true,
       name: existingRoom?.name ?? stat.roomName,
       department: existingRoom?.department ?? stat.roomName,
+      serviceTypeIds: existingRoom?.serviceTypeIds,
+      serviceTypes: existingRoom?.serviceTypes,
+      services: existingRoom?.services,
       specialistName: existingRoom?.specialistName ?? stat.roomName,
       status: 'open',
       loadPercent: workload,
@@ -612,6 +665,9 @@ export function toSharedRooms(
       isActive: getBackendRoomActive(ticket.room),
       name: roomName,
       department: serviceType,
+      serviceTypeIds: ticket.room?.serviceTypeIds,
+      serviceTypes: ticket.room?.serviceTypes as Room['serviceTypes'],
+      services: ticket.room?.services as Room['services'],
       specialistName: roomName,
       status: getBackendRoomActive(ticket.room) ? 'open' : 'paused',
       loadPercent: 0,
@@ -688,6 +744,46 @@ export function toBackendRecommendations(value: unknown): BackendRecommendation[
   }
 
   return []
+}
+
+export function toBackendAnalyticsPoints(value: unknown): BackendAnalyticsPoint[] {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord).map((item) => item as BackendAnalyticsPoint)
+  }
+
+  if (!isRecord(value)) {
+    return []
+  }
+
+  const arrayKeys = [
+    'analytics',
+    'data',
+    'items',
+    'periods',
+    'points',
+    'rooms',
+    'rows',
+    'serviceTime',
+    'service_time',
+  ]
+
+  for (const key of arrayKeys) {
+    const nested = value[key]
+
+    if (Array.isArray(nested)) {
+      return nested.filter(isRecord).map((item) => item as BackendAnalyticsPoint)
+    }
+
+    if (isRecord(nested)) {
+      const nestedPoints = toBackendAnalyticsPoints(nested)
+
+      if (nestedPoints.length > 0) {
+        return nestedPoints
+      }
+    }
+  }
+
+  return [value as BackendAnalyticsPoint]
 }
 
 function toBackendTickets(value: unknown): BackendTicket[] {
@@ -810,6 +906,73 @@ function createOverloadRecommendation(room: BackendOverloadRoom): QueueRecommend
   }
 }
 
+function getAnalyticsLabel(point: BackendAnalyticsPoint, index: number): string {
+  const record = point as Record<string, unknown>
+  const rawLabel = getRecordString(record, [
+    'label',
+    'period',
+    'time',
+    'hour',
+    'date',
+    'roomName',
+    'serviceName',
+  ])
+
+  if (!rawLabel) {
+    return `Период ${index + 1}`
+  }
+
+  const hourValue = Number(rawLabel)
+
+  if (Number.isInteger(hourValue) && hourValue >= 0 && hourValue <= 23) {
+    return `${String(hourValue).padStart(2, '0')}:00`
+  }
+
+  return rawLabel
+}
+
+export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): AnalyticsPoint[] {
+  const analyticsByLabel = new Map<string, AnalyticsPoint>()
+
+  points.forEach((point, index) => {
+    const record = point as Record<string, unknown>
+    const label = getAnalyticsLabel(point, index)
+    const existing = analyticsByLabel.get(label)
+    const nextPoint: AnalyticsPoint = {
+      label,
+      waiting: getRecordNumber(record, [
+        'waiting',
+        'waitingCount',
+        'waiting_count',
+        'waitingTickets',
+        'activeTickets',
+      ], existing?.waiting ?? 0),
+      completed: getRecordNumber(record, [
+        'completed',
+        'completedCount',
+        'completed_count',
+        'completedTickets',
+      ], existing?.completed ?? 0),
+      avgWaitMinutes: getRecordNumber(record, [
+        'avgWaitMinutes',
+        'averageWaitMinutes',
+        'avg_wait_minutes',
+        'average_wait_minutes',
+        'avgServiceMinutes',
+      ], existing?.avgWaitMinutes ?? 0),
+    }
+
+    analyticsByLabel.set(label, {
+      label,
+      waiting: existing ? Math.max(existing.waiting, nextPoint.waiting) : nextPoint.waiting,
+      completed: existing ? Math.max(existing.completed, nextPoint.completed) : nextPoint.completed,
+      avgWaitMinutes: nextPoint.avgWaitMinutes || existing?.avgWaitMinutes || 0,
+    })
+  })
+
+  return Array.from(analyticsByLabel.values())
+}
+
 export function toSharedRecommendations(
   recommendations: BackendRecommendation[] = [],
   tickets: Ticket[] = [],
@@ -875,6 +1038,7 @@ export function toQueueSnapshot(
   rooms: BackendRoom[] = [],
   recommendations: BackendRecommendation[] = [],
   highPriorityTickets: BackendTicket[] = [],
+  analytics: BackendAnalyticsPoint[] = [],
 ): QueueSnapshot {
   const sharedTickets = toSharedTickets(tickets)
   const sharedRooms = toSharedRooms(tickets, stats, rooms)
@@ -891,7 +1055,7 @@ export function toQueueSnapshot(
       sharedHighPriorityTickets,
       overload,
     ),
-    analytics: [],
+    analytics: toSharedAnalytics(analytics),
     kpi: toQueueKpi(tickets, stats, overload),
   }
 }

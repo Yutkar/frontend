@@ -13,6 +13,7 @@ export const mockKioskApi: KioskApi = {
     return Promise.resolve(createSharedTicket({
       patientName: 'Посетитель',
       priority: input.priority,
+      roomId: input.roomId,
       serviceType: input.serviceType ?? getSharedServiceTypeByOptionId(input.serviceTypeId),
     }))
   },

@@ -977,6 +977,16 @@ h3 {
   width: 100%;
 }
 
+.field-hint {
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.service-type-field {
+  grid-column: 1 / -1;
+}
+
 .field textarea {
   resize: vertical;
 }

@@ -1,68 +1,28 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ClipboardPlus } from 'lucide-react'
-import { adminService } from '@services/adminService'
-import type { AdminRecord } from '@services/api'
-import type { ServiceType, TicketCreateInput, TicketPriority } from '@shared/types'
+import { ticketService } from '@services/ticketService'
+import type { TicketSettingsOptions } from '@services/api'
+import type { TicketCreateInput, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
-import { getPriorityMeta, getServiceTypeLabel } from '@shared/utils'
-
-const serviceTypes: ServiceType[] = [
-  'registration',
-  'consultation',
-  'diagnostics',
-  'laboratory',
-  'pharmacy',
-  'billing',
-]
+import { getPriorityMeta } from '@shared/utils'
+import {
+  getRoomsForService,
+  getServiceOptionLabel,
+  getServiceTypes,
+} from './ticketFormOptions'
 
 const priorities: TicketPriority[] = ['low', 'normal', 'high', 'critical']
-
-type RoomOption = {
-  id: string
-  name: string
-}
 
 type TicketCreateFormProps = {
   loading: boolean
   onSubmit: (input: TicketCreateInput) => Promise<void>
 }
 
-function getRecordText(record: AdminRecord, keys: string[], fallback: string): string {
-  for (const key of keys) {
-    const value = record[key]
-
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim()
-    }
-
-    if (typeof value === 'number') {
-      return String(value)
-    }
-  }
-
-  return fallback
-}
-
-function getRoomActive(room: AdminRecord): boolean {
-  if (typeof room.isActive === 'boolean') {
-    return room.isActive
-  }
-
-  if (typeof room.active === 'boolean') {
-    return room.active
-  }
-
-  return room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted'
-}
-
-function toRoomOption(room: AdminRecord): RoomOption {
-  const id = String(room.id ?? room.roomId ?? room._id)
-
-  return {
-    id,
-    name: getRecordText(room, ['name', 'title', 'roomName'], `Кабинет ${id}`),
-  }
+const emptyOptions: TicketSettingsOptions = {
+  rooms: [],
+  serviceTypes: [],
+  specialists: [],
 }
 
 export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
@@ -70,51 +30,47 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
   const [patientName, setPatientName] = useState('')
   const [priority, setPriority] = useState<TicketPriority>('normal')
   const [roomId, setRoomId] = useState('')
-  const [rooms, setRooms] = useState<RoomOption[]>([])
-  const [roomsLoading, setRoomsLoading] = useState(true)
-  const [serviceType, setServiceType] = useState<ServiceType>('registration')
+  const [options, setOptions] = useState<TicketSettingsOptions>(emptyOptions)
+  const [optionsLoading, setOptionsLoading] = useState(true)
+  const [serviceTypeId, setServiceTypeId] = useState('')
   const [notes, setNotes] = useState('')
+  const serviceTypes = useMemo(() => getServiceTypes(options), [options])
+  const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
+  const rooms = useMemo(
+    () => getRoomsForService(options, selectedServiceType?.id),
+    [options, selectedServiceType?.id],
+  )
   const selectedRoomExists = useMemo(
-    () => rooms.some((room) => room.id === roomId),
+    () => rooms.some((room) => String(room.id) === roomId),
     [roomId, rooms],
   )
 
   useEffect(() => {
     let active = true
 
-    setRoomsLoading(true)
+    setOptionsLoading(true)
     setError(null)
 
-    adminService
-      .getRooms()
-      .then((records) => {
+    ticketService
+      .getTicketSettingsOptions()
+      .then((nextOptions) => {
         if (!active) {
           return
         }
 
-        const activeRooms = records
-          .filter(getRoomActive)
-          .map(toRoomOption)
-          .filter((room) => room.id && room.id !== 'undefined')
-
-        setRooms(activeRooms)
-        setRoomId((currentRoomId) => (
-          currentRoomId && activeRooms.some((room) => room.id === currentRoomId)
-            ? currentRoomId
-            : activeRooms[0]?.id ?? ''
-        ))
+        setOptions(nextOptions)
       })
       .catch((loadError) => {
-        console.error('Ticket create rooms load failed', loadError)
+        console.error('Ticket create options load failed', loadError)
 
         if (active) {
-          setRooms([])
-          setError('Не удалось загрузить кабинеты. Проверьте подключение к серверу.')
+          setOptions(emptyOptions)
+          setError('Не удалось загрузить услуги и кабинеты. Проверьте подключение к серверу.')
         }
       })
       .finally(() => {
         if (active) {
-          setRoomsLoading(false)
+          setOptionsLoading(false)
         }
       })
 
@@ -122,6 +78,20 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!serviceTypeId && serviceTypes[0]) {
+      setServiceTypeId(String(serviceTypes[0].id))
+    }
+  }, [serviceTypeId, serviceTypes])
+
+  useEffect(() => {
+    setRoomId((currentRoomId) => (
+      currentRoomId && rooms.some((room) => String(room.id) === currentRoomId)
+        ? currentRoomId
+        : ''
+    ))
+  }, [rooms])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -131,8 +101,13 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
       return
     }
 
+    if (!selectedServiceType) {
+      setError('Выберите тип услуги.')
+      return
+    }
+
     if (!roomId || !selectedRoomExists) {
-      setError('Выберите кабинет.')
+      setError('Выберите доступный кабинет.')
       return
     }
 
@@ -140,14 +115,16 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
       patientName: patientName.trim(),
       priority,
       roomId,
-      serviceType,
+      serviceType: selectedServiceType.code,
+      serviceTypeId: selectedServiceType.id,
       notes: notes.trim() || undefined,
     })
 
     setPatientName('')
     setNotes('')
     setPriority('normal')
-    setServiceType('registration')
+    setServiceTypeId(String(serviceTypes[0]?.id ?? ''))
+    setRoomId('')
   }
 
   return (
@@ -162,15 +139,19 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
       </label>
 
       <div className="form-grid">
-        <label className="field">
+        <label className="field service-type-field">
           <span>{t.tickets.serviceType}</span>
           <select
-            onChange={(event) => setServiceType(event.target.value as ServiceType)}
-            value={serviceType}
+            disabled={loading || optionsLoading || serviceTypes.length === 0}
+            onChange={(event) => {
+              setServiceTypeId(event.target.value)
+              setRoomId('')
+            }}
+            value={serviceTypeId}
           >
-            {serviceTypes.map((type) => (
-              <option key={type} value={type}>
-                {getServiceTypeLabel(type)}
+            {serviceTypes.map((serviceType) => (
+              <option key={String(serviceType.id)} value={String(serviceType.id)}>
+                {getServiceOptionLabel(serviceType)}
               </option>
             ))}
           </select>
@@ -179,7 +160,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
         <label className="field">
           <span>Кабинет</span>
           <select
-            disabled={loading || roomsLoading || rooms.length === 0}
+            disabled={loading || optionsLoading || rooms.length === 0}
             onChange={(event) => setRoomId(event.target.value)}
             value={roomId}
           >
@@ -190,9 +171,12 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
                 </option>
               ))
             ) : (
-              <option value="">Активные кабинеты не найдены</option>
+              <option value="">Нет доступных кабинетов</option>
             )}
           </select>
+          {selectedServiceType && rooms.length === 0 ? (
+            <small className="field-hint">Нет доступных кабинетов для выбранной услуги</small>
+          ) : null}
         </label>
 
         <label className="field">
@@ -223,7 +207,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
       {error ? <div className="modal-error">{error}</div> : null}
 
       <Button
-        disabled={loading || roomsLoading || !patientName.trim() || !roomId}
+        disabled={loading || optionsLoading || !patientName.trim() || !roomId}
         icon={<ClipboardPlus size={18} />}
         type="submit"
         variant="primary"
