@@ -719,7 +719,7 @@ export function toQueueKpi(
     ['created', 'waiting', 'called', 'in_service', 'redirected'].includes(ticket.status ?? ''),
   )
   const activeTickets = activeWaitTickets.length
-  const averageWaitingFromTickets = getAverageWaitingMinutes(activeWaitTickets.map(toSharedTicket))
+  const averageWaitingFromTickets = getAverageWaitingMinutes(tickets.map(toSharedTicket))
 
   return {
     activeTickets,
@@ -1035,11 +1035,8 @@ function getActualWaitingMinutes(ticket: Ticket, now = Date.now()): number | nul
   }
 
   const calledAt = parseAnalyticsTimestamp(ticket.calledAt)
-  const startedAt = parseAnalyticsTimestamp(ticket.startedAt)
-  const endTime = calledAt ?? startedAt
-
-  if (endTime !== undefined) {
-    return Math.max(0, Math.round((endTime - createdAt) / 60_000))
+  if (calledAt !== undefined) {
+    return Math.max(0, Math.round((calledAt - createdAt) / 60_000))
   }
 
   if (activeWaitingStatuses.has(ticket.status)) {
@@ -1118,26 +1115,7 @@ function mergeAnalyticsPoints(
     return endpointAnalytics.sort((left, right) => left.label.localeCompare(right.label))
   }
 
-  const analyticsByLabel = new Map<string, AnalyticsPoint>()
-
-  ticketAnalytics.forEach((point) => analyticsByLabel.set(point.label, point))
-  endpointAnalytics.forEach((point) => {
-    const existing = analyticsByLabel.get(point.label)
-
-    if (!existing) {
-      return
-    }
-
-    analyticsByLabel.set(point.label, {
-      label: existing.label,
-      waiting: existing.waiting || point.waiting,
-      completed: existing.completed || point.completed,
-      avgWaitMinutes: existing.avgWaitMinutes || point.avgWaitMinutes,
-      avgServiceMinutes: existing.avgServiceMinutes ?? point.avgServiceMinutes,
-    })
-  })
-
-  return Array.from(analyticsByLabel.values()).sort((left, right) => left.label.localeCompare(right.label))
+  return ticketAnalytics.sort((left, right) => left.label.localeCompare(right.label))
 }
 
 export function toSharedRecommendations(

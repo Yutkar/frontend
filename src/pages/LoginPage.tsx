@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ShieldCheck } from 'lucide-react'
 import { appModeService } from '@services/appModeService'
 import { useGlobalStore } from '@store/global'
 import { Button } from '@shared/ui/components'
@@ -25,7 +25,7 @@ export function LoginPage() {
       await login(loginValue.trim(), password)
       navigate('/dashboard')
     } catch (err) {
-      setError('Неверный логин или пароль. Попробуйте снова.')
+      setError('Неверный логин или пароль')
     } finally {
       setIsLoading(false)
     }
@@ -51,8 +51,9 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6 max-w-md mx-auto">
             {error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
+              <div aria-live="assertive" className="login-error-alert" role="alert">
+                <AlertTriangle aria-hidden="true" size={20} />
+                <span>{error}</span>
               </div>
             )}
 

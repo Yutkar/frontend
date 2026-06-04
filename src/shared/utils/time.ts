@@ -7,6 +7,8 @@ type TicketWaitingSource = {
   status?: string | null
 }
 
+const activeWaitingStatuses = new Set(['created', 'waiting', 'called', 'in_service', 'redirected'])
+
 function parseTimestamp(value?: string | null): number | undefined {
   if (!value) {
     return undefined
@@ -28,19 +30,17 @@ export function getWaitingMinutes(
   }
 
   const nowTime = typeof now === 'number' ? now : now.getTime()
-  const endTime =
-    parseTimestamp(ticket.calledAt) ??
-    parseTimestamp(ticket.serviceStartedAt) ??
-    parseTimestamp(ticket.startedAt)
+  const calledAt = parseTimestamp(ticket.calledAt)
 
-  if (endTime === undefined && ['cancelled', 'completed', 'no_show'].includes(ticket.status ?? '')) {
+  if (calledAt !== undefined) {
+    return Math.max(0, Math.floor((calledAt - createdAt) / 60_000))
+  }
+
+  if (!activeWaitingStatuses.has(ticket.status ?? '')) {
     return null
   }
 
-  const resolvedEndTime = endTime ?? nowTime
-  const diffMinutes = Math.floor((resolvedEndTime - createdAt) / 60_000)
-
-  return Math.max(0, diffMinutes)
+  return Math.max(0, Math.floor((nowTime - createdAt) / 60_000))
 }
 
 export function formatWaitingTime(minutes?: number | null): string {

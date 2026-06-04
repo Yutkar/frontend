@@ -45,33 +45,36 @@ export function TicketPrintPreview({ data, onPrint }: TicketPrintPreviewProps) {
     <section className="ticket-print-panel">
       <div className="ticket-print-preview">
         <strong className="ticket-print-brand">SmartQ</strong>
-        <h2>ТАЛОН № {data.ticketNumber}</h2>
+        <div className="ticket-print-number">
+          <span>Номер талона</span>
+          <strong>{data.ticketNumber}</strong>
+        </div>
 
         <dl>
           <div>
-            <dt>Услуга:</dt>
+            <dt>Услуга</dt>
             <dd>{data.serviceName}</dd>
           </div>
           <div>
-            <dt>Кабинет:</dt>
+            <dt>Кабинет</dt>
             <dd>{data.roomName}</dd>
           </div>
           {data.doctorName ? (
             <div>
-              <dt>Врач:</dt>
+              <dt>Врач</dt>
               <dd>{data.doctorName}</dd>
             </div>
           ) : null}
           <div>
-            <dt>Приоритет:</dt>
+            <dt>Приоритет</dt>
             <dd>{data.priorityLabel}</dd>
           </div>
           <div>
-            <dt>Дата:</dt>
+            <dt>Дата</dt>
             <dd>{formattedDate}</dd>
           </div>
           <div>
-            <dt>Время:</dt>
+            <dt>Время</dt>
             <dd>{formattedTime}</dd>
           </div>
         </dl>
