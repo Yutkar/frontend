@@ -76,6 +76,10 @@ export function getUserLogin(user: User): string {
 
 export function getAdminErrorMessage(error: unknown, fallbackMessage: string): string {
   if (error instanceof Error) {
+    if (/[а-яё]/i.test(error.message)) {
+      return error.message
+    }
+
     if (error.message.includes('подключение')) {
       return `${fallbackMessage}. Проверьте подключение к backend.`
     }

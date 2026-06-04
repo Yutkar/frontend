@@ -6,13 +6,13 @@ import { Button } from '@shared/ui/components'
 import { getAdminErrorMessage, getUserLogin } from './adminPageHelpers'
 
 type ManagerFormState = {
-  email: string
+  login: string
   name: string
   password: string
 }
 
 const emptyForm: ManagerFormState = {
-  email: '',
+  login: '',
   name: '',
   password: '',
 }
@@ -57,7 +57,7 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
   function handleEdit(manager: User) {
     setEditingManagerId(manager.id)
     setForm({
-      email: manager.email ?? '',
+      login: manager.email ?? '',
       name: manager.name,
       password: '',
     })
@@ -67,7 +67,7 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!form.name.trim() || !form.email.trim()) {
+    if (!form.name.trim() || !form.login.trim()) {
       setError('Введите имя и логин.')
       return
     }
@@ -81,7 +81,7 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
     setError(null)
 
     const payload = {
-      email: form.email.trim(),
+      email: form.login.trim(),
       name: form.name.trim(),
       password: form.password.trim() || undefined,
     }
@@ -101,7 +101,7 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
       console.error('Admin manager save failed', saveError)
       setError(getAdminErrorMessage(
         saveError,
-        editingManagerId ? 'Не удалось сохранить менеджера' : 'Не удалось создать менеджера',
+        editingManagerId ? 'Не удалось сохранить пользователя' : 'Не удалось создать менеджера',
       ))
     } finally {
       setSaving(false)
@@ -212,10 +212,10 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
             <label className="field">
               <span>Логин</span>
               <input
-                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                onChange={(event) => setForm((current) => ({ ...current, login: event.target.value }))}
                 placeholder="Введите логин"
                 type="text"
-                value={form.email}
+                value={form.login}
               />
             </label>
 

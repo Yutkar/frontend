@@ -1,6 +1,6 @@
 import { isAxiosError } from 'axios'
 import type { Role, ServiceType, User } from '@shared/types'
-import { apiClient } from '../client'
+import { apiClient, publicApiClient } from '../client'
 import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
 import type {
   AdminApi,
@@ -305,23 +305,40 @@ function getDesiredRoomId(input: Partial<AdminUserInput>): string | number | und
 }
 
 function toRegisterPayload(input: AdminUserInput) {
-  const roomId = getDesiredRoomId(input)
   return {
-    email: input.email,
-    name: input.name,
-    password: input.password,
+    email: input.email?.trim(),
+    name: input.name.trim(),
+    password: input.password?.trim(),
     role: input.role,
-    roomId: roomId ? Number(roomId) : undefined,
   }
 }
 
-function toUserPayload(input: AdminUserInput) {
+function toUserUpdatePayload(input: Partial<AdminUserInput>) {
   const roomId = getDesiredRoomId(input)
+  const payload: UnknownRecord = {}
 
-  return {
-    ...toRegisterPayload(input),
-    ...(roomId ? { assignedRoomId: normalizeIdValue(roomId), roomId: normalizeIdValue(roomId) } : {}),
+  if (input.name?.trim()) {
+    payload.name = input.name.trim()
   }
+
+  if (input.email?.trim()) {
+    payload.email = input.email.trim()
+  }
+
+  if (input.role) {
+    payload.role = input.role
+  }
+
+  if (input.password?.trim()) {
+    payload.password = input.password.trim()
+  }
+
+  if (roomId) {
+    payload.assignedRoomId = normalizeIdValue(roomId)
+    payload.roomId = normalizeIdValue(roomId)
+  }
+
+  return payload
 }
 
 function toRoomCreatePayload(input: AdminRecordInput) {
@@ -470,6 +487,48 @@ async function assignUserToRoom(userId: string | number, roomId: string | number
   return toUser(unwrapUser(response), 'specialist')
 }
 
+async function verifyCredentials(
+  email: string | undefined,
+  password: string | undefined,
+  errorMessage: string,
+  logScope: string,
+): Promise<void> {
+  const normalizedEmail = email?.trim()
+  const normalizedPassword = password?.trim()
+
+  if (!normalizedEmail || !normalizedPassword) {
+    return
+  }
+
+  try {
+    await publicApiClient.post('/auth/login', {
+      email: normalizedEmail,
+      password: normalizedPassword,
+    })
+  } catch (error) {
+    console.warn(`${logScope}: credentials verification failed`, error)
+    throw new Error(errorMessage)
+  }
+}
+
+function verifyUpdatedCredentials(email?: string, password?: string): Promise<void> {
+  return verifyCredentials(
+    email,
+    password,
+    'Пароль не удалось изменить. Проверьте поддержку backend.',
+    'backendAdminApi.updateUser',
+  )
+}
+
+function verifyCreatedCredentials(email?: string, password?: string): Promise<void> {
+  return verifyCredentials(
+    email,
+    password,
+    'Не удалось создать аккаунт для входа',
+    'backendAdminApi.createUser',
+  )
+}
+
 function getDeleteUserError(error: unknown): Error {
   if (isNetworkError(error)) {
     return new Error('Проверьте подключение к backend')
@@ -549,15 +608,30 @@ export const backendAdminApi: AdminApi = {
 
   async createUser(input: AdminUserInput) {
     const desiredRoomId = getDesiredRoomId(input)
-    const response = await requestFirst([
-      () => apiClient.post<BackendUserResponse>('/auth/register', toRegisterPayload(input)).then((result) => result.data),
-      () => apiClient.post<BackendUserResponse>('/users', toUserPayload(input)).then((result) => result.data),
-    ])
+    let response: BackendUserResponse
+
+    try {
+      response = await apiClient
+        .post<BackendUserResponse>('/auth/register', toRegisterPayload(input))
+        .then((result) => result.data)
+    } catch (error) {
+      console.warn('backendAdminApi.createUser: account registration failed', error)
+      throw new Error('Не удалось создать аккаунт для входа')
+    }
 
     const createdUser = await resolveCreatedUser(input, response)
 
-    if (!desiredRoomId || !hasUserId(createdUser)) {
+    await verifyCreatedCredentials(input.email, input.password)
+
+    if (!desiredRoomId) {
       return createdUser
+    }
+
+    if (!hasUserId(createdUser)) {
+      return {
+        ...createdUser,
+        roomAssignmentPending: true,
+      }
     }
 
     try {
@@ -573,18 +647,17 @@ export const backendAdminApi: AdminApi = {
   },
 
   async updateUser(id, input) {
-    const payload = {
-      ...input,
-      ...(input.password ? { password: input.password } : {}),
-      ...(input.roomId ? { roomId: Number(input.roomId) } : {}),
-    }
+    const payload = toUserUpdatePayload(input)
     
     const response = await requestFirst([
       () => apiClient.patch<BackendUserResponse>(`/users/${id}`, payload).then((result) => result.data),
       () => apiClient.patch<BackendUserResponse>(`/staff/${id}`, payload).then((result) => result.data),
     ])
+    const updatedUser = toUser(unwrapUser(response), input.role)
 
-    return toUser(unwrapUser(response), input.role)
+    await verifyUpdatedCredentials(input.email ?? updatedUser.email, input.password)
+
+    return updatedUser
   },
 
   async deleteUser(id) {

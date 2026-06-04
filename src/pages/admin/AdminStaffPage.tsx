@@ -14,7 +14,7 @@ import {
 } from './adminPageHelpers'
 
 type StaffFormState = {
-  email: string
+  login: string
   name: string
   password: string
   role: 'specialist'
@@ -22,7 +22,7 @@ type StaffFormState = {
 }
 
 const emptyForm: StaffFormState = {
-  email: '',
+  login: '',
   name: '',
   password: '',
   role: 'specialist',
@@ -77,7 +77,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
   function handleEdit(staffMember: User) {
     setEditingUserId(staffMember.id)
     setForm({
-      email: staffMember.email ?? '',
+      login: staffMember.email ?? '',
       name: staffMember.name,
       password: '',
       role: 'specialist',
@@ -89,7 +89,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!form.name.trim() || !form.email.trim()) {
+    if (!form.name.trim() || !form.login.trim()) {
       setError('Введите имя и логин.')
       return
     }
@@ -104,7 +104,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
 
     const payload = {
       assignedRoomId: form.roomId || undefined,
-      email: form.email.trim(),
+      email: form.login.trim(),
       name: form.name.trim(),
       password: form.password.trim() || undefined,
       role: form.role,
@@ -117,7 +117,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
         : await adminService.createDoctor(payload)
 
       setSuccessMessage(savedUser.roomAssignmentPending
-        ? 'Врач создан. Кабинет можно назначить после обновления списка.'
+        ? 'Пользователь создан. Кабинет можно назначить после обновления списка.'
         : 'Врач успешно сохранён')
       resetForm()
       await loadData()
@@ -126,7 +126,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
       console.error('Admin staff save failed', saveError)
       setError(getAdminErrorMessage(
         saveError,
-        editingUserId ? 'Не удалось сохранить врача' : 'Не удалось создать врача',
+        editingUserId ? 'Не удалось сохранить пользователя' : 'Не удалось создать врача',
       ))
     } finally {
       setSaving(false)
@@ -245,10 +245,10 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
             <label className="field">
               <span>Логин</span>
               <input
-                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                onChange={(event) => setForm((current) => ({ ...current, login: event.target.value }))}
                 placeholder="Введите логин"
                 type="text"
-                value={form.email}
+                value={form.login}
               />
             </label>
 
