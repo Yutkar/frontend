@@ -16,6 +16,7 @@ import type {
   TicketSettingsServiceTypeOption,
   TicketSettingsUserOption,
 } from '../types'
+import { requestTicketReturn } from './ticketReturnFallback'
 
 type BackendRoomOption = {
   _id?: string | number
@@ -369,8 +370,8 @@ export const backendTicketApi: TicketApi = {
     return backendTicketApi.noShowTicket(id)
   },
 
-  returnTicket(id: string) {
-    return backendTicketApi.arriveTicket(id)
+  async returnTicket(id: string) {
+    return toArchitectureTicket(await requestTicketReturn(id))
   },
 
   async redirectTicket(id: string, newRoomId: string | number) {

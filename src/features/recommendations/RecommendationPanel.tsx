@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { AlertTriangle, Check, ExternalLink, Info, Siren } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { QueueRecommendation, Room } from '@shared/types'
@@ -17,6 +18,7 @@ type RecommendationPanelProps = {
   recommendations: QueueRecommendation[]
   rooms: Room[]
 }
+const recommendationExitMs = 180
 
 function iconForSeverity(severity: QueueRecommendation['severity']) {
   if (severity === 'critical') {
@@ -41,12 +43,20 @@ function getRecommendationTitle(recommendation: QueueRecommendation, now: number
   return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${waitingTime}`
 }
 
+function waitForRecommendationExit() {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, recommendationExitMs)
+  })
+}
+
 export function RecommendationPanel({ recommendations, rooms }: RecommendationPanelProps) {
   const navigate = useNavigate()
+  const [closingRecommendationIds, setClosingRecommendationIds] = useState<string[]>([])
   const resolveRecommendation = useQueueStore((state) => state.resolveRecommendation)
   const selectTicket = useQueueStore((state) => state.selectTicket)
   const now = useCurrentTime()
   const activeRecommendations = recommendations.filter((recommendation) => recommendation.isResolved !== true)
+  const closingRecommendationIdSet = new Set(closingRecommendationIds)
 
   const handleOpenTicket = (recommendation: QueueRecommendation) => {
     if (!recommendation.ticketId) {
@@ -59,6 +69,19 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
 
   const handleOpenRoom = () => {
     navigate('/admin')
+  }
+
+  const handleResolveRecommendation = async (recommendation: QueueRecommendation) => {
+    if (closingRecommendationIdSet.has(recommendation.id)) {
+      return
+    }
+
+    setClosingRecommendationIds((ids) => (
+      ids.includes(recommendation.id) ? ids : [...ids, recommendation.id]
+    ))
+    await waitForRecommendationExit()
+    setClosingRecommendationIds((ids) => ids.filter((id) => id !== recommendation.id))
+    await resolveRecommendation(recommendation.id)
   }
 
   return (
@@ -76,7 +99,7 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
 
         return (
           <article
-            className={`recommendation-card recommendation-${recommendation.severity}`}
+            className={`recommendation-card recommendation-${recommendation.severity} ${closingRecommendationIdSet.has(recommendation.id) ? 'recommendation-card-closing' : ''}`}
             key={recommendation.id}
           >
             <div className="recommendation-icon">{iconForSeverity(recommendation.severity)}</div>
@@ -135,7 +158,11 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
                     Открыть кабинет
                   </button>
                 ) : null}
-                <button onClick={() => void resolveRecommendation(recommendation.id)} type="button">
+                <button
+                  disabled={closingRecommendationIdSet.has(recommendation.id)}
+                  onClick={() => void handleResolveRecommendation(recommendation)}
+                  type="button"
+                >
                   <Check size={14} />
                   Закрыть
                 </button>

@@ -4,7 +4,7 @@ import { CallBoard } from '@features/tv-board/CallBoard'
 import { t } from '@shared/locales/useLocale'
 import { publicApiClient } from '@services/api/client'
 import type { Room, Ticket } from '@shared/types'
-import { toArchitectureTickets } from '@services/api/backendAdapters'
+import { normalizeBoardTicket, type BackendTicket } from '@services/api/backendAdapters'
 
 export function TvBoardPage() {
   const [searchParams] = useSearchParams()
@@ -32,22 +32,26 @@ export function TvBoardPage() {
       try {
         const response = await publicApiClient.get(url)
         const data = response.data
-        const converted = toArchitectureTickets(data)
+        const boardTickets = Array.isArray(data) ? data as BackendTicket[] : []
+        const converted = boardTickets.map(normalizeBoardTicket)
 
         if (!active || currentRequestId !== requestId) return
 
         setTickets(converted)
 
-        const uniqueRooms = new Map()
-        data.forEach((t: any) => {
-          if (t.room) {
-            uniqueRooms.set(String(t.room.id), {
-              id: String(t.room.id),
-              name: t.room.name,
-              serviceTypes: [],
+        const uniqueRooms = new Map<string, Room>()
+        boardTickets.forEach((ticket) => {
+          if (ticket.room?.id && ticket.room.name) {
+            uniqueRooms.set(String(ticket.room.id), {
+              department: 'Табло',
+              id: String(ticket.room.id),
+              loadPercent: 0,
+              name: ticket.room.name,
+              specialistName: '',
+              status: 'open',
             })
-            if (roomId && String(t.room.id) === roomId) {
-              setRoomName(t.room.name)
+            if (roomId && String(ticket.room.id) === roomId) {
+              setRoomName(ticket.room.name)
             }
           }
         })

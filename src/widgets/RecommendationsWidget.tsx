@@ -37,6 +37,7 @@ function getRecommendationMessage(recommendation: QueueRecommendation, now: numb
 
 export function RecommendationsWidget({ recommendations }: RecommendationsWidgetProps) {
   const now = useCurrentTime()
+  const activeRecommendations = recommendations.filter((recommendation) => recommendation.isResolved !== true)
 
   return (
     <section className="widget-panel">
@@ -47,9 +48,9 @@ export function RecommendationsWidget({ recommendations }: RecommendationsWidget
         </div>
       </div>
 
-      {recommendations.length > 0 ? (
+      {activeRecommendations.length > 0 ? (
         <div className="recommendation-mini-list">
-          {recommendations.slice(0, 4).map((recommendation) => (
+          {activeRecommendations.slice(0, 4).map((recommendation) => (
             <article
               className={`recommendation-mini recommendation-${recommendation.severity}`}
               key={recommendation.id}

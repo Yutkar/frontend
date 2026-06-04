@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bell, Check, ExternalLink, Info, LogOut, Radio, ShieldCheck, Siren } from 'lucide-react'
+import { AlertTriangle, Bell, Check, ExternalLink, Info, LogOut, Radio, ShieldCheck, Siren, Trash2, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
@@ -26,6 +26,7 @@ const severityLabel: Record<QueueRecommendation['severity'], string> = {
   info: 'Информация',
   warning: 'Внимание',
 }
+const notificationExitMs = 180
 
 function severityIcon(severity: QueueRecommendation['severity']) {
   if (severity === 'critical') {
@@ -50,12 +51,21 @@ function getNotificationTitle(recommendation: QueueRecommendation, now: number):
   return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${waitingTime}`
 }
 
+function waitForNotificationExit() {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, notificationExitMs)
+  })
+}
+
 export function TopNavbar({ routes }: TopNavbarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const notificationRef = useRef<HTMLDivElement>(null)
   const notificationsRequested = useRef(false)
+  const [closingRecommendationIds, setClosingRecommendationIds] = useState<string[]>([])
+  const [confirmCloseAllOpen, setConfirmCloseAllOpen] = useState(false)
   const [dismissedRecommendationIds, setDismissedRecommendationIds] = useState<string[]>([])
+  const [notificationError, setNotificationError] = useState<string | null>(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const now = useCurrentTime()
 
@@ -66,6 +76,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
   const loading = useQueueStore((state) => state.loading)
   const recommendations = useQueueStore((state) => state.recommendations)
   const resolveRecommendation = useQueueStore((state) => state.resolveRecommendation)
+  const resolveRecommendations = useQueueStore((state) => state.resolveRecommendations)
   const selectTicket = useQueueStore((state) => state.selectTicket)
 
   const currentRoute = routes.find((route) => route.path === location.pathname)
@@ -84,6 +95,10 @@ export function TopNavbar({ routes }: TopNavbarProps) {
     [dismissedRecommendationIds, recommendations, user?.role],
   )
   const unreadCount = visibleRecommendations.length
+  const closingRecommendationIdSet = useMemo(
+    () => new Set(closingRecommendationIds),
+    [closingRecommendationIds],
+  )
 
   useEffect(() => {
     if (
@@ -109,12 +124,16 @@ export function TopNavbar({ routes }: TopNavbarProps) {
     function handlePointerDown(event: MouseEvent) {
       if (!notificationRef.current?.contains(event.target as Node)) {
         setNotificationsOpen(false)
+        setConfirmCloseAllOpen(false)
+        setNotificationError(null)
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setNotificationsOpen(false)
+        setConfirmCloseAllOpen(false)
+        setNotificationError(null)
       }
     }
 
@@ -148,10 +167,46 @@ export function TopNavbar({ routes }: TopNavbarProps) {
   }
 
   const handleResolveRecommendation = async (recommendation: QueueRecommendation) => {
+    if (closingRecommendationIdSet.has(recommendation.id)) {
+      return
+    }
+
+    setNotificationError(null)
+    setClosingRecommendationIds((ids) => (
+      ids.includes(recommendation.id) ? ids : [...ids, recommendation.id]
+    ))
+    await waitForNotificationExit()
     setDismissedRecommendationIds((ids) => (
       ids.includes(recommendation.id) ? ids : [...ids, recommendation.id]
     ))
+    setClosingRecommendationIds((ids) => ids.filter((id) => id !== recommendation.id))
     await resolveRecommendation(recommendation.id)
+  }
+
+  const handleCloseAllRecommendations = async () => {
+    const recommendationIds = visibleRecommendations.map((recommendation) => recommendation.id)
+
+    if (recommendationIds.length === 0) {
+      setConfirmCloseAllOpen(false)
+      return
+    }
+
+    setConfirmCloseAllOpen(false)
+    setNotificationError(null)
+    setClosingRecommendationIds((ids) => Array.from(new Set([...ids, ...recommendationIds])))
+    await waitForNotificationExit()
+
+    const result = await resolveRecommendations(recommendationIds)
+
+    if (result.hiddenIds.length > 0) {
+      setDismissedRecommendationIds((ids) => Array.from(new Set([...ids, ...result.hiddenIds])))
+    }
+
+    setClosingRecommendationIds((ids) => ids.filter((id) => !recommendationIds.includes(id)))
+
+    if (result.failedCount > 0) {
+      setNotificationError('Не удалось закрыть часть уведомлений')
+    }
   }
 
   return (
@@ -176,21 +231,62 @@ export function TopNavbar({ routes }: TopNavbarProps) {
             type="button"
           >
             <Bell size={18} />
-            <span>{unreadCount}</span>
+            {unreadCount > 0 ? <span>{unreadCount}</span> : null}
           </button>
 
           {notificationsOpen ? (
             <div className="notification-popover" role="dialog">
-              <header>
-                <strong>Уведомления</strong>
-                <span>{unreadCount} новых</span>
+              <header className="notification-popover-header">
+                <div>
+                  <strong>Уведомления</strong>
+                  <span>{unreadCount} новых</span>
+                </div>
+                {visibleRecommendations.length > 0 ? (
+                  <button
+                    className="notification-close-all"
+                    disabled={loading || closingRecommendationIds.length > 0}
+                    onClick={() => setConfirmCloseAllOpen(true)}
+                    type="button"
+                  >
+                    <Trash2 size={14} />
+                    Закрыть все
+                  </button>
+                ) : null}
               </header>
+
+              {confirmCloseAllOpen ? (
+                <div className="notification-confirm" role="alertdialog">
+                  <strong>Вы точно хотите закрыть все уведомления?</strong>
+                  <div>
+                    <button
+                      disabled={loading}
+                      onClick={() => void handleCloseAllRecommendations()}
+                      type="button"
+                    >
+                      <Check size={14} />
+                      Да, закрыть
+                    </button>
+                    <button
+                      disabled={loading}
+                      onClick={() => setConfirmCloseAllOpen(false)}
+                      type="button"
+                    >
+                      <X size={14} />
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {notificationError ? (
+                <div className="notification-error" role="alert">{notificationError}</div>
+              ) : null}
 
               {visibleRecommendations.length > 0 ? (
                 <div className="notification-list">
                   {visibleRecommendations.map((recommendation) => (
                     <article
-                      className={`notification-item notification-${recommendation.severity}`}
+                      className={`notification-item notification-${recommendation.severity} ${closingRecommendationIdSet.has(recommendation.id) ? 'notification-item-closing' : ''}`}
                       key={recommendation.id}
                     >
                       <span className="notification-icon">
@@ -252,6 +348,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                         ) : null}
                         <button
                           aria-label="Закрыть уведомление"
+                          disabled={loading || closingRecommendationIdSet.has(recommendation.id)}
                           onClick={() => void handleResolveRecommendation(recommendation)}
                           type="button"
                         >

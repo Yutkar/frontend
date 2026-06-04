@@ -31,6 +31,7 @@ type QueueState = {
   loadRoomQueue: (roomId: string | number) => Promise<void>
   redirectTicket: (input: RedirectTicketInput) => Promise<void>
   resolveRecommendation: (id: string) => Promise<void>
+  resolveRecommendations: (ids: string[]) => Promise<{ failedCount: number; hiddenIds: string[] }>
   returnTicket: (ticketId: string) => Promise<void>
   selectTicket: (ticketId?: string) => void
   skipTicket: (ticketId: string) => Promise<void>
@@ -49,6 +50,20 @@ const defaultErrorMessage = 'Не удалось загрузить данные
 
 function getQueueErrorMessage(error: unknown): string {
   return getApiErrorMessage(error, defaultErrorMessage)
+}
+
+function getHttpStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined
+  }
+
+  return (error as { response?: { status?: number } }).response?.status
+}
+
+function isRecommendationResolveUnsupported(error: unknown): boolean {
+  const status = getHttpStatus(error)
+
+  return status === 404 || status === 405 || status === 501
 }
 
 export const useQueueStore = create<QueueState>((set, get) => ({
@@ -215,6 +230,65 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         statusMessage: 'Уведомление закрыто',
       }))
     }
+  },
+
+  resolveRecommendations: async (ids) => {
+    const uniqueIds = Array.from(new Set(ids)).filter(Boolean)
+
+    if (uniqueIds.length === 0) {
+      return { failedCount: 0, hiddenIds: [] }
+    }
+
+    set({ error: null, loading: true, statusMessage: null })
+
+    const results = await Promise.allSettled(
+      uniqueIds.map((id) => queueApi.resolveRecommendation(id)),
+    )
+    const hiddenIds = results.flatMap((result, index) => (
+      result.status === 'fulfilled' || isRecommendationResolveUnsupported(result.reason)
+        ? [uniqueIds[index]]
+        : []
+    ))
+    const failedCount = uniqueIds.length - hiddenIds.length
+
+    try {
+      if (results.some((result) => result.status === 'fulfilled')) {
+        const snapshot = await queueApi.getQueueSnapshot()
+
+        set({
+          ...snapshot,
+          error: failedCount > 0 ? 'Не удалось закрыть часть уведомлений' : null,
+          hydrated: true,
+          lastUpdatedAt: new Date().toISOString(),
+          loading: false,
+          recommendations: snapshot.recommendations.filter(
+            (recommendation) => !hiddenIds.includes(recommendation.id),
+          ),
+          statusMessage: failedCount > 0 ? null : 'Все уведомления закрыты',
+        })
+      } else {
+        set((state) => ({
+          error: failedCount > 0 ? 'Не удалось закрыть часть уведомлений' : null,
+          loading: false,
+          recommendations: state.recommendations.filter(
+            (recommendation) => !hiddenIds.includes(recommendation.id),
+          ),
+          statusMessage: failedCount > 0 ? null : 'Уведомления скрыты до следующей загрузки',
+        }))
+      }
+    } catch (error) {
+      console.error('Queue resolve recommendations refresh failed', error)
+      set((state) => ({
+        error: failedCount > 0 ? 'Не удалось закрыть часть уведомлений' : null,
+        loading: false,
+        recommendations: state.recommendations.filter(
+          (recommendation) => !hiddenIds.includes(recommendation.id),
+        ),
+        statusMessage: failedCount > 0 ? null : 'Все уведомления закрыты',
+      }))
+    }
+
+    return { failedCount, hiddenIds }
   },
 
   returnTicket: async (ticketId) => {

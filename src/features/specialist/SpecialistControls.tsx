@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
-import { CheckCircle2, FastForward, Play, UserX } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { CheckCircle2, FastForward, Play, RotateCcw, UserX } from 'lucide-react'
+import { ticketService } from '@services/ticketService'
 import type { Room, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
@@ -18,11 +19,14 @@ const priorityOrder: Record<TicketPriority, number> = {
   low: 4,
 }
 
-const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'no_show', 'redirected'] as const
 
 export function SpecialistControls({ room }: SpecialistControlsProps) {
+  const [returnError, setReturnError] = useState<string | null>(null)
+  const [returningTicketId, setReturningTicketId] = useState<string | null>(null)
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const completeService = useQueueStore((state) => state.completeService)
+  const loadQueue = useQueueStore((state) => state.loadQueue)
   const loading = useQueueStore((state) => state.loading)
   const skipTicket = useQueueStore((state) => state.skipTicket)
   const startService = useQueueStore((state) => state.startService)
@@ -40,8 +44,12 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
 
   const currentTicket = useMemo<Ticket | undefined>(
     () =>
-      roomTickets.find((ticket) => ['called', 'in_service'].includes(ticket.status)) ??
-      roomTickets.find((ticket) => ticket.id === room.currentTicketId),
+      roomTickets.find(
+        (ticket) =>
+          ticket.id === room.currentTicketId &&
+          ['called', 'in_service'].includes(ticket.status),
+      ) ??
+      roomTickets.find((ticket) => ['called', 'in_service'].includes(ticket.status)),
     [room.currentTicketId, roomTickets],
   )
 
@@ -60,6 +68,35 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         }),
     [roomTickets],
   )
+  const noShowTickets = useMemo(
+    () =>
+      roomTickets
+        .filter((ticket) => ticket.status === 'no_show')
+        .sort((left, right) => {
+          const leftDate = left.updatedAt ?? left.calledAt ?? left.createdAt
+          const rightDate = right.updatedAt ?? right.calledAt ?? right.createdAt
+
+          return new Date(rightDate).getTime() - new Date(leftDate).getTime()
+        }),
+    [roomTickets],
+  )
+
+  const handleReturnTicket = async (ticketId: string) => {
+    setReturnError(null)
+    setReturningTicketId(ticketId)
+
+    try {
+      await ticketService.returnTicket(ticketId)
+      await loadQueue({ force: true, successMessage: 'Пациент возвращён в лист ожидания' })
+    } catch (error) {
+      console.error('Specialist return ticket failed', error)
+      setReturnError(
+        error instanceof Error ? error.message : 'Не удалось вернуть пациента в очередь',
+      )
+    } finally {
+      setReturningTicketId(null)
+    }
+  }
 
   return (
     <div className="specialist-workspace">
@@ -83,15 +120,21 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           <TicketCard
             actionSlot={
               <div className="button-row">
-                <Button disabled={loading || currentTicket.status !== 'called'} icon={<Play size={17} />} onClick={() => void startService(currentTicket.id)} variant="secondary">
-                  {t.specialist.startService}
-                </Button>
-                <Button disabled={loading || currentTicket.status !== 'in_service'} icon={<CheckCircle2 size={17} />} onClick={() => void completeService(currentTicket.id)} variant="primary">
-                  {t.specialist.complete}
-                </Button>
-                <Button disabled={loading || currentTicket.status !== 'in_service'} icon={<UserX size={17} />} onClick={() => void skipTicket(currentTicket.id)} variant="danger">
-                  Пропустить (неявка)
-                </Button>
+                {currentTicket.status === 'called' ? (
+                  <>
+                    <Button disabled={loading} icon={<Play size={17} />} onClick={() => void startService(currentTicket.id)} variant="secondary">
+                      {t.specialist.startService}
+                    </Button>
+                    <Button disabled={loading} icon={<UserX size={17} />} onClick={() => void skipTicket(currentTicket.id)} variant="danger">
+                      {t.specialist.noShow}
+                    </Button>
+                  </>
+                ) : null}
+                {currentTicket.status === 'in_service' ? (
+                  <Button disabled={loading} icon={<CheckCircle2 size={17} />} onClick={() => void completeService(currentTicket.id)} variant="primary">
+                    {t.specialist.complete}
+                  </Button>
+                ) : null}
               </div>
             }
             now={now}
@@ -107,25 +150,68 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
       </section>
 
       <aside className="specialist-panel specialist-waiting-panel">
-        <div className="panel-header">
-          <div>
-            <span className="eyebrow">{t.specialist.nextPatients}</span>
-            <h2>{t.specialist.waitingList}</h2>
+        <section className="specialist-side-section">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">{t.specialist.nextPatients}</span>
+              <h2>{t.specialist.waitingList}</h2>
+            </div>
+            <strong className="waiting-count">{waitingTickets.length}</strong>
           </div>
-          <strong className="waiting-count">{waitingTickets.length}</strong>
-        </div>
 
-        {waitingTickets.length > 0 ? (
-          <div className="specialist-waiting-list">
-            {waitingTickets.map((ticket) => (
-              <TicketCard compact key={ticket.id} now={now} ticket={ticket} />
-            ))}
+          {waitingTickets.length > 0 ? (
+            <div className="specialist-waiting-list">
+              {waitingTickets.map((ticket) => (
+                <TicketCard compact key={ticket.id} now={now} ticket={ticket} />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state compact-empty">
+              <h2>{t.specialist.waitingListEmpty}</h2>
+            </div>
+          )}
+        </section>
+
+        <section className="specialist-side-section">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">{t.specialist.returnPatientQueue}</span>
+              <h2>{t.specialist.noShowPatients}</h2>
+            </div>
+            <strong className="waiting-count">{noShowTickets.length}</strong>
           </div>
-        ) : (
-          <div className="empty-state compact-empty">
-            <h2>{t.specialist.waitingListEmpty}</h2>
-          </div>
-        )}
+
+          {returnError ? <div className="modal-error">{returnError}</div> : null}
+
+          {noShowTickets.length > 0 ? (
+            <div className="specialist-waiting-list">
+              {noShowTickets.map((ticket) => (
+                <TicketCard
+                  actionSlot={
+                    <div className="button-row">
+                      <Button
+                        disabled={loading || returningTicketId === ticket.id}
+                        icon={<RotateCcw size={17} />}
+                        onClick={() => void handleReturnTicket(ticket.id)}
+                        variant="secondary"
+                      >
+                        {t.specialist.returnPatient}
+                      </Button>
+                    </div>
+                  }
+                  compact
+                  key={ticket.id}
+                  now={now}
+                  ticket={ticket}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state compact-empty">
+              <h2>{t.specialist.noShowListEmpty}</h2>
+            </div>
+          )}
+        </section>
       </aside>
     </div>
   )

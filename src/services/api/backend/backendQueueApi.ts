@@ -19,6 +19,7 @@ import {
 } from '../backendAdapters'
 import { apiClient, publicApiClient } from '../client'
 import type { QueueApi, QueueOverloadRoom } from '../types'
+import { requestTicketReturn } from './ticketReturnFallback'
 
 const roomVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
 const analyticsPaths = [
@@ -386,7 +387,7 @@ export const backendQueueApi: QueueApi = {
   },
 
   async returnTicket(ticketId: string) {
-    await apiClient.post<BackendTicket>(`/tickets/${ticketId}/arrive`)
+    await requestTicketReturn(ticketId)
 
     return loadQueueSnapshot()
   },
