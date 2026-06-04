@@ -2,9 +2,56 @@ import { useEffect, useState } from 'react'
 import { SpecialistControls } from '@features/specialist/SpecialistControls'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
 import { t } from '@shared/locales/useLocale'
+import type { Room, User } from '@shared/types'
 import { StatusBadge } from '@shared/ui/components'
+import { getServiceTypeLabel } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
+
+function getRoomProcedureLabel(room?: Room): string {
+  if (!room) {
+    return '-'
+  }
+
+  const directServices = [...(room.serviceTypes ?? []), ...(room.services ?? [])]
+    .map((service) => {
+      if (typeof service === 'string' || typeof service === 'number') {
+        return String(service)
+      }
+
+      return service.name ?? service.title ?? String(service.serviceTypeId ?? '')
+    })
+    .filter(Boolean)
+
+  if (directServices.length > 0) {
+    return Array.from(new Set(directServices)).join(', ')
+  }
+
+  return room.department || getServiceTypeLabel('consultation')
+}
+
+function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
+  return (
+    <div>
+      <span className="eyebrow">Текущий специалист</span>
+      <h2>{user.name}</h2>
+      <dl className="specialist-doctor-details">
+        <div>
+          <dt>ФИО</dt>
+          <dd>{user.name}</dd>
+        </div>
+        <div>
+          <dt>Кабинет</dt>
+          <dd>{room.name}</dd>
+        </div>
+        <div>
+          <dt>Специальность</dt>
+          <dd>{user.department || getRoomProcedureLabel(room)}</dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
 
 export function SpecialistPanelPage() {
   useQueueBootstrap()
@@ -77,10 +124,7 @@ export function SpecialistPanelPage() {
     return (
       <div className="page-stack">
         <section className="specialist-header">
-          <div>
-            <span className="eyebrow">{t.specialist.currentPatientView}</span>
-            <h2>{room.specialistName}</h2>
-          </div>
+          <SpecialistUserSummary room={room} user={user} />
           <StatusBadge label="Кабинет закрыт" tone="warning" />
         </section>
         <section className="empty-state">
@@ -95,10 +139,7 @@ export function SpecialistPanelPage() {
   return (
     <div className="page-stack">
       <section className="specialist-header">
-        <div>
-          <span className="eyebrow">{t.specialist.currentPatientView}</span>
-          <h2>{room.specialistName}</h2>
-        </div>
+        <SpecialistUserSummary room={room} user={user} />
         <StatusBadge label={t.status[room.status]} tone={room.status === 'paused' ? 'warning' : 'success'} />
       </section>
       <SpecialistControls room={room} />

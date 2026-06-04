@@ -44,6 +44,25 @@ function GuardedRoute({ route }: { route: AppRoute }) {
   return <>{route.element}</>
 }
 
+function IndexRedirect({ routes }: { routes: AppRoute[] }) {
+  const user = useGlobalStore((state) => state.user)
+  const initialized = useGlobalStore((state) => state.initialized)
+
+  if (!initialized) {
+    return null
+  }
+
+  if (!user) {
+    return <Navigate replace to="/login" />
+  }
+
+  const fallbackPath = routes.find((route) => (
+    !route.allowedRoles || route.allowedRoles.includes(user.role)
+  ))?.path ?? '/login'
+
+  return <Navigate replace to={fallbackPath} />
+}
+
 export function AppRouter({ routes }: AppRouterProps) {
   const initializeAuth = useGlobalStore((state) => state.initializeAuth)
 
@@ -57,14 +76,13 @@ export function AppRouter({ routes }: AppRouterProps) {
   const shellRoutes = routes.filter((route) => !route.fullscreen && !route.standalone)
   const fullscreenRoutes = routes.filter((route) => route.fullscreen)
   const navigationRoutes = routes.filter((route) => !route.hideFromSidebar && !route.standalone)
-  const fallbackPath = shellRoutes.find((route) => route.path === '/dashboard')?.path ?? shellRoutes[0]?.path ?? '/'
 
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<AppLayout routes={navigationRoutes} />}>
-          <Route element={<Navigate replace to={fallbackPath} />} index />
+          <Route element={<IndexRedirect routes={shellRoutes} />} index />
           {shellRoutes.map((route) => (
             <Route
               element={<GuardedRoute route={route} />}

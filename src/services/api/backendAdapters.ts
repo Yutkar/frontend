@@ -15,6 +15,7 @@ import {
   getAverageWaitingMinutes,
   getWaitingMinutes,
 } from '@shared/utils/time'
+import { planRoomLoads } from '@shared/utils/queuePlanning'
 import type {
   Room as ArchitectureRoom,
   ServiceType as ArchitectureServiceType,
@@ -1241,8 +1242,11 @@ export function toQueueSnapshot(
   highPriorityTickets: BackendTicket[] = [],
   analytics: BackendAnalyticsPoint[] = [],
 ): QueueSnapshot {
-  const sharedTickets = toSharedTickets(tickets)
-  const sharedRooms = toSharedRooms(tickets, stats, rooms)
+  const initialTickets = toSharedTickets(tickets)
+  const initialRooms = toSharedRooms(tickets, stats, rooms)
+  const plannedQueue = planRoomLoads(initialRooms, initialTickets)
+  const sharedTickets = plannedQueue.tickets
+  const sharedRooms = plannedQueue.rooms
   const sharedHighPriorityTickets = toSharedTickets(highPriorityTickets)
   const endpointAnalytics = toSharedAnalytics(analytics)
   const ticketAnalytics = createAnalyticsFromTickets(sharedTickets)
@@ -1259,7 +1263,10 @@ export function toQueueSnapshot(
       overload,
     ),
     analytics: mergeAnalyticsPoints(endpointAnalytics, ticketAnalytics),
-    kpi: toQueueKpi(tickets, stats, overload),
+    kpi: {
+      ...toQueueKpi(tickets, stats, overload),
+      overloadedRooms: sharedRooms.filter((room) => room.loadPercent >= 75).length,
+    },
   }
 }
 
@@ -1280,7 +1287,7 @@ export function toBoardQueueSnapshot(value: unknown): QueueSnapshot {
 
   return {
     tickets: boardTickets,
-    rooms: toSharedRooms(tickets, [], rooms),
+    rooms: planRoomLoads(toSharedRooms(tickets, [], rooms), toSharedTickets(tickets)).rooms,
     events: [],
     recommendations: [],
     analytics: [],

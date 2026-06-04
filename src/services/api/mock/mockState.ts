@@ -1,5 +1,5 @@
 import { createInitialQueueSnapshot, calculateQueueKpi } from '@mock/queue.mock'
-import { createMockTicket, createQueueEvent, getServiceTypeLabel } from '@shared/utils'
+import { createMockTicket, createQueueEvent, getServiceTypeLabel, planRoomLoads } from '@shared/utils'
 import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
 import type {
   QueueSnapshot,
@@ -115,24 +115,10 @@ function getRecordActive(record: Record<string, unknown>): boolean {
 }
 
 function refreshQueueSnapshot(): void {
-  queueSnapshot.rooms = queueSnapshot.rooms.map((room) => {
-    const isActive = room.isActive !== false && room.status !== 'paused'
-    const currentTicket = queueSnapshot.tickets.find(
-      (ticket) => isActive && ticket.roomId === room.id && ['called', 'in_service'].includes(ticket.status),
-    )
-    const waitingCount = queueSnapshot.tickets.filter(
-      (ticket) => isActive && ticket.status === 'waiting' && (!ticket.roomId || ticket.roomId === room.id),
-    ).length
-    const loadPercent = Math.min(100, Math.max(room.workload ?? 0, waitingCount * 12 + (currentTicket ? 30 : 0)))
+  const plannedQueue = planRoomLoads(queueSnapshot.rooms, queueSnapshot.tickets)
 
-    return {
-      ...room,
-      currentTicketId: currentTicket?.id,
-      loadPercent,
-      status: isActive ? currentTicket ? 'busy' : 'open' : 'paused',
-      workload: loadPercent,
-    }
-  })
+  queueSnapshot.rooms = plannedQueue.rooms
+  queueSnapshot.tickets = plannedQueue.tickets
   queueSnapshot.kpi = calculateQueueKpi(queueSnapshot.tickets, queueSnapshot.rooms)
   queueSnapshot.recommendations = queueSnapshot.recommendations.map((recommendation) => {
     const ticket = recommendation.ticket
