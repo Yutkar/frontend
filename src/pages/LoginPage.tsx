@@ -5,6 +5,13 @@ import { appModeService } from '@services/appModeService'
 import { useGlobalStore } from '@store/global'
 import { Button } from '@shared/ui/components'
 import { t } from '@shared/locales/useLocale'
+import type { Role } from '@shared/types'
+
+const defaultPathByRole: Record<Role, string> = {
+  admin: '/dashboard',
+  manager: '/dashboard',
+  specialist: '/specialist',
+}
 
 export function LoginPage() {
   const [loginValue, setLoginValue] = useState('')
@@ -23,7 +30,9 @@ export function LoginPage() {
 
     try {
       await login(loginValue.trim(), password)
-      navigate('/dashboard')
+      const user = useGlobalStore.getState().user
+
+      navigate(user ? defaultPathByRole[user.role] : '/dashboard', { replace: true })
     } catch (err) {
       setError('Неверный логин или пароль')
     } finally {

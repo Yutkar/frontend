@@ -1,6 +1,7 @@
 import {
   BarChart3,
   ClipboardPlus,
+  History,
   LayoutDashboard,
   Monitor,
   Settings,
@@ -18,6 +19,7 @@ import { SettingsPage } from './SettingsPage'
 import { SpecialistPanelPage } from './SpecialistPanelPage'
 import { TicketCreatePage } from './TicketCreatePage'
 import { TvBoardPage } from './TvBoardPage'
+import { VisitHistoryPage } from './VisitHistoryPage'
 
 export const smartqBusinessRoutes: AppRoute[] = [
   {
@@ -91,6 +93,13 @@ export const smartqBusinessRoutes: AppRoute[] = [
     element: <SpecialistPanelPage />,
   },
   {
+    path: '/visit-history',
+    label: 'История посещений',
+    icon: History,
+    allowedRoles: ['specialist'],
+    element: <VisitHistoryPage />,
+  },
+  {
     path: '/board',
     label: t.nav.tvBoard,
     icon: Monitor,
@@ -112,7 +121,7 @@ export const smartqBusinessRoutes: AppRoute[] = [
     path: '/settings',
     label: t.nav.settings,
     icon: Settings,
-    allowedRoles: ['admin', 'manager', 'specialist'],
+    allowedRoles: ['admin', 'manager'],
     element: <SettingsPage />,
   },
 ]
