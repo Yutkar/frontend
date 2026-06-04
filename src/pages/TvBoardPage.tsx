@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CallBoard } from '@features/tv-board/CallBoard'
 import { t } from '@shared/locales/useLocale'
-import { publicApiClient } from '@services/api/client'
+import { queueService } from '@services/queueService'
 import type { Room, Ticket } from '@shared/types'
-import { normalizeBoardTicket, type BackendTicket } from '@services/api/backendAdapters'
 
 export function TvBoardPage() {
   const [searchParams] = useSearchParams()
@@ -21,7 +20,6 @@ export function TvBoardPage() {
   }, [])
 
   useEffect(() => {
-    const url = roomId ? `/queue/board/${roomId}` : '/queue/board'
     let active = true
     let requestId = 0
 
@@ -30,32 +28,23 @@ export function TvBoardPage() {
       requestId = currentRequestId
 
       try {
-        const response = await publicApiClient.get(url)
-        const data = response.data
-        const boardTickets = Array.isArray(data) ? data as BackendTicket[] : []
-        const converted = boardTickets.map(normalizeBoardTicket)
+        const snapshot = await queueService.getBoardSnapshot()
+        const filteredTickets = roomId
+          ? snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomId)
+          : snapshot.tickets
+        const filteredRooms = roomId
+          ? snapshot.rooms.filter((room) => String(room.id) === roomId)
+          : snapshot.rooms
 
         if (!active || currentRequestId !== requestId) return
 
-        setTickets(converted)
-
-        const uniqueRooms = new Map<string, Room>()
-        boardTickets.forEach((ticket) => {
-          if (ticket.room?.id && ticket.room.name) {
-            uniqueRooms.set(String(ticket.room.id), {
-              department: 'Табло',
-              id: String(ticket.room.id),
-              loadPercent: 0,
-              name: ticket.room.name,
-              specialistName: '',
-              status: 'open',
-            })
-            if (roomId && String(ticket.room.id) === roomId) {
-              setRoomName(ticket.room.name)
-            }
-          }
-        })
-        setRooms(Array.from(uniqueRooms.values()))
+        setTickets(filteredTickets)
+        setRooms(filteredRooms)
+        setRoomName(
+          roomId
+            ? filteredRooms[0]?.name ?? filteredTickets.find((ticket) => ticket.roomName)?.roomName ?? ''
+            : '',
+        )
         setError(null)
       } catch (error) {
         console.error('Board load failed', error)
@@ -80,7 +69,7 @@ export function TvBoardPage() {
       <header className="tv-header">
         <div>
           <span>{t.system.smartq}</span>
-          <strong>{roomName ? `Табло — ${roomName}` : 'Общее табло'}</strong>
+          <strong>{roomName ? `Табло вызовов — ${roomName}` : 'Табло вызовов'}</strong>
         </div>
         <time>
           {new Intl.DateTimeFormat('ru-RU', {

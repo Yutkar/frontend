@@ -2778,9 +2778,10 @@ h3 {
 .tv-header {
   align-items: center;
   display: flex;
-  justify-content: center;
+  gap: 24px;
+  justify-content: space-between;
   margin-bottom: 28px;
-  text-align: center;
+  text-align: left;
 }
 
 .tv-header div {
@@ -2803,6 +2804,8 @@ h3 {
   color: #23435f;
   font-size: 34px;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .tv-grid {
@@ -2905,8 +2908,8 @@ h3 {
   border: 1px solid #d5e5f1;
   border-radius: var(--radius);
   display: grid;
-  gap: 10px;
-  grid-template-columns: 110px minmax(0, 1fr) 76px;
+  gap: 14px;
+  grid-template-columns: minmax(96px, 118px) minmax(0, 1fr) 82px;
   padding: 14px;
 }
 
@@ -2919,6 +2922,18 @@ h3 {
 .tv-recent-row time {
   color: #496b86;
   font-weight: 800;
+}
+
+.tv-recent-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tv-recent-row time {
+  font-variant-numeric: tabular-nums;
+  justify-self: end;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .tv-empty-recent {

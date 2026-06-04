@@ -47,6 +47,8 @@ export type BackendRoom = {
   id?: number | string
   isActive?: boolean
   name?: string
+  room_id?: number | string
+  room_name?: string
   roomId?: number | string
   roomName?: string
   services?: unknown[]
@@ -69,6 +71,8 @@ export type BackendTicket = {
   serviceTypeId?: number | string
   serviceTypeName?: string | null
   serviceName?: string | null
+  room_id?: number | string | null
+  room_name?: string | null
   roomId?: number | string | null
   createdAt?: string
   created_at?: string
@@ -273,15 +277,15 @@ function getRecordNumberOptional(record: Record<string, unknown>, keys: string[]
 }
 
 function getBackendRoomId(room?: BackendRoom | null): string {
-  return toId(room?.id ?? room?.roomId ?? room?._id)
+  return toId(room?.id ?? room?.roomId ?? room?.room_id ?? room?._id)
 }
 
 function getBackendRoomName(room?: BackendRoom | null): string {
-  return room?.name ?? room?.title ?? room?.roomName ?? 'Кабинет без названия'
+  return room?.name ?? room?.title ?? room?.roomName ?? room?.room_name ?? 'Кабинет без названия'
 }
 
 export function getBackendTicketRoomId(ticket: BackendTicket): string {
-  const roomId = toId(ticket.roomId)
+  const roomId = toId(ticket.roomId ?? ticket.room_id)
 
   if (roomId) {
     return roomId
@@ -303,21 +307,28 @@ export function getBackendTicketRoomId(ticket: BackendTicket): string {
 }
 
 function getBackendTicketRoomName(ticket: BackendTicket): string {
-  const nestedRoomName = ticket.room?.name ?? ticket.room?.title ?? ticket.room?.roomName
+  const nestedRoomName = ticket.room?.name ?? ticket.room?.title ?? ticket.room?.roomName ?? ticket.room?.room_name
 
   if (nestedRoomName) {
     return nestedRoomName
   }
 
-  const roomName = ticket.roomName?.trim()
+  const directRoomName = ticket.roomName?.trim()
 
-  if (roomName) {
-    return roomName
+  if (directRoomName) {
+    return directRoomName
+  }
+
+  const snakeRoomName = ticket.room_name?.trim()
+
+  if (snakeRoomName) {
+    return snakeRoomName
   }
 
   const assignedRoomName = ticket.assignedRoom?.name
     ?? ticket.assignedRoom?.title
     ?? ticket.assignedRoom?.roomName
+    ?? ticket.assignedRoom?.room_name
 
   if (assignedRoomName) {
     return assignedRoomName
@@ -814,20 +825,65 @@ export function toBackendTickets(value: unknown): BackendTicket[] {
     return []
   }
 
-  if (Array.isArray(value.tickets)) {
-    return value.tickets.filter(isRecord).map((item) => item as BackendTicket)
+  const arrayKeys = [
+    'tickets',
+    'items',
+    'queue',
+    'board',
+    'calls',
+    'recent',
+    'recentCalls',
+    'recent_calls',
+    'called',
+    'results',
+  ]
+  const singleKeys = [
+    'current',
+    'currentTicket',
+    'current_ticket',
+    'lastCall',
+    'last_call',
+    'lastCalled',
+    'last_called',
+  ]
+  const records: BackendTicket[] = []
+
+  for (const key of singleKeys) {
+    const nested = value[key]
+
+    if (isRecord(nested)) {
+      records.push(nested as BackendTicket)
+    }
   }
 
-  if (Array.isArray(value.items)) {
-    return value.items.filter(isRecord).map((item) => item as BackendTicket)
+  for (const key of arrayKeys) {
+    const nested = value[key]
+
+    if (Array.isArray(nested)) {
+      records.push(...nested.filter(isRecord).map((item) => item as BackendTicket))
+    }
+
+    if (isRecord(nested)) {
+      records.push(...toBackendTickets(nested))
+    }
   }
 
   if (Array.isArray(value.data)) {
-    return value.data.filter(isRecord).map((item) => item as BackendTicket)
+    records.push(...value.data.filter(isRecord).map((item) => item as BackendTicket))
   }
 
   if (isRecord(value.data)) {
-    return toBackendTickets(value.data)
+    records.push(...toBackendTickets(value.data))
+  }
+
+  if (records.length > 0) {
+    const ticketMap = new Map<string, BackendTicket>()
+
+    records.forEach((ticket, index) => {
+      ticketMap.set(toId(ticket.id) || `ticket-${index}`, ticket)
+    })
+
+    return Array.from(ticketMap.values())
   }
 
   if (value.id !== undefined) {
@@ -1208,20 +1264,23 @@ export function toQueueSnapshot(
 }
 
 function getBoardTicketSortTime(ticket: Ticket): number {
-  return Date.parse(ticket.calledAt ?? ticket.updatedAt ?? ticket.createdAt)
+  const timestamp = Date.parse(ticket.calledAt ?? ticket.updatedAt ?? ticket.createdAt)
+
+  return Number.isFinite(timestamp) ? timestamp : 0
 }
 
 export function toBoardQueueSnapshot(value: unknown): QueueSnapshot {
   const tickets = toBackendTickets(value)
+  const rooms = toBackendRooms(value)
   const boardTickets = tickets
     .map(normalizeBoardTicket)
     .filter((ticket) => ticket.status === 'called')
     .sort((left, right) => getBoardTicketSortTime(right) - getBoardTicketSortTime(left))
-    .slice(0, 10)
+    .slice(0, 11)
 
   return {
     tickets: boardTickets,
-    rooms: toSharedRooms(tickets),
+    rooms: toSharedRooms(tickets, [], rooms),
     events: [],
     recommendations: [],
     analytics: [],

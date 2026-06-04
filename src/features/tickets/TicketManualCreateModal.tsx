@@ -108,6 +108,11 @@ export function TicketManualCreateModal({
     () => getSpecialistsForRoom(options, roomId),
     [options, roomId],
   )
+  const selectedRoomExists = useMemo(
+    () => rooms.some((room) => String(room.id) === roomId),
+    [roomId, rooms],
+  )
+  const canCreateTicket = Boolean(selectedServiceType && selectedRoomExists && priority && status)
 
   useEffect(() => {
     const hasSelectedServiceType = serviceTypes.some(
@@ -157,8 +162,8 @@ export function TicketManualCreateModal({
       return
     }
 
-    if (!roomId || !rooms.some((room) => String(room.id) === roomId)) {
-      setError('Выберите кабинет.')
+    if (!roomId || !selectedRoomExists) {
+      setError('Выберите кабинет')
       return
     }
 
@@ -240,6 +245,7 @@ export function TicketManualCreateModal({
               }}
               value={roomId}
             >
+              <option value="">Выберите кабинет</option>
               {rooms.length > 0 ? (
                 rooms.map((room) => (
                   <option key={String(room.id)} value={String(room.id)}>
@@ -306,7 +312,7 @@ export function TicketManualCreateModal({
           <Button disabled={saving} onClick={onClose} variant="ghost">
             Отмена
           </Button>
-          <Button disabled={isBusy || !roomId} type="submit" variant="primary">
+          <Button disabled={isBusy || !canCreateTicket} type="submit" variant="primary">
             {saving ? 'Создаём...' : 'Создать'}
           </Button>
         </footer>

@@ -44,6 +44,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
     () => rooms.some((room) => String(room.id) === roomId),
     [roomId, rooms],
   )
+  const canCreateTicket = Boolean(selectedServiceType && selectedRoomExists && priority)
 
   useEffect(() => {
     let active = true
@@ -89,7 +90,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
     setRoomId((currentRoomId) => (
       currentRoomId && rooms.some((room) => String(room.id) === currentRoomId)
         ? currentRoomId
-        : String(rooms[0]?.id ?? '')
+        : ''
     ))
   }, [rooms])
 
@@ -97,22 +98,18 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
     event.preventDefault()
     setError(null)
 
-    if (!patientName.trim()) {
-      return
-    }
-
     if (!selectedServiceType) {
       setError('Выберите тип услуги.')
       return
     }
 
     if (!roomId || !selectedRoomExists) {
-      setError('Выберите доступный кабинет.')
+      setError('Выберите кабинет')
       return
     }
 
     await onSubmit({
-      patientName: patientName.trim(),
+      patientName: patientName.trim() || 'Пациент',
       priority,
       roomId,
       serviceType: selectedServiceType.code,
@@ -164,6 +161,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
             onChange={(event) => setRoomId(event.target.value)}
             value={roomId}
           >
+            <option value="">Выберите кабинет</option>
             {rooms.length > 0 ? (
               rooms.map((room) => (
                 <option key={room.id} value={room.id}>
@@ -207,7 +205,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
       {error ? <div className="modal-error">{error}</div> : null}
 
       <Button
-        disabled={loading || optionsLoading || !patientName.trim() || !roomId}
+        disabled={loading || optionsLoading || !canCreateTicket}
         icon={<ClipboardPlus size={18} />}
         type="submit"
         variant="primary"

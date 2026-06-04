@@ -28,11 +28,10 @@ function getRoomName(ticket: Ticket, rooms: Room[]): string {
 
 export function CallBoard({ rooms, tickets }: CallBoardProps) {
   const calledTickets = tickets
-    .filter((ticket) => ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'completed')
+    .filter((ticket) => ticket.status === 'called')
     .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
-    .slice(0, 10)
   const currentCall = calledTickets[0]
-  const recentCalls = calledTickets.slice(1)
+  const recentCalls = calledTickets.slice(1, 11)
 
   return (
     <div className="tv-grid">

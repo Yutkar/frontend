@@ -21,9 +21,19 @@ export function formatDuration(minutes: number): string {
   return formatEta(minutes)
 }
 
-export function formatTime(isoDate: string): string {
+export function formatTime(isoDate?: string | null): string {
+  if (!isoDate) {
+    return 'Нет данных'
+  }
+
+  const date = new Date(isoDate)
+
+  if (!Number.isFinite(date.getTime())) {
+    return 'Нет данных'
+  }
+
   return new Intl.DateTimeFormat('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(isoDate))
+  }).format(date)
 }
