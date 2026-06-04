@@ -3,7 +3,7 @@ import { PlusCircle, ShieldCheck } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import type { User } from '@shared/types'
 import { Button } from '@shared/ui/components'
-import { getAdminErrorMessage, getUserEmail } from './adminPageHelpers'
+import { getAdminErrorMessage, getUserLogin } from './adminPageHelpers'
 
 type ManagerFormState = {
   email: string
@@ -68,7 +68,7 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
     event.preventDefault()
 
     if (!form.name.trim() || !form.email.trim()) {
-      setError('Введите имя и email.')
+      setError('Введите имя и логин.')
       return
     }
 
@@ -159,7 +159,7 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
                 <thead>
                   <tr>
                     <th>Имя</th>
-                    <th>Email</th>
+                    <th>Логин</th>
                     <th>Действия</th>
                   </tr>
                 </thead>
@@ -167,7 +167,7 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
                   {managers.map((manager) => (
                     <tr key={manager.id}>
                       <td>{manager.name}</td>
-                      <td>{getUserEmail(manager)}</td>
+                      <td>{getUserLogin(manager)}</td>
                       <td>
                         <div className="button-row">
                           <Button onClick={() => handleEdit(manager)} size="sm" variant="secondary">
@@ -210,11 +210,11 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
             </label>
 
             <label className="field">
-              <span>Email</span>
+              <span>Логин</span>
               <input
                 onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                placeholder="manager@smartq.test"
-                type="email"
+                placeholder="Введите логин"
+                type="text"
                 value={form.email}
               />
             </label>

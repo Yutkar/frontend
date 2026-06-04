@@ -7,7 +7,7 @@ import { Button } from '@shared/ui/components'
 import { t } from '@shared/locales/useLocale'
 
 export function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,10 +22,10 @@ export function LoginPage() {
     setIsLoading(true)
 
     try {
-      await login(email, password)
+      await login(loginValue.trim(), password)
       navigate('/dashboard')
     } catch (err) {
-      setError('Неверный email или пароль. Попробуйте снова.')
+      setError('Неверный логин или пароль. Попробуйте снова.')
     } finally {
       setIsLoading(false)
     }
@@ -58,13 +58,13 @@ export function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Электронная почта
+                Логин
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@smartq.test"
+                type="text"
+                value={loginValue}
+                onChange={(e) => setLoginValue(e.target.value)}
+                placeholder="Введите логин"
                 className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 required
               />

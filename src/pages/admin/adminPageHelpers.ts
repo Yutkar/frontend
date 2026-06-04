@@ -70,7 +70,7 @@ export function getUserRoomId(user: User): string {
   return user.roomId ?? user.assignedRoomId ?? ''
 }
 
-export function getUserEmail(user: User): string {
+export function getUserLogin(user: User): string {
   return user.email ?? 'Не указан'
 }
 

@@ -252,6 +252,26 @@ function getRecordNumber(record: Record<string, unknown>, keys: string[], fallba
   return fallback
 }
 
+function getRecordNumberOptional(record: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key]
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+
+    if (typeof value === 'string') {
+      const numberValue = Number(value)
+
+      if (Number.isFinite(numberValue)) {
+        return numberValue
+      }
+    }
+  }
+
+  return undefined
+}
+
 function getBackendRoomId(room?: BackendRoom | null): string {
   return toId(room?.id ?? room?.roomId ?? room?._id)
 }
@@ -692,7 +712,7 @@ export function toSharedRooms(
 
 export function toQueueKpi(
   tickets: BackendTicket[],
-  stats: BackendQueueStats[] = [],
+  _stats: BackendQueueStats[] = [],
   overload: BackendOverloadRoom[] = [],
 ): QueueKpi {
   const activeWaitTickets = tickets.filter((ticket) =>
@@ -700,11 +720,10 @@ export function toQueueKpi(
   )
   const activeTickets = activeWaitTickets.length
   const averageWaitingFromTickets = getAverageWaitingMinutes(activeWaitTickets.map(toSharedTicket))
-  const totalEta = stats.reduce((sum, item) => sum + item.etaMinutes, 0)
 
   return {
     activeTickets,
-    averageWaitMinutes: averageWaitingFromTickets ?? (stats.length > 0 ? Math.round(totalEta / stats.length) : 0),
+    averageWaitMinutes: averageWaitingFromTickets ?? 0,
     completedToday: tickets.filter((ticket) => ticket.status === 'completed').length,
     overloadedRooms: overload.length,
   }
@@ -938,6 +957,12 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
     const record = point as Record<string, unknown>
     const label = getAnalyticsLabel(point, index)
     const existing = analyticsByLabel.get(label)
+    const avgServiceMinutes = getRecordNumberOptional(record, [
+      'avgServiceMinutes',
+      'averageServiceMinutes',
+      'avg_service_minutes',
+      'average_service_minutes',
+    ])
     const nextPoint: AnalyticsPoint = {
       label,
       waiting: getRecordNumber(record, [
@@ -958,8 +983,8 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
         'averageWaitMinutes',
         'avg_wait_minutes',
         'average_wait_minutes',
-        'avgServiceMinutes',
       ], existing?.avgWaitMinutes ?? 0),
+      avgServiceMinutes: avgServiceMinutes ?? existing?.avgServiceMinutes,
     }
 
     analyticsByLabel.set(label, {
@@ -967,10 +992,141 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
       waiting: existing ? Math.max(existing.waiting, nextPoint.waiting) : nextPoint.waiting,
       completed: existing ? Math.max(existing.completed, nextPoint.completed) : nextPoint.completed,
       avgWaitMinutes: nextPoint.avgWaitMinutes || existing?.avgWaitMinutes || 0,
+      avgServiceMinutes: nextPoint.avgServiceMinutes ?? existing?.avgServiceMinutes,
     })
   })
 
   return Array.from(analyticsByLabel.values())
+}
+
+const activeWaitingStatuses = new Set<TicketStatus>(['created', 'waiting', 'called', 'in_service', 'redirected'])
+const queueWaitingStatuses = new Set<TicketStatus>(['created', 'waiting', 'redirected'])
+
+function parseAnalyticsTimestamp(value?: string): number | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const timestamp = Date.parse(value)
+
+  return Number.isFinite(timestamp) ? timestamp : undefined
+}
+
+function getPositiveDiffMinutes(start?: string, end?: string): number | null {
+  const startTime = parseAnalyticsTimestamp(start)
+  const endTime = parseAnalyticsTimestamp(end)
+
+  if (startTime === undefined || endTime === undefined || endTime < startTime) {
+    return null
+  }
+
+  return Math.round((endTime - startTime) / 60_000)
+}
+
+function getActualWaitingMinutes(ticket: Ticket, now = Date.now()): number | null {
+  const createdAt = parseAnalyticsTimestamp(ticket.createdAt)
+
+  if (createdAt === undefined) {
+    return null
+  }
+
+  const calledAt = parseAnalyticsTimestamp(ticket.calledAt)
+  const startedAt = parseAnalyticsTimestamp(ticket.startedAt)
+  const endTime = calledAt ?? startedAt
+
+  if (endTime !== undefined) {
+    return Math.max(0, Math.round((endTime - createdAt) / 60_000))
+  }
+
+  if (activeWaitingStatuses.has(ticket.status)) {
+    return Math.max(0, Math.round((now - createdAt) / 60_000))
+  }
+
+  return null
+}
+
+function getActualServiceMinutes(ticket: Ticket): number | null {
+  return getPositiveDiffMinutes(ticket.startedAt, ticket.completedAt)
+}
+
+function getTicketHourLabel(ticket: Ticket): string | undefined {
+  const createdAt = parseAnalyticsTimestamp(ticket.createdAt)
+
+  if (createdAt === undefined) {
+    return undefined
+  }
+
+  const hour = new Date(createdAt).getHours()
+
+  return `${String(hour).padStart(2, '0')}:00`
+}
+
+function getAverageMinutes(values: number[]): number {
+  if (values.length === 0) {
+    return 0
+  }
+
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+function createAnalyticsFromTickets(tickets: Ticket[], now = Date.now()): AnalyticsPoint[] {
+  const groupedTickets = new Map<string, Ticket[]>()
+
+  tickets.forEach((ticket) => {
+    const label = getTicketHourLabel(ticket)
+
+    if (!label) {
+      return
+    }
+
+    groupedTickets.set(label, [...(groupedTickets.get(label) ?? []), ticket])
+  })
+
+  return Array.from(groupedTickets.entries())
+    .sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel))
+    .map(([label, groupTickets]) => {
+      const waitingMinutes = groupTickets
+        .map((ticket) => getActualWaitingMinutes(ticket, now))
+        .filter((minutes): minutes is number => minutes !== null)
+      const serviceMinutes = groupTickets
+        .map(getActualServiceMinutes)
+        .filter((minutes): minutes is number => minutes !== null)
+
+      return {
+        label,
+        waiting: groupTickets.filter((ticket) => queueWaitingStatuses.has(ticket.status)).length,
+        completed: groupTickets.filter((ticket) => ticket.status === 'completed').length,
+        avgWaitMinutes: getAverageMinutes(waitingMinutes),
+        avgServiceMinutes: serviceMinutes.length > 0 ? getAverageMinutes(serviceMinutes) : undefined,
+      }
+    })
+}
+
+function mergeAnalyticsPoints(
+  endpointAnalytics: AnalyticsPoint[],
+  ticketAnalytics: AnalyticsPoint[],
+): AnalyticsPoint[] {
+  const analyticsByLabel = new Map<string, AnalyticsPoint>()
+
+  ticketAnalytics.forEach((point) => analyticsByLabel.set(point.label, point))
+  endpointAnalytics.forEach((point) => {
+    const existing = analyticsByLabel.get(point.label)
+
+    if (!existing) {
+      analyticsByLabel.set(point.label, point)
+      return
+    }
+
+    analyticsByLabel.set(point.label, {
+      label: existing.label,
+      waiting: existing.waiting || point.waiting,
+      completed: existing.completed || point.completed,
+      avgWaitMinutes: existing.avgWaitMinutes || point.avgWaitMinutes,
+      avgServiceMinutes: existing.avgServiceMinutes ?? point.avgServiceMinutes,
+    })
+  })
+
+  return Array.from(analyticsByLabel.values()).sort((left, right) => left.label.localeCompare(right.label))
 }
 
 export function toSharedRecommendations(
@@ -1043,6 +1199,8 @@ export function toQueueSnapshot(
   const sharedTickets = toSharedTickets(tickets)
   const sharedRooms = toSharedRooms(tickets, stats, rooms)
   const sharedHighPriorityTickets = toSharedTickets(highPriorityTickets)
+  const endpointAnalytics = toSharedAnalytics(analytics)
+  const ticketAnalytics = createAnalyticsFromTickets(sharedTickets)
 
   return {
     tickets: sharedTickets,
@@ -1055,7 +1213,7 @@ export function toQueueSnapshot(
       sharedHighPriorityTickets,
       overload,
     ),
-    analytics: toSharedAnalytics(analytics),
+    analytics: mergeAnalyticsPoints(endpointAnalytics, ticketAnalytics),
     kpi: toQueueKpi(tickets, stats, overload),
   }
 }

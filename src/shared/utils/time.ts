@@ -4,6 +4,7 @@ type TicketWaitingSource = {
   createdAt?: string | null
   serviceStartedAt?: string | null
   startedAt?: string | null
+  status?: string | null
 }
 
 function parseTimestamp(value?: string | null): number | undefined {
@@ -28,12 +29,16 @@ export function getWaitingMinutes(
 
   const nowTime = typeof now === 'number' ? now : now.getTime()
   const endTime =
-    parseTimestamp(ticket.completedAt) ??
-    parseTimestamp(ticket.startedAt) ??
-    parseTimestamp(ticket.serviceStartedAt) ??
     parseTimestamp(ticket.calledAt) ??
-    nowTime
-  const diffMinutes = Math.floor((endTime - createdAt) / 60_000)
+    parseTimestamp(ticket.serviceStartedAt) ??
+    parseTimestamp(ticket.startedAt)
+
+  if (endTime === undefined && ['cancelled', 'completed', 'no_show'].includes(ticket.status ?? '')) {
+    return null
+  }
+
+  const resolvedEndTime = endTime ?? nowTime
+  const diffMinutes = Math.floor((resolvedEndTime - createdAt) / 60_000)
 
   return Math.max(0, diffMinutes)
 }

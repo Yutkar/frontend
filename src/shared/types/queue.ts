@@ -92,6 +92,7 @@ export type AnalyticsPoint = {
   waiting: number
   completed: number
   avgWaitMinutes: number
+  avgServiceMinutes?: number
 }
 
 export type QueueKpi = {

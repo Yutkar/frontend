@@ -26,7 +26,10 @@ const analyticsPaths = [
   '/analytics/dashboard',
   '/analytics/rooms',
   '/queue/analytics/service-time',
-  '/queue/analytics/period',
+  '/queue/analytics/period?period=day',
+  '/queue/analytics/period?period=week',
+  '/queue/analytics/period?period=month',
+  '/queue/analytics/period?period=year',
 ] as const
 
 type TicketCreateBody = {

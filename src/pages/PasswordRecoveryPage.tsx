@@ -17,7 +17,7 @@ export function PasswordRecoveryPage() {
     setSuccess(false)
 
     if (!email.trim()) {
-      setError(t.auth.invalidEmail)
+      setError(t.auth.invalidLogin)
       return
     }
 
@@ -63,10 +63,10 @@ export function PasswordRecoveryPage() {
           <div>
             <label>{t.auth.email}</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="user@smartq.test"
+              placeholder="Введите логин"
               required
             />
           </div>

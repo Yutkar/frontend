@@ -81,10 +81,10 @@ export function RegisterPage() {
           <div>
             <label>{t.auth.email}</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="user@smartq.test"
+              placeholder="Введите логин"
               required
             />
           </div>

@@ -7,7 +7,7 @@ import {
   getAdminErrorMessage,
   getRoomActive,
   getRoomName,
-  getUserEmail,
+  getUserLogin,
   getUserRoomId,
   roleLabels,
   type AdminRoomRecord,
@@ -90,7 +90,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
     event.preventDefault()
 
     if (!form.name.trim() || !form.email.trim()) {
-      setError('Введите имя и email.')
+      setError('Введите имя и логин.')
       return
     }
 
@@ -188,7 +188,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                 <thead>
                   <tr>
                     <th>Имя</th>
-                    <th>Email</th>
+                    <th>Логин</th>
                     <th>Роль</th>
                     <th>Кабинет</th>
                     <th>Действия</th>
@@ -198,7 +198,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                   {staff.map((staffMember) => (
                     <tr key={staffMember.id}>
                       <td>{staffMember.name}</td>
-                      <td>{getUserEmail(staffMember)}</td>
+                      <td>{getUserLogin(staffMember)}</td>
                       <td>{roleLabels[staffMember.role]}</td>
                       <td>{getRoomLabel(getUserRoomId(staffMember))}</td>
                       <td>
@@ -243,11 +243,11 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
             </label>
 
             <label className="field">
-              <span>Email</span>
+              <span>Логин</span>
               <input
                 onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                placeholder="doctor@smartq.test"
-                type="email"
+                placeholder="Введите логин"
+                type="text"
                 value={form.email}
               />
             </label>
