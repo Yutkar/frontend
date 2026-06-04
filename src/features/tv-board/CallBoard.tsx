@@ -12,7 +12,6 @@ function getCallTime(ticket: Ticket): string {
 
 function getCallTimestamp(ticket: Ticket): number {
   const timestamp = Date.parse(getCallTime(ticket))
-
   return Number.isFinite(timestamp) ? timestamp : 0
 }
 
@@ -20,18 +19,28 @@ function getRoomName(ticket: Ticket, rooms: Room[]): string {
   if (ticket.roomName) {
     return ticket.roomName
   }
-
-  const room = rooms.find((item) => item.id === ticket.roomId)
-
+  const room = rooms.find((item) => String(item.id) === String(ticket.roomId))
   return room?.name ?? (ticket.roomId ? `Кабинет ${ticket.roomId}` : 'Кабинет не назначен')
 }
 
+const statusOrder: Record<string, number> = { called: 0, in_service: 1, completed: 2 }
+
 export function CallBoard({ rooms, tickets }: CallBoardProps) {
-  const calledTickets = tickets
-    .filter((ticket) => ticket.status === 'called')
-    .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
-  const currentCall = calledTickets[0]
-  const recentCalls = calledTickets.slice(1, 11)
+  const allTickets = tickets
+    .filter((ticket) => ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'completed')
+    .sort((left, right) => {
+      const statusDiff = (statusOrder[left.status] ?? 3) - (statusOrder[right.status] ?? 3)
+      if (statusDiff !== 0) return statusDiff
+      return getCallTimestamp(right) - getCallTimestamp(left)
+    })
+
+  const currentCall = allTickets.find(
+    (ticket) => ticket.status === 'called' || ticket.status === 'in_service'
+  )
+
+  const recentCalls = allTickets
+    .filter((ticket) => ticket.status === 'completed')
+    .slice(0, 9)
 
   return (
     <div className="tv-grid">

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CallBoard } from '@features/tv-board/CallBoard'
 import { t } from '@shared/locales/useLocale'
-import { queueService } from '@services/queueService'
+import { publicApiClient } from '@services/api/client'
 import type { Room, Ticket } from '@shared/types'
 
 export function TvBoardPage() {
@@ -20,6 +20,7 @@ export function TvBoardPage() {
   }, [])
 
   useEffect(() => {
+    const url = roomId ? `/queue/board/${roomId}` : '/queue/board'
     let active = true
     let requestId = 0
 
@@ -28,23 +29,45 @@ export function TvBoardPage() {
       requestId = currentRequestId
 
       try {
-        const snapshot = await queueService.getBoardSnapshot()
-        const filteredTickets = roomId
-          ? snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomId)
-          : snapshot.tickets
-        const filteredRooms = roomId
-          ? snapshot.rooms.filter((room) => String(room.id) === roomId)
-          : snapshot.rooms
+        const response = await publicApiClient.get(url)
+        const data = response.data
 
         if (!active || currentRequestId !== requestId) return
 
-        setTickets(filteredTickets)
-        setRooms(filteredRooms)
-        setRoomName(
-          roomId
-            ? filteredRooms[0]?.name ?? filteredTickets.find((ticket) => ticket.roomName)?.roomName ?? ''
-            : '',
-        )
+        // Конвертируем вручную чтобы сохранить roomName
+        const converted: Ticket[] = data.map((item: any) => ({
+          id: String(item.id),
+          number: item.number ?? `Талон ${item.id}`,
+          status: item.status ?? 'waiting',
+          priority: item.priority ?? 2,
+          serviceType: item.serviceType?.name ?? 'consultation',
+          createdAt: item.createdAt ?? new Date().toISOString(),
+          calledAt: item.calledAt ?? undefined,
+          updatedAt: item.updatedAt ?? undefined,
+          startedAt: item.serviceStartedAt ?? undefined,
+          completedAt: item.completedAt ?? undefined,
+          roomId: item.roomId ? String(item.roomId) : undefined,
+          roomName: item.room?.name ?? undefined,
+          etaMinutes: item.etaMinutes ?? 0,
+          patientName: `Пациент ${item.number ?? item.id}`,
+        }))
+
+        setTickets(converted)
+
+        const uniqueRooms = new Map()
+        data.forEach((item: any) => {
+          if (item.room) {
+            uniqueRooms.set(String(item.room.id), {
+              id: String(item.room.id),
+              name: item.room.name,
+              serviceTypes: [],
+            })
+            if (roomId && String(item.room.id) === roomId) {
+              setRoomName(item.room.name)
+            }
+          }
+        })
+        setRooms(Array.from(uniqueRooms.values()))
         setError(null)
       } catch (error) {
         console.error('Board load failed', error)
