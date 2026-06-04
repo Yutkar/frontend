@@ -30,6 +30,7 @@ type QueueState = {
   loadQueue: (options?: { force?: boolean; successMessage?: string }) => Promise<void>
   loadRoomQueue: (roomId: string | number) => Promise<void>
   redirectTicket: (input: RedirectTicketInput) => Promise<void>
+  refreshAnalyticsData: () => Promise<void>
   resolveRecommendation: (id: string) => Promise<void>
   resolveRecommendations: (ids: string[]) => Promise<{ failedCount: number; hiddenIds: string[] }>
   returnTicket: (ticketId: string) => Promise<void>
@@ -205,6 +206,13 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })
       throw error
     }
+  },
+
+  refreshAnalyticsData: async () => {
+    await get().loadQueue({
+      force: true,
+      successMessage: 'Аналитика обновлена',
+    })
   },
 
   resolveRecommendation: async (id) => {

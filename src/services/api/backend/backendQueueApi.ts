@@ -3,6 +3,7 @@ import {
   toArchitectureRooms,
   toArchitectureTickets,
   toBackendRooms,
+  toBackendTickets,
   getBackendTicketRoomId,
   toBoardQueueSnapshot,
   toBackendAnalyticsPoints,
@@ -48,7 +49,7 @@ async function loadQueueSnapshot(ticketPath = '/tickets') {
     highPriorityTickets,
     analytics,
   ] = await Promise.all([
-    apiClient.get<BackendTicket[]>(ticketPath),
+    apiClient.get<unknown>(ticketPath),
     apiClient.get<BackendQueueStats[]>('/queue/stats'),
     apiClient.get<BackendOverloadRoom[]>('/queue/overload'),
     getBackendRooms(),
@@ -56,11 +57,12 @@ async function loadQueueSnapshot(ticketPath = '/tickets') {
     getBackendHighPriorityTickets(),
     getBackendAnalyticsPoints(),
   ])
+  const backendTickets = toBackendTickets(ticketsResponse.data)
   const referencedTickets = await getRecommendationTickets(recommendations, [
-    ...ticketsResponse.data,
+    ...backendTickets,
     ...highPriorityTickets,
   ])
-  const tickets = mergeBackendTickets(ticketsResponse.data, referencedTickets)
+  const tickets = mergeBackendTickets(backendTickets, referencedTickets)
 
   return toQueueSnapshot(
     tickets,
@@ -168,9 +170,9 @@ async function getBackendRecommendations(): Promise<BackendRecommendation[]> {
 
 async function getBackendHighPriorityTickets(): Promise<BackendTicket[]> {
   try {
-    const response = await apiClient.get<BackendTicket[]>('/queue/high-priority')
+    const response = await apiClient.get<unknown>('/queue/high-priority')
 
-    return response.data
+    return toBackendTickets(response.data)
   } catch (error) {
     console.warn('backendQueueApi: GET /queue/high-priority is not available', error)
 
@@ -216,11 +218,11 @@ async function getRecommendationTickets(
   }
 
   const results = await Promise.allSettled(
-    missingTicketIds.map((ticketId) => apiClient.get<BackendTicket>(`/tickets/${ticketId}`)),
+    missingTicketIds.map((ticketId) => apiClient.get<unknown>(`/tickets/${ticketId}`)),
   )
 
   return results.flatMap((result) => (
-    result.status === 'fulfilled' ? [result.value.data] : []
+    result.status === 'fulfilled' ? toBackendTickets(result.value.data) : []
   ))
 }
 
@@ -235,9 +237,9 @@ function mergeBackendTickets(tickets: BackendTicket[], extraTickets: BackendTick
 
 async function getAllBackendTicketsForRoomFallback(): Promise<BackendTicket[]> {
   try {
-    const response = await apiClient.get<BackendTicket[]>('/tickets')
+    const response = await apiClient.get<unknown>('/tickets')
 
-    return response.data
+    return toBackendTickets(response.data)
   } catch (error) {
     console.warn('backendQueueApi: GET /tickets fallback for room queue failed', error)
 
@@ -314,7 +316,7 @@ export const backendQueueApi: QueueApi = {
       highPriorityTickets,
       analytics,
     ] = await Promise.all([
-      apiClient.get<BackendTicket[]>(`/queue/room/${roomId}`),
+      apiClient.get<unknown>(`/queue/room/${roomId}`),
       getAllBackendTicketsForRoomFallback(),
       apiClient.get<BackendQueueStats[]>('/queue/stats'),
       apiClient.get<BackendOverloadRoom[]>('/queue/overload'),
@@ -323,12 +325,17 @@ export const backendQueueApi: QueueApi = {
       getBackendHighPriorityTickets(),
       getBackendAnalyticsPoints(),
     ])
+    const roomEndpointTickets = toBackendTickets(ticketsResponse.data)
     const referencedTickets = await getRecommendationTickets(recommendations, [
-      ...ticketsResponse.data,
+      ...roomEndpointTickets,
       ...allTickets,
       ...highPriorityTickets,
     ])
-    const roomTickets = mergeRoomTickets(roomId, ticketsResponse.data, mergeBackendTickets(allTickets, referencedTickets))
+    const roomTickets = mergeRoomTickets(
+      roomId,
+      roomEndpointTickets,
+      mergeBackendTickets(allTickets, referencedTickets),
+    )
 
     return toQueueSnapshot(
       roomTickets,

@@ -805,7 +805,7 @@ export function toBackendAnalyticsPoints(value: unknown): BackendAnalyticsPoint[
   return [value as BackendAnalyticsPoint]
 }
 
-function toBackendTickets(value: unknown): BackendTicket[] {
+export function toBackendTickets(value: unknown): BackendTicket[] {
   if (Array.isArray(value)) {
     return value.filter(isRecord).map((item) => item as BackendTicket)
   }
@@ -828,6 +828,10 @@ function toBackendTickets(value: unknown): BackendTicket[] {
 
   if (isRecord(value.data)) {
     return toBackendTickets(value.data)
+  }
+
+  if (value.id !== undefined) {
+    return [value as BackendTicket]
   }
 
   return []
@@ -1046,6 +1050,10 @@ function getActualWaitingMinutes(ticket: Ticket, now = Date.now()): number | nul
 }
 
 function getActualServiceMinutes(ticket: Ticket): number | null {
+  if (ticket.status !== 'completed') {
+    return null
+  }
+
   return getPositiveDiffMinutes(ticket.startedAt, ticket.completedAt)
 }
 
@@ -1106,6 +1114,10 @@ function mergeAnalyticsPoints(
   endpointAnalytics: AnalyticsPoint[],
   ticketAnalytics: AnalyticsPoint[],
 ): AnalyticsPoint[] {
+  if (ticketAnalytics.length === 0) {
+    return endpointAnalytics.sort((left, right) => left.label.localeCompare(right.label))
+  }
+
   const analyticsByLabel = new Map<string, AnalyticsPoint>()
 
   ticketAnalytics.forEach((point) => analyticsByLabel.set(point.label, point))
@@ -1113,7 +1125,6 @@ function mergeAnalyticsPoints(
     const existing = analyticsByLabel.get(point.label)
 
     if (!existing) {
-      analyticsByLabel.set(point.label, point)
       return
     }
 

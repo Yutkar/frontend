@@ -38,6 +38,10 @@ function formatPeriodLabel(label: string, index: number): string {
 }
 
 function getCompletedServiceMinutes(ticket: Ticket): number | null {
+  if (ticket.status !== 'completed') {
+    return null
+  }
+
   if (!ticket.startedAt || !ticket.completedAt) {
     return null
   }
