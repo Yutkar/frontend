@@ -26,6 +26,7 @@ function getRoomName(ticket: Ticket, rooms: Room[]): string {
 const statusOrder: Record<string, number> = { called: 0, in_service: 1, completed: 2 }
 
 export function CallBoard({ rooms, tickets }: CallBoardProps) {
+  // Все талоны со всех кабинетов перемешаны по времени вызова
   const allTickets = tickets
     .filter((ticket) => ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'completed')
     .sort((left, right) => {

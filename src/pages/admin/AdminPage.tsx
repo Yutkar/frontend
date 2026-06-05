@@ -8,8 +8,9 @@ import { getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
 import { ManagersSection } from './AdminManagersPage'
 import { RoomsSection } from './AdminRoomsPage'
 import { StaffSection } from './AdminStaffPage'
+import { BoardSettingsSection } from './AdminBoardSettingsPage'
 
-type AdminSectionId = 'rooms' | 'staff' | 'managers'
+type AdminSectionId = 'rooms' | 'staff' | 'managers' | 'board'
 
 type AdminSectionConfig = {
   id: AdminSectionId
@@ -28,6 +29,7 @@ const adminSections: AdminSectionConfig[] = [
   { id: 'rooms', label: 'Кабинеты', roles: ['admin', 'manager'] },
   { id: 'staff', label: 'Персонал', roles: ['admin', 'manager'] },
   { id: 'managers', label: 'Менеджеры', roles: ['admin'] },
+  { id: 'board', label: 'Табло', roles: ['admin', 'manager'] },
 ]
 
 const emptySummary: AdminSummary = {
@@ -135,6 +137,7 @@ export function AdminPage() {
       {selectedSection?.id === 'managers' && canManageManagers ? (
         <ManagersSection onManagersChange={handleAdminDataChange} />
       ) : null}
+      {selectedSection?.id === 'board' ? <BoardSettingsSection /> : null}
     </div>
   )
 }
