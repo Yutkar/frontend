@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  ClipboardPlus,
   History,
   LayoutDashboard,
   Monitor,
@@ -17,7 +16,6 @@ import { DashboardPage } from './DashboardPage'
 import { KioskPage } from './KioskPage'
 import { SettingsPage } from './SettingsPage'
 import { SpecialistPanelPage } from './SpecialistPanelPage'
-import { TicketCreatePage } from './TicketCreatePage'
 import { TvBoardPage } from './TvBoardPage'
 import { VisitHistoryPage } from './VisitHistoryPage'
 
@@ -39,9 +37,9 @@ export const smartqBusinessRoutes: AppRoute[] = [
   {
     path: '/tickets',
     label: t.nav.createTicket,
-    icon: ClipboardPlus,
     allowedRoles: ['admin', 'manager'],
-    element: <TicketCreatePage />,
+    hideFromSidebar: true,
+    element: <Navigate replace to="/dashboard" />,
   },
   {
     path: '/analytics',

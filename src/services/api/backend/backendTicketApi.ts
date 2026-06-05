@@ -87,6 +87,8 @@ const serviceCodeByBackendName: Record<string, SharedServiceType> = {
 }
 
 type TicketCreateBody = {
+  doctorId?: number
+  note?: string
   priority: number
   roomId?: number
   serviceTypeId: number | string
@@ -105,6 +107,18 @@ function withoutRoomId(payload: TicketCreateBody) {
   }
 }
 
+function withoutOptionalCreateFields(payload: TicketCreateBody): TicketCreateBody {
+  return {
+    priority: payload.priority,
+    ...(payload.roomId !== undefined ? { roomId: payload.roomId } : {}),
+    serviceTypeId: payload.serviceTypeId,
+  }
+}
+
+function hasOptionalCreateFields(payload: TicketCreateBody): boolean {
+  return payload.doctorId !== undefined || payload.note !== undefined
+}
+
 async function createBackendTicket(
   path: string,
   payload: TicketCreateBody,
@@ -115,7 +129,19 @@ async function createBackendTicket(
 
     return response.data
   } catch (error) {
-    if (payload.roomId === undefined) {
+    if (hasOptionalCreateFields(payload)) {
+      try {
+        const response = await client.post<BackendTicket>(path, withoutOptionalCreateFields(payload))
+
+        return response.data
+      } catch (fallbackError) {
+        if (payload.roomId === undefined) {
+          throw fallbackError
+        }
+
+        console.warn('backendTicketApi: POST /tickets with optional fields failed, retrying without roomId', fallbackError)
+      }
+    } else if (payload.roomId === undefined) {
       throw error
     }
 
@@ -279,6 +305,7 @@ function toBackendSettingsPayload(payload: TicketSettingsPayload) {
     comment?: string
     doctorId?: number
     etaMinutes?: number
+    note?: string
     priority?: number
     roomId?: number
     serviceTypeId?: number | string
@@ -315,6 +342,11 @@ function toBackendSettingsPayload(payload: TicketSettingsPayload) {
     body.comment = payload.comment
   }
 
+  if (payload.note !== undefined) {
+    body.note = payload.note
+    body.comment = payload.comment ?? payload.note
+  }
+
   if (payload.etaMinutes !== undefined) {
     body.etaMinutes = payload.etaMinutes
   }
@@ -325,8 +357,12 @@ function toBackendSettingsPayload(payload: TicketSettingsPayload) {
 function toBackendCreateSettingsPayload(payload: TicketSettingsPayload & { priority: TicketPriority }) {
   const roomId = toNumberOrUndefined(payload.roomId)
   const serviceTypeId = toNumberOrUndefined(payload.serviceTypeId)
+  const doctorId = toNumberOrUndefined(payload.doctorId)
+  const note = payload.note?.trim() || payload.comment?.trim()
 
   return {
+    ...(doctorId !== undefined ? { doctorId } : {}),
+    ...(note ? { note } : {}),
     priority: toBackendPriority(payload.priority),
     ...(roomId !== undefined ? { roomId } : {}),
     serviceTypeId: serviceTypeId ?? payload.serviceTypeId ?? 1,

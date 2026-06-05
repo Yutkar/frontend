@@ -66,6 +66,7 @@ export type TicketSettingsPayload = {
   priority?: SharedTicketPriority
   status?: SharedTicketStatus
   comment?: string
+  note?: string
   etaMinutes?: number
 }
 

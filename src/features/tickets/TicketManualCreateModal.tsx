@@ -4,10 +4,13 @@ import { ticketService } from '@services/ticketService'
 import type {
   TicketCreateSettingsPayload,
   TicketSettingsOptions,
+  TicketSettingsRoomOption,
+  TicketSettingsUserOption,
 } from '@services/api'
 import type {
   Room,
   ServiceType,
+  Ticket,
   TicketPriority,
 } from '@shared/types'
 import { Button } from '@shared/ui/components'
@@ -16,7 +19,6 @@ import {
   getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
-  getSpecialistsForRoom,
   ticketPriorities,
 } from './ticketFormOptions'
 
@@ -25,6 +27,7 @@ type TicketManualCreateModalProps = {
   onClose: () => void
   onSaved: () => Promise<void>
   open: boolean
+  tickets: Ticket[]
 }
 
 const emptyOptions: TicketSettingsOptions = {
@@ -33,18 +36,86 @@ const emptyOptions: TicketSettingsOptions = {
   specialists: [],
 }
 
+const activeQueueStatuses = new Set(['created', 'waiting', 'called', 'in_service', 'redirected'])
+const overloadLoadPercent = 75
+
+function normalizeId(value?: string | number | null): string {
+  return value == null ? '' : String(value)
+}
+
+function getRoomLoadPercent(room: TicketSettingsRoomOption, fallbackRooms: Room[]): number {
+  const fallbackRoom = fallbackRooms.find((item) => item.id === normalizeId(room.id))
+  const roomWithLoad = room as TicketSettingsRoomOption & {
+    loadPercent?: number
+    workload?: number
+  }
+
+  return fallbackRoom?.loadPercent ?? roomWithLoad.loadPercent ?? fallbackRoom?.workload ?? roomWithLoad.workload ?? 0
+}
+
+function isRoomAvailable(room: TicketSettingsRoomOption, fallbackRooms: Room[]): boolean {
+  const fallbackRoom = fallbackRooms.find((item) => item.id === normalizeId(room.id))
+  const isActive = room.isActive !== false &&
+    room.active !== false &&
+    fallbackRoom?.isActive !== false &&
+    fallbackRoom?.status !== 'paused'
+
+  return isActive && getRoomLoadPercent(room, fallbackRooms) < overloadLoadPercent
+}
+
+function getRoomQueueCount(roomId: string, tickets: Ticket[]): number {
+  return tickets.filter((ticket) =>
+    normalizeId(ticket.roomId) === roomId && activeQueueStatuses.has(ticket.status),
+  ).length
+}
+
+function getAutoRoom(
+  rooms: TicketSettingsRoomOption[],
+  fallbackRooms: Room[],
+  tickets: Ticket[],
+): TicketSettingsRoomOption | undefined {
+  return [...rooms]
+    .filter((room) => isRoomAvailable(room, fallbackRooms))
+    .sort((left, right) => {
+      const leftId = normalizeId(left.id)
+      const rightId = normalizeId(right.id)
+      const queueDelta = getRoomQueueCount(leftId, tickets) - getRoomQueueCount(rightId, tickets)
+
+      if (queueDelta !== 0) {
+        return queueDelta
+      }
+
+      const loadDelta = getRoomLoadPercent(left, fallbackRooms) - getRoomLoadPercent(right, fallbackRooms)
+
+      if (loadDelta !== 0) {
+        return loadDelta
+      }
+
+      return left.name.localeCompare(right.name, 'ru')
+    })[0]
+}
+
+function getAutoDoctor(
+  roomId: string,
+  specialists: TicketSettingsUserOption[],
+): TicketSettingsUserOption | undefined {
+  return specialists.find((specialist) =>
+    normalizeId(specialist.roomId ?? specialist.assignedRoomId) === roomId,
+  )
+}
+
 export function TicketManualCreateModal({
   fallbackRooms,
   onClose,
   onSaved,
   open,
+  tickets,
 }: TicketManualCreateModalProps) {
-  const [doctorId, setDoctorId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loadingOptions, setLoadingOptions] = useState(false)
+  const [note, setNote] = useState('')
   const [options, setOptions] = useState<TicketSettingsOptions>(emptyOptions)
   const [priority, setPriority] = useState<TicketPriority>('normal')
-  const [roomId, setRoomId] = useState('')
   const [saving, setSaving] = useState(false)
   const [serviceTypeId, setServiceTypeId] = useState('')
 
@@ -53,10 +124,9 @@ export function TicketManualCreateModal({
       return
     }
 
-    setDoctorId('')
     setError(null)
+    setNote('')
     setPriority('normal')
-    setRoomId('')
     setSaving(false)
     setServiceTypeId('')
   }, [open])
@@ -99,15 +169,17 @@ export function TicketManualCreateModal({
     () => getRoomsForService(options, selectedServiceType?.id, fallbackRooms),
     [fallbackRooms, options, selectedServiceType?.id],
   )
-  const specialists = useMemo(
-    () => getSpecialistsForRoom(options, roomId),
-    [options, roomId],
+  const autoRoom = useMemo(
+    () => getAutoRoom(rooms, fallbackRooms, tickets),
+    [fallbackRooms, rooms, tickets],
   )
-  const selectedRoomExists = useMemo(
-    () => rooms.some((room) => String(room.id) === roomId),
-    [roomId, rooms],
+  const autoDoctor = useMemo(
+    () => autoRoom ? getAutoDoctor(normalizeId(autoRoom.id), options.specialists) : undefined,
+    [autoRoom, options.specialists],
   )
-  const canCreateTicket = Boolean(selectedServiceType && selectedRoomExists && priority)
+  const noRoomAvailable = Boolean(selectedServiceType && !autoRoom && !loadingOptions)
+  const noDoctorAssigned = Boolean(autoRoom && !autoDoctor && !loadingOptions)
+  const canCreateTicket = Boolean(selectedServiceType && autoRoom && priority)
 
   useEffect(() => {
     const hasSelectedServiceType = serviceTypes.some(
@@ -118,30 +190,6 @@ export function TicketManualCreateModal({
       setServiceTypeId(String(serviceTypes[0].id))
     }
   }, [open, serviceTypeId, serviceTypes])
-
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    setRoomId((currentRoomId) => (
-      currentRoomId && rooms.some((room) => String(room.id) === currentRoomId)
-        ? currentRoomId
-        : ''
-    ))
-  }, [open, rooms])
-
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    setDoctorId((currentDoctorId) => (
-      currentDoctorId && specialists.some((specialist) => String(specialist.id) === currentDoctorId)
-        ? currentDoctorId
-        : ''
-    ))
-  }, [open, specialists])
 
   if (!open) {
     return null
@@ -157,15 +205,18 @@ export function TicketManualCreateModal({
       return
     }
 
-    if (!roomId || !selectedRoomExists) {
-      setError('Выберите кабинет')
+    if (!autoRoom) {
+      setError('Нет доступного кабинета для выбранной услуги')
       return
     }
 
+    const trimmedNote = note.trim()
     const payload: TicketCreateSettingsPayload = {
-      doctorId: doctorId || undefined,
+      comment: trimmedNote || undefined,
+      doctorId: normalizeId(autoDoctor?.id) || undefined,
+      note: trimmedNote || undefined,
       priority,
-      roomId: roomId || undefined,
+      roomId: normalizeId(autoRoom.id),
       serviceType: selectedServiceType.code ?? (serviceTypeId as ServiceType),
       serviceTypeId: selectedServiceType.id,
       status: 'waiting',
@@ -176,8 +227,8 @@ export function TicketManualCreateModal({
 
     try {
       await ticketService.createTicketWithSettings(payload)
-      await onSaved()
       onClose()
+      await onSaved()
     } catch (saveError) {
       console.error('Manual ticket create failed', saveError)
       setError('Не удалось создать талон.')
@@ -209,6 +260,12 @@ export function TicketManualCreateModal({
         </header>
 
         {error ? <div className="modal-error">{error}</div> : null}
+        {!error && noRoomAvailable ? (
+          <div className="modal-error">Нет доступного кабинета для выбранной услуги</div>
+        ) : null}
+        {!error && noDoctorAssigned ? (
+          <div className="modal-info">Кабинет выбран автоматически, врач не назначен</div>
+        ) : null}
 
         <div className="settings-form-grid">
           <label className="field service-type-field">
@@ -217,56 +274,13 @@ export function TicketManualCreateModal({
               disabled={isBusy}
               onChange={(event) => {
                 setServiceTypeId(event.target.value)
-                setRoomId('')
-                setDoctorId('')
+                setError(null)
               }}
               value={serviceTypeId}
             >
               {serviceTypes.map((serviceType) => (
                 <option key={String(serviceType.id)} value={String(serviceType.id)}>
                   {getServiceOptionLabel(serviceType)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Кабинет</span>
-            <select
-              disabled={isBusy || rooms.length === 0}
-              onChange={(event) => {
-                setRoomId(event.target.value)
-                setDoctorId('')
-              }}
-              value={roomId}
-            >
-              <option value="">Выберите кабинет</option>
-              {rooms.length > 0 ? (
-                rooms.map((room) => (
-                  <option key={String(room.id)} value={String(room.id)}>
-                    {room.name}
-                  </option>
-                ))
-              ) : (
-                <option value="">Нет доступных кабинетов</option>
-              )}
-            </select>
-            {selectedServiceType && rooms.length === 0 ? (
-              <small className="field-hint">Нет доступных кабинетов для выбранной услуги</small>
-            ) : null}
-          </label>
-
-          <label className="field">
-            <span>Врач</span>
-            <select
-              disabled={isBusy}
-              onChange={(event) => setDoctorId(event.target.value)}
-              value={doctorId}
-            >
-              <option value="">Не назначен</option>
-              {specialists.map((specialist) => (
-                <option key={String(specialist.id)} value={String(specialist.id)}>
-                  {specialist.name}
                 </option>
               ))}
             </select>
@@ -285,6 +299,15 @@ export function TicketManualCreateModal({
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="field settings-comment-field">
+            <span>Примечание</span>
+            <input
+              disabled={isBusy}
+              onChange={(event) => setNote(event.target.value)}
+              value={note}
+            />
           </label>
         </div>
 

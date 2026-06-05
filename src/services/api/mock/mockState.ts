@@ -412,8 +412,8 @@ export function updateSharedTicketSettings(id: string, payload: TicketSettingsPa
     ticket.priority = payload.priority
   }
 
-  if (payload.comment !== undefined) {
-    ticket.notes = payload.comment.trim() || undefined
+  if (payload.comment !== undefined || payload.note !== undefined) {
+    ticket.notes = (payload.note ?? payload.comment)?.trim() || undefined
   }
 
   if (payload.etaMinutes !== undefined) {

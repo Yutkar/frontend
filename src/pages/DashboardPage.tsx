@@ -214,6 +214,11 @@ export function DashboardPage() {
     setSuccessMessage('Талон успешно сохранён')
   }
 
+  async function handleTicketCreated() {
+    await loadQueue({ force: true, successMessage: 'Талон создан' })
+    setSuccessMessage('Талон создан')
+  }
+
   async function handleTicketAction(
     ticket: Ticket,
     action: () => Promise<unknown>,
@@ -546,8 +551,9 @@ export function DashboardPage() {
       <TicketManualCreateModal
         fallbackRooms={rooms}
         onClose={() => setCreateModalOpen(false)}
-        onSaved={handleTicketSaved}
+        onSaved={handleTicketCreated}
         open={createModalOpen}
+        tickets={tickets}
       />
     </div>
   )

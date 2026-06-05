@@ -84,7 +84,7 @@ export const mockTicketApi: TicketApi = {
       patientName: 'Посетитель',
       priority: payload.priority,
       serviceType: payload.serviceType ?? getSharedServiceTypeByOptionId(payload.serviceTypeId),
-      notes: payload.comment,
+      notes: payload.note ?? payload.comment,
     })
     const updatedTicket = updateSharedTicketSettings(ticket.id, payload)
 
