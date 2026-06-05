@@ -34,6 +34,14 @@ function normalizeId(value: string): string | number {
   return Number.isFinite(numberValue) && value.trim() !== '' ? numberValue : value
 }
 
+function toRoomNumberInput(room: AdminRoomRecord): string {
+  return getRoomName(room).replace(/^Кабинет\s*/i, '').replace(/\D/g, '')
+}
+
+function normalizeRoomNumberInput(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
 export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
   const [editingRoomId, setEditingRoomId] = useState<string | number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -78,7 +86,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
     setEditingRoomId(room.id)
     setForm({
       active: getRoomActive(room),
-      name: getRoomName(room),
+      name: toRoomNumberInput(room),
       serviceTypeIds: getRoomServiceTypeIds(room),
     })
     setSuccessMessage(null)
@@ -96,8 +104,10 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!form.name.trim()) {
-      setError('Введите название кабинета.')
+    const roomNumber = normalizeRoomNumberInput(form.name)
+
+    if (!roomNumber) {
+      setError('Введите номер кабинета.')
       return
     }
 
@@ -107,7 +117,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
     const payload = {
       active: form.active,
       isActive: form.active,
-      name: form.name.trim(),
+      name: roomNumber,
       serviceTypeIds: form.serviceTypeIds.map(normalizeId),
     }
 
@@ -183,7 +193,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Название кабинета</th>
+                    <th>Номер кабинета</th>
                     <th>Типы услуг</th>
                     <th>Активен</th>
                     <th>Действия</th>
@@ -228,10 +238,15 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
             </div>
 
             <label className="field">
-              <span>Название кабинета</span>
+              <span>Номер кабинета</span>
               <input
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Кабинет 101"
+                inputMode="numeric"
+                onChange={(event) => setForm((current) => ({
+                  ...current,
+                  name: normalizeRoomNumberInput(event.target.value),
+                }))}
+                pattern="[0-9]*"
+                placeholder="123"
                 value={form.name}
               />
             </label>

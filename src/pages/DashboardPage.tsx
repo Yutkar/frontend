@@ -83,6 +83,20 @@ function normalizeFilterValue(value?: string | number | null): string {
   return value == null ? '' : String(value)
 }
 
+function isTicketCreatedToday(ticket: Ticket, now: number): boolean {
+  const createdAt = new Date(ticket.createdAt)
+
+  if (!Number.isFinite(createdAt.getTime())) {
+    return false
+  }
+
+  const today = new Date(now)
+
+  return createdAt.getFullYear() === today.getFullYear() &&
+    createdAt.getMonth() === today.getMonth() &&
+    createdAt.getDate() === today.getDate()
+}
+
 export function DashboardPage() {
   useQueueBootstrap({ force: true })
 
@@ -108,7 +122,11 @@ export function DashboardPage() {
   const tickets = useQueueStore((state) => state.tickets)
   const user = useGlobalStore((state) => state.user)
 
-  const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0]
+  const todayTickets = useMemo(
+    () => tickets.filter((ticket) => isTicketCreatedToday(ticket, now)),
+    [now, tickets],
+  )
+  const selectedTicket = todayTickets.find((ticket) => ticket.id === selectedTicketId) ?? todayTickets[0]
   const dispatchRoom = rooms.find((room) => room.isActive !== false && room.status === 'open')
   const canManageTicketSettings = user?.role === 'admin' || user?.role === 'manager'
   const canMarkTicketNoShow = user?.role === 'admin' || user?.role === 'specialist'
@@ -158,7 +176,7 @@ export function DashboardPage() {
       (serviceType) => normalizeFilterValue(serviceType.id) === filters.serviceTypeId,
     )
 
-    return tickets.filter((ticket) => {
+    return todayTickets.filter((ticket) => {
       if (filters.roomId && normalizeFilterValue(ticket.roomId) !== filters.roomId) {
         return false
       }
@@ -193,7 +211,7 @@ export function DashboardPage() {
 
       return true
     })
-  }, [filters, serviceFilterOptions, tickets])
+  }, [filters, serviceFilterOptions, todayTickets])
 
   const sortedTickets = useMemo(() => {
     return [...filteredTickets].sort((left, right) => {
@@ -505,7 +523,7 @@ export function DashboardPage() {
                 </div>
               )
             }}
-            emptyTitle={hasActiveFilters ? 'По выбранным фильтрам талоны не найдены' : undefined}
+            emptyTitle={hasActiveFilters ? 'По выбранным фильтрам талоны не найдены' : 'Сегодня талоны не найдены'}
             onSelectTicket={(ticket) => selectTicket(ticket.id)}
             now={now}
             rooms={rooms}

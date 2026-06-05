@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { getApiErrorMessage, queueApi } from '@services/api'
+import { getApiErrorMessage, queueApi, socketClient } from '@services/api'
 import type {
   AnalyticsPoint,
   QueueEvent,
@@ -40,6 +40,8 @@ type QueueState = {
   returnTicket: (ticketId: string, roomId?: string | number) => Promise<void>
   selectTicket: (ticketId?: string) => void
   skipTicket: (ticketId: string) => Promise<void>
+  startRealtime: () => void
+  stopRealtime: () => void
   startService: (ticketId: string) => Promise<void>
 }
 
@@ -54,6 +56,7 @@ const defaultSuccessMessage = 'Данные успешно обновлены'
 const defaultErrorMessage = 'Не удалось загрузить данные'
 const activeTicketStatuses = new Set<Ticket['status']>(['waiting', 'called', 'in_service', 'redirected'])
 const warnedReturnedNoShowIds = new Set<string>()
+let realtimeUnsubscribe: (() => void) | undefined
 
 function getQueueErrorMessage(error: unknown): string {
   return getApiErrorMessage(error, defaultErrorMessage)
@@ -79,6 +82,28 @@ function isActiveTicket(ticket: Ticket): boolean {
 
 function isNoShowTicket(ticket: Ticket): boolean {
   return ticket.status === 'no_show'
+}
+
+function getEventTime(event: QueueEvent): number {
+  const timestamp = Date.parse(event.createdAt ?? event.occurredAt)
+
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function mergeQueueEvents(...eventGroups: QueueEvent[][]): QueueEvent[] {
+  const eventMap = new Map<string, QueueEvent>()
+
+  eventGroups.flat().forEach((event) => {
+    eventMap.set(event.id, {
+      ...event,
+      createdAt: event.createdAt ?? event.occurredAt,
+      occurredAt: event.occurredAt ?? event.createdAt,
+    })
+  })
+
+  return Array.from(eventMap.values())
+    .sort((left, right) => getEventTime(right) - getEventTime(left))
+    .slice(0, 50)
 }
 
 function mergeTicketsById(...ticketGroups: Ticket[][]): Ticket[] {
@@ -168,6 +193,7 @@ function createSnapshotUpdate(
     ...snapshot,
     activeTickets,
     noShowTickets,
+    events: mergeQueueEvents(snapshot.events, state.events),
     returnedTicketOverrides: resolved.returnedTicketOverrides,
     tickets: resolved.tickets,
   }
@@ -186,6 +212,7 @@ function createRoomActiveUpdate(
   return {
     ...snapshot,
     activeTickets,
+    events: mergeQueueEvents(snapshot.events, state.events),
     noShowTickets: state.noShowTickets,
     returnedTicketOverrides: resolved.returnedTicketOverrides,
     tickets,
@@ -206,6 +233,7 @@ function createRoomSnapshotUpdate(
   return {
     ...snapshot,
     activeTickets,
+    events: mergeQueueEvents(snapshot.events, state.events),
     noShowTickets,
     returnedTicketOverrides: resolved.returnedTicketOverrides,
     tickets: mergeTicketsById(getClosedTickets(state.tickets), activeTickets, noShowTickets),
@@ -541,6 +569,40 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })
       throw error
     }
+  },
+
+  startRealtime: () => {
+    if (realtimeUnsubscribe) {
+      return
+    }
+
+    socketClient.connect()
+    realtimeUnsubscribe = socketClient.subscribe((event) => {
+      set((state) => ({
+        events: mergeQueueEvents([event], state.events),
+      }))
+
+      void queueApi.getQueueSnapshot()
+        .then((snapshot) => {
+          set((state) => ({
+            ...createSnapshotUpdate(snapshot, state),
+            error: null,
+            hydrated: true,
+            lastUpdatedAt: new Date().toISOString(),
+            loading: state.loading,
+            statusMessage: state.statusMessage,
+          }))
+        })
+        .catch((error) => {
+          console.error('Queue realtime refresh failed', error)
+        })
+    })
+  },
+
+  stopRealtime: () => {
+    realtimeUnsubscribe?.()
+    realtimeUnsubscribe = undefined
+    socketClient.disconnect()
   },
 
   startService: async (ticketId) => {

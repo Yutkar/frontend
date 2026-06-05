@@ -64,6 +64,7 @@ export type Room = {
 }
 
 export type QueueEventType =
+  | 'status_update'
   | 'ticket_created'
   | 'ticket_called'
   | 'service_started'
@@ -73,10 +74,13 @@ export type QueueEventType =
 export type QueueEvent = {
   id: string
   type: QueueEventType
-  ticketId?: string
+  ticketId?: string | number
   ticketNumber?: string
-  roomId?: string
-  specialistId?: string
+  roomId?: string | number
+  roomName?: string
+  specialistId?: string | number
+  status?: string
+  createdAt: string
   occurredAt: string
   message: string
 }
