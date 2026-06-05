@@ -15,6 +15,15 @@ const serviceDurationByType: Record<ServiceType, number> = {
   registration: 10,
 }
 
+const serviceTypeIdsByType: Record<ServiceType, string[]> = {
+  billing: ['14'],
+  consultation: ['2', '3', '4', '5', '6', '16', '17'],
+  diagnostics: ['9', '10', '11', '12', '13'],
+  laboratory: ['7', '8'],
+  pharmacy: [],
+  registration: ['1', '15', '18', '19'],
+}
+
 const priorityWeight: Record<TicketPriority, number> = {
   critical: 5,
   high: 4,
@@ -133,6 +142,13 @@ function roomSupportsTicket(room: Room, ticket: Ticket): boolean {
   ]
     .map(normalizeServiceValue)
     .filter((value): value is string => Boolean(value))
+  const serviceTypeIds = (room.serviceTypeIds ?? []).map((id) => String(id).trim().toLowerCase())
+  const ticketServiceTypeIds = serviceTypeIdsByType[ticket.serviceType]
+
+  if (serviceTypeIds.length > 0) {
+    return ticketServiceTypeIds.some((id) => serviceTypeIds.includes(id)) ||
+      serviceValues.includes(ticket.serviceType.toLowerCase())
+  }
 
   if (serviceValues.length === 0) {
     return true
@@ -189,7 +205,10 @@ export function planRoomLoads(
     fallbackRemainingWorkMinutes,
   )
   const activeRooms = rooms.filter((room) => room.isActive !== false && room.status !== 'paused')
-  const accumulators = new Map(activeRooms.map((room) => [room.id, createAccumulator(room)]))
+  const accumulators = new Map(rooms.map((room) => [room.id, createAccumulator(room)]))
+  const activeAccumulators = activeRooms
+    .map((room) => accumulators.get(room.id))
+    .filter((room): room is RoomAccumulator => Boolean(room))
   const plannedTickets = tickets.map((ticket) => ({ ...ticket }))
   const activeTickets = plannedTickets
     .filter((ticket) => activeStatuses.has(ticket.status))
@@ -211,7 +230,7 @@ export function planRoomLoads(
   activeTickets
     .filter((ticket) => !ticket.roomId || !accumulators.has(ticket.roomId))
     .forEach((ticket) => {
-      const accumulator = getBestRoomForTicket(ticket, Array.from(accumulators.values()))
+      const accumulator = getBestRoomForTicket(ticket, activeAccumulators)
 
       if (!accumulator) {
         return
@@ -271,7 +290,9 @@ export function planRoomLoads(
       loadPercent,
       plannedServiceMinutes: Math.round(accumulator.serviceMinutes),
       remainingWorkMinutes,
-      status: currentTicket ? 'busy' : 'open',
+      status: room.isActive === false || room.status === 'paused'
+        ? 'paused'
+        : currentTicket ? 'busy' : 'open',
       workload: loadPercent,
     } satisfies PlannedRoom
   })

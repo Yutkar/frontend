@@ -10,6 +10,7 @@ import {
   getSharedServiceTypeByOptionId,
   redirectSharedTicket,
   toArchitectureTicket,
+  assertMockRoomAcceptsTickets,
   createSharedTicket,
   updateSharedTicketSettings,
   updateSharedTicketStatus,
@@ -77,6 +78,8 @@ export const mockTicketApi: TicketApi = {
   },
 
   createTicketWithSettings(payload) {
+    assertMockRoomAcceptsTickets(payload.roomId)
+
     const ticket = createSharedTicket({
       patientName: 'Посетитель',
       priority: payload.priority,

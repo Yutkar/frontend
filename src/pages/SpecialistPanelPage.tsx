@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { Power, PowerOff } from 'lucide-react'
 import { SpecialistControls } from '@features/specialist/SpecialistControls'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
+import { adminService } from '@services/adminService'
 import { t } from '@shared/locales/useLocale'
 import type { Room, User } from '@shared/types'
-import { StatusBadge } from '@shared/ui/components'
+import { Button, StatusBadge } from '@shared/ui/components'
 import { getServiceTypeLabel } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
@@ -53,9 +55,58 @@ function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
   )
 }
 
+function SpecialistRoomToggle({ onChanged, room }: { onChanged: (room: Room) => Promise<void>; room: Room }) {
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const roomInactive = room.isActive === false || room.status === 'paused'
+
+  async function handleToggleRoom() {
+    setError(null)
+    setSaving(true)
+
+    try {
+      const nextActive = roomInactive
+      await adminService.updateRoom(room.id, {
+        active: nextActive,
+        isActive: nextActive,
+        name: room.name,
+        serviceTypeIds: room.serviceTypeIds,
+      })
+      await onChanged({
+        ...room,
+        currentTicketId: nextActive ? room.currentTicketId : undefined,
+        isActive: nextActive,
+        status: nextActive ? 'open' : 'paused',
+      })
+    } catch (toggleError) {
+      console.error('Specialist room toggle failed', toggleError)
+      setError(roomInactive ? 'Не удалось открыть кабинет' : 'Не удалось закрыть кабинет')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="specialist-room-toggle">
+      <Button
+        disabled={saving}
+        icon={roomInactive ? <Power size={18} /> : <PowerOff size={18} />}
+        onClick={handleToggleRoom}
+        variant={roomInactive ? 'primary' : 'danger'}
+      >
+        {roomInactive
+          ? saving ? 'Включаем выдачу...' : 'Включить выдачу талонов'
+          : saving ? 'Закрываем выдачу...' : 'Закрыть выдачу талонов'}
+      </Button>
+      {error ? <div className="modal-error">{error}</div> : null}
+    </div>
+  )
+}
+
 export function SpecialistPanelPage() {
   useQueueBootstrap()
 
+  const [roomOverride, setRoomOverride] = useState<Room | null>(null)
   const [roomStatusChecked, setRoomStatusChecked] = useState(false)
   const user = useGlobalStore((state) => state.user)
   const hydrated = useQueueStore((state) => state.hydrated)
@@ -63,8 +114,25 @@ export function SpecialistPanelPage() {
   const loading = useQueueStore((state) => state.loading)
   const rooms = useQueueStore((state) => state.rooms)
   const specialistRoomId = user?.roomId ?? user?.assignedRoomId
-  const room = rooms.find((item) => item.id === specialistRoomId)
+  const storeRoom = rooms.find((item) => item.id === specialistRoomId)
+  const room = storeRoom
+    ? roomOverride && roomOverride.id === storeRoom.id
+      ? { ...storeRoom, ...roomOverride }
+      : storeRoom
+    : roomOverride?.id === specialistRoomId
+      ? roomOverride
+      : undefined
   const roomInactive = room?.isActive === false || room?.status === 'paused'
+
+  async function refreshSpecialistRoom(nextRoom?: Room) {
+    if (nextRoom) {
+      setRoomOverride(nextRoom)
+    }
+
+    if (specialistRoomId) {
+      await loadRoomQueue(specialistRoomId)
+    }
+  }
 
   useEffect(() => {
     if (!specialistRoomId) {
@@ -120,28 +188,23 @@ export function SpecialistPanelPage() {
     )
   }
 
-  if (roomInactive) {
-    return (
-      <div className="page-stack">
-        <section className="specialist-header">
-          <SpecialistUserSummary room={room} user={user} />
-          <StatusBadge label="Кабинет закрыт" tone="warning" />
-        </section>
-        <section className="empty-state">
-          <span className="eyebrow">{t.specialist.panel}</span>
-          <h1>Кабинет специалиста неактивен</h1>
-          <p>Ваш кабинет временно закрыт. Управление очередью недоступно.</p>
-        </section>
-      </div>
-    )
-  }
-
   return (
     <div className="page-stack">
       <section className="specialist-header">
         <SpecialistUserSummary room={room} user={user} />
-        <StatusBadge label={t.status[room.status]} tone={room.status === 'paused' ? 'warning' : 'success'} />
+        <div className="specialist-header-actions">
+          <StatusBadge
+            label={roomInactive ? 'Выдача остановлена' : t.status[room.status]}
+            tone={roomInactive ? 'warning' : 'success'}
+          />
+          <SpecialistRoomToggle onChanged={refreshSpecialistRoom} room={room} />
+        </div>
       </section>
+      {roomInactive ? (
+        <div className="modal-info">
+          Новые талоны в этот кабинет не выдаются. Текущую очередь можно продолжать обслуживать.
+        </div>
+      ) : null}
       <SpecialistControls room={room} />
     </div>
   )

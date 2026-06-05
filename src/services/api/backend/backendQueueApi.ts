@@ -1,3 +1,4 @@
+import type { QueueSnapshot } from '@shared/types'
 import type { QueueStats, Room, Ticket } from '../../../types'
 import {
   toArchitectureRooms,
@@ -168,6 +169,38 @@ async function getBackendRecommendations(): Promise<BackendRecommendation[]> {
   }
 }
 
+function isBackendRoomAcceptingTickets(room: BackendRoom): boolean {
+  const record = room as Record<string, unknown>
+
+  if (typeof record.isActive === 'boolean') {
+    return record.isActive
+  }
+
+  if (typeof record.active === 'boolean') {
+    return record.active
+  }
+
+  return record.status !== 'paused' && record.status !== 'inactive' && record.status !== 'deleted'
+}
+
+async function assertRoomAcceptsTickets(roomId?: string | number) {
+  if (roomId === undefined) {
+    return
+  }
+
+  const rooms = await getBackendRooms()
+
+  if (rooms.length === 0) {
+    return
+  }
+
+  const room = rooms.find((item) => String(item.id ?? item.roomId ?? item._id) === String(roomId))
+
+  if (!room || !isBackendRoomAcceptingTickets(room)) {
+    throw new Error('Ticket issuance is closed for this room.')
+  }
+}
+
 async function getBackendHighPriorityTickets(): Promise<BackendTicket[]> {
   try {
     const response = await apiClient.get<unknown>('/queue/high-priority')
@@ -278,6 +311,39 @@ function mergeRoomTickets(roomId: string | number, roomTickets: BackendTicket[],
   return Array.from(mergedTickets.values())
 }
 
+function ensureRoomSnapshotRoom(snapshot: QueueSnapshot, roomId: string | number): QueueSnapshot {
+  const roomIdValue = String(roomId)
+
+  if (snapshot.rooms.some((room) => String(room.id) === roomIdValue)) {
+    return snapshot
+  }
+
+  const roomTicket = snapshot.tickets.find((ticket) => String(ticket.roomId) === roomIdValue)
+
+  if (!roomTicket) {
+    return snapshot
+  }
+
+  const roomName = roomTicket.roomName ?? `Кабинет ${roomIdValue}`
+
+  return {
+    ...snapshot,
+    rooms: [
+      {
+        department: roomName,
+        id: roomIdValue,
+        isActive: false,
+        loadPercent: 0,
+        name: roomName,
+        specialistName: roomName,
+        status: 'paused',
+        workload: 0,
+      },
+      ...snapshot.rooms,
+    ],
+  }
+}
+
 function toRooms(stats: BackendQueueStats[]): Room[] {
   return stats.map((item) => ({
     id: String(item.roomId),
@@ -337,18 +403,23 @@ export const backendQueueApi: QueueApi = {
       mergeBackendTickets(allTickets, referencedTickets),
     )
 
-    return toQueueSnapshot(
-      roomTickets,
-      statsResponse.data,
-      overloadResponse.data,
-      rooms,
-      recommendations,
-      highPriorityTickets,
-      analytics,
+    return ensureRoomSnapshotRoom(
+      toQueueSnapshot(
+        roomTickets,
+        statsResponse.data,
+        overloadResponse.data,
+        rooms,
+        recommendations,
+        highPriorityTickets,
+        analytics,
+      ),
+      roomId,
     )
   },
 
   async createTicket(input) {
+    await assertRoomAcceptsTickets(input.roomId)
+
     const ticket = await createBackendTicket('/tickets', toBackendTicketCreateInput(input))
 
     await arriveCreatedTicket(ticket)
@@ -357,6 +428,8 @@ export const backendQueueApi: QueueApi = {
   },
 
   async createKioskTicket(input) {
+    await assertRoomAcceptsTickets(input.roomId)
+
     const ticket = await createBackendTicket(
       '/tickets/kiosk',
       toBackendTicketCreateInput(input),
@@ -370,8 +443,9 @@ export const backendQueueApi: QueueApi = {
 
   async callNextTicket(roomId: string) {
     const response = await apiClient.get<BackendTicket | null>(`/queue/room/${roomId}/next`)
+    const responseRoomId = response.data ? getBackendTicketRoomId(response.data) : undefined
 
-    if (response.data?.id) {
+    if (response.data?.id && (!responseRoomId || responseRoomId === String(roomId))) {
       await apiClient.post<BackendTicket>(`/tickets/${response.data.id}/call`)
     }
 
@@ -439,8 +513,11 @@ export const backendQueueApi: QueueApi = {
 
   async getNextTicket(roomId: string | number) {
     const response = await apiClient.get<BackendTicket | null>(`/queue/room/${roomId}/next`)
+    const responseRoomId = response.data ? getBackendTicketRoomId(response.data) : undefined
 
-    return response.data ? toArchitectureTickets([response.data])[0] : undefined
+    return response.data && (!responseRoomId || responseRoomId === String(roomId))
+      ? toArchitectureTickets([response.data])[0]
+      : undefined
   },
 
   async getHighPriority() {

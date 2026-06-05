@@ -1123,6 +1123,18 @@ h3 {
   justify-content: space-between;
 }
 
+.specialist-header-actions,
+.specialist-room-toggle {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.specialist-room-toggle .modal-error {
+  max-width: 280px;
+}
+
 .specialist-doctor-details {
   display: flex;
   flex-wrap: wrap;
@@ -3029,6 +3041,8 @@ h3 {
   .top-navbar,
   .navbar-actions,
   .specialist-header,
+  .specialist-header-actions,
+  .specialist-room-toggle,
   .panel-header,
   .dashboard-hero,
   .live-queue-header,

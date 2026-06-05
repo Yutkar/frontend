@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { TicketPrintPreview, type TicketPrintData } from '@features/tickets/TicketPrintPreview'
 import {
@@ -29,12 +29,19 @@ export function KioskPage() {
   const [options, setOptions] = useState<TicketSettingsOptions>(emptyOptions)
   const [selectedServiceTypeId, setSelectedServiceTypeId] = useState('')
 
+  const loadTicketOptions = useCallback(async () => {
+    const nextOptions = await ticketService.getTicketSettingsOptions()
+
+    setOptions(nextOptions)
+
+    return nextOptions
+  }, [])
+
   useEffect(() => {
     let active = true
 
     setLoadingOptions(true)
-    ticketService
-      .getTicketSettingsOptions()
+    loadTicketOptions()
       .then((nextOptions) => {
         if (active) {
           setOptions(nextOptions)
@@ -55,7 +62,7 @@ export function KioskPage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [loadTicketOptions])
 
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
   const selectedServiceType = serviceTypes.find(
@@ -118,11 +125,22 @@ export function KioskPage() {
     setLoading(true)
 
     try {
+      const latestOptions = await loadTicketOptions()
+      const latestServiceType = getServiceTypes(latestOptions).find(
+        (serviceType) => String(serviceType.id) === String(selectedServiceType.id),
+      )
+      const latestRoom = getRoomsForService(latestOptions, latestServiceType?.id)[0]
+
+      if (!latestServiceType || !latestRoom) {
+        setError('Нет доступных кабинетов для выбранной услуги')
+        return
+      }
+
       const ticket = await kioskService.createTicketForKiosk({
         priority: 'normal',
-        roomId: selectedRoom.id,
-        serviceType: selectedServiceType.code,
-        serviceTypeId: selectedServiceType.id,
+        roomId: latestRoom.id,
+        serviceType: latestServiceType.code,
+        serviceTypeId: latestServiceType.id,
         status: 'waiting',
       })
 

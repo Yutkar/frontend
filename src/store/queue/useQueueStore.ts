@@ -174,12 +174,16 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     set({ error: null, loading: true, statusMessage: null })
     try {
       const snapshot = await queueApi.getRoomQueueSnapshot(roomId)
+      const roomIdValue = String(roomId)
+      const currentRoom = get().rooms.find((room) => String(room.id) === roomIdValue)
+      const snapshotHasRoom = snapshot.rooms.some((room) => String(room.id) === roomIdValue)
       set({
         ...snapshot,
         error: null,
         hydrated: true,
         lastUpdatedAt: new Date().toISOString(),
         loading: false,
+        rooms: snapshotHasRoom || !currentRoom ? snapshot.rooms : [currentRoom, ...snapshot.rooms],
         statusMessage: defaultSuccessMessage,
       })
     } catch (error) {

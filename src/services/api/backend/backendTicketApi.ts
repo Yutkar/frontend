@@ -29,6 +29,7 @@ type BackendRoomOption = {
   serviceTypeIds?: Array<string | number>
   serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  status?: string
   title?: string
 }
 
@@ -132,6 +133,30 @@ async function createBackendTicket(
 
       return response.data
     }
+  }
+}
+
+function isBackendRoomAcceptingTickets(room: BackendRoomOption): boolean {
+  return room.isActive
+    ?? room.active
+    ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted')
+}
+
+async function assertRoomAcceptsTickets(roomId?: string | number) {
+  if (roomId === undefined) {
+    return
+  }
+
+  const rooms = await getOrEmpty<BackendRoomOption>('/rooms')
+
+  if (rooms.length === 0) {
+    return
+  }
+
+  const room = rooms.find((item) => String(item.id ?? item.roomId ?? item._id) === String(roomId))
+
+  if (!room || !isBackendRoomAcceptingTickets(room)) {
+    throw new Error('Ticket issuance is closed for this room.')
   }
 }
 
@@ -322,6 +347,8 @@ export const backendTicketApi: TicketApi = {
   },
 
   async createTicket(input) {
+    await assertRoomAcceptsTickets(input.roomId)
+
     const ticket = await createBackendTicket(
       '/tickets',
       toBackendArchitectureTicketCreateInput(input),
@@ -332,6 +359,8 @@ export const backendTicketApi: TicketApi = {
   },
 
   async createKioskTicket(input) {
+    await assertRoomAcceptsTickets(input.roomId)
+
     const ticket = await createBackendTicket(
       '/tickets/kiosk',
       toBackendArchitectureTicketCreateInput(input),
@@ -397,6 +426,8 @@ export const backendTicketApi: TicketApi = {
   },
 
   async createTicketWithSettings(payload) {
+    await assertRoomAcceptsTickets(payload.roomId)
+
     const createdTicket = await createBackendTicket(
       '/tickets',
       toBackendCreateSettingsPayload(payload),

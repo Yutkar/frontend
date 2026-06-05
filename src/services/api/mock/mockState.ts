@@ -96,6 +96,22 @@ function findRoom(roomId?: string): SharedRoom | undefined {
   return queueSnapshot.rooms.find((room) => room.id === roomId)
 }
 
+function isRoomAcceptingTickets(room?: SharedRoom): boolean {
+  return Boolean(room && room.isActive !== false && room.status !== 'paused')
+}
+
+export function assertMockRoomAcceptsTickets(roomId?: string | number): void {
+  if (!roomId) {
+    return
+  }
+
+  const room = findRoom(String(roomId))
+
+  if (!isRoomAcceptingTickets(room)) {
+    throw new Error('Ticket issuance is closed for this room.')
+  }
+}
+
 function getRecordText(record: Record<string, unknown>, keys: string[], fallback: string): string {
   const value = keys.map((key) => record[key]).find((item) => typeof item === 'string' && item.trim())
 
@@ -294,6 +310,8 @@ export function getArchitectureTicketById(id: string): ArchitectureTicket | unde
 }
 
 export function createSharedTicket(input: SharedTicketCreateInput): SharedTicket {
+  assertMockRoomAcceptsTickets(input.roomId)
+
   const ticket = createMockTicket(input, queueSnapshot.tickets.length)
 
   queueSnapshot.tickets = [ticket, ...queueSnapshot.tickets]
@@ -425,7 +443,7 @@ export function getNextSharedTicket(roomId?: string | number): SharedTicket | un
   const resolvedRoomId = roomId ? String(roomId) : undefined
   const candidates = queueSnapshot.tickets
     .filter((ticket) => ['created', 'waiting'].includes(ticket.status))
-    .filter((ticket) => !resolvedRoomId || !ticket.roomId || ticket.roomId === resolvedRoomId)
+    .filter((ticket) => !resolvedRoomId || ticket.roomId === resolvedRoomId)
     .sort((first, second) => {
       const priorityDelta = priorityWeight[second.priority] - priorityWeight[first.priority]
 
