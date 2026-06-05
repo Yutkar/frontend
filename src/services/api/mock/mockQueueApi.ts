@@ -38,6 +38,10 @@ export const mockQueueApi: QueueApi = {
     })
   },
 
+  getPeriodAnalytics() {
+    return Promise.resolve(getQueueSnapshot().analytics)
+  },
+
   getRoomQueueSnapshot(roomId: string | number) {
     const snapshot = getQueueSnapshot()
     const roomIdValue = String(roomId)

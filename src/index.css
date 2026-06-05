@@ -1610,6 +1610,13 @@ h3 {
   font-size: 14px;
   font-weight: 850;
   gap: 8px;
+  justify-content: space-between;
+}
+
+.ticket-filters-header > div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
 }
 
 .ticket-filters-grid {
@@ -1622,14 +1629,6 @@ h3 {
 .ticket-filters .field input,
 .ticket-filters .field select {
   background: var(--surface);
-}
-
-.ticket-filter-actions {
-  display: flex;
-}
-
-.ticket-filter-actions .button {
-  width: 100%;
 }
 
 .live-queue-page {
@@ -2390,6 +2389,23 @@ h3 {
   display: grid;
   gap: 18px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-period-panel {
+  align-items: end;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.analytics-period-panel .field {
+  max-width: 260px;
+  min-width: min(100%, 220px);
 }
 
 .wide-panel {
@@ -3502,6 +3518,23 @@ h3 {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+.queue-routing-form {
+  max-width: 720px;
+}
+
+.queue-routing-rooms label {
+  align-items: center;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+}
+
+.queue-routing-rooms label small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .kiosk-page {

@@ -251,14 +251,22 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
     ? record.isActive
     : typeof record.active === 'boolean'
       ? record.active
-      : record.status !== 'paused'
+      : record.status !== 'paused' && record.status !== 'inactive' && record.status !== 'deleted'
   const serviceTypeIds = getServiceTypeIds(record)
+  const ticketIssueEnabled = typeof record.ticketIssueEnabled === 'boolean'
+    ? record.ticketIssueEnabled
+    : typeof record.isTicketIssueEnabled === 'boolean'
+      ? record.isTicketIssueEnabled
+      : typeof record.kioskEnabled === 'boolean'
+        ? record.kioskEnabled
+        : undefined
 
   return {
     ...record,
     active: isActive,
     id: getId(record),
     isActive,
+    ...(ticketIssueEnabled === undefined ? {} : { ticketIssueEnabled, isTicketIssueEnabled: ticketIssueEnabled }),
     name,
     serviceTypeIds,
   }
@@ -350,10 +358,18 @@ function toUserUpdatePayload(input: Partial<AdminUserInput>) {
 function toRoomCreatePayload(input: AdminRecordInput) {
   const name = getText(input.name) ?? getText(input.title) ?? ''
   const serviceTypeIds = normalizeIdList(input.serviceTypeIds as Array<string | number> | undefined)
+  const ticketIssueEnabled = typeof input.ticketIssueEnabled === 'boolean'
+    ? input.ticketIssueEnabled
+    : typeof input.isTicketIssueEnabled === 'boolean'
+      ? input.isTicketIssueEnabled
+      : typeof input.kioskEnabled === 'boolean'
+        ? input.kioskEnabled
+        : undefined
 
   return {
     name,
     serviceTypeIds,
+    ...(ticketIssueEnabled === undefined ? {} : { ticketIssueEnabled, isTicketIssueEnabled: ticketIssueEnabled }),
   }
 }
 
@@ -428,8 +444,10 @@ async function updateRoom(path: string, id: string | number, input: AdminRecordI
     () => apiClient.patch<unknown>(`${path}/${id}`, payload),
     () => apiClient.patch<unknown>(`${path}/${id}`, {
       active: payload.active,
+      isTicketIssueEnabled: payload.isTicketIssueEnabled,
       name: payload.name,
       services: payload.serviceTypeIds,
+      ticketIssueEnabled: payload.ticketIssueEnabled,
     }),
     () => apiClient.put<unknown>(`${path}/${id}`, payload),
   ])

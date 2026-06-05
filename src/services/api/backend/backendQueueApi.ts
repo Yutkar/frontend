@@ -8,6 +8,7 @@ import {
   getBackendTicketRoomId,
   toBoardQueueSnapshot,
   toBackendAnalyticsPoints,
+  toSharedAnalytics,
   toBackendTicketCreateInput,
   toBackendRecommendations,
   toQueueKpi,
@@ -178,6 +179,13 @@ async function getBackendRecommendations(): Promise<BackendRecommendation[]> {
 
 function isBackendRoomAcceptingTickets(room: BackendRoom): boolean {
   const record = room as Record<string, unknown>
+  const issueEnabled = record.ticketIssueEnabled
+    ?? record.isTicketIssueEnabled
+    ?? record.kioskEnabled
+
+  if (issueEnabled === false) {
+    return false
+  }
 
   if (typeof record.isActive === 'boolean') {
     return record.isActive
@@ -407,6 +415,12 @@ export const backendQueueApi: QueueApi = {
       rooms: snapshot.rooms.filter((room) => String(room.id) === roomIdValue),
       tickets: snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomIdValue),
     }
+  },
+
+  async getPeriodAnalytics(period) {
+    const response = await apiClient.get<unknown>(`/queue/analytics/period?period=${period}`)
+
+    return toSharedAnalytics(toBackendAnalyticsPoints(response.data))
   },
 
   async getRoomQueueSnapshot(roomId: string | number) {

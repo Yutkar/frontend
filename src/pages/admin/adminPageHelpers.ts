@@ -5,6 +5,8 @@ import { formatRoomName } from '@shared/utils'
 export type AdminRoomRecord = AdminRecord & {
   active?: boolean
   isActive?: boolean
+  isTicketIssueEnabled?: boolean
+  kioskEnabled?: boolean
   name?: string
   roomName?: string
   roomId?: string | number
@@ -13,6 +15,7 @@ export type AdminRoomRecord = AdminRecord & {
   serviceTypeIds?: Array<string | number>
   serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   status?: string
+  ticketIssueEnabled?: boolean
   title?: string
 }
 
@@ -27,7 +30,13 @@ export function getRoomName(room?: AdminRoomRecord): string {
 }
 
 export function getRoomActive(room: AdminRoomRecord): boolean {
-  return room.isActive ?? room.active ?? room.status !== 'paused'
+  return room.isActive
+    ?? room.active
+    ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted')
+}
+
+export function getRoomTicketIssueEnabled(room: AdminRoomRecord): boolean {
+  return (room.ticketIssueEnabled ?? room.isTicketIssueEnabled ?? room.kioskEnabled) !== false
 }
 
 export function getRoomServiceTypeIds(room: AdminRoomRecord): string[] {

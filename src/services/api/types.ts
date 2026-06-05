@@ -1,6 +1,7 @@
 import type {
   QueueSnapshot,
   RedirectTicketInput,
+  AnalyticsPeriod as SharedAnalyticsPeriod,
   Room as SharedRoom,
   ServiceType as SharedServiceType,
   Ticket as SharedTicket,
@@ -48,12 +49,15 @@ export type TicketSettingsRoomServiceOption = {
 export type TicketSettingsRoomOption = Pick<SharedRoom, 'id' | 'name'> & {
   active?: boolean
   isActive?: boolean
+  isTicketIssueEnabled?: boolean
+  kioskEnabled?: boolean
   roomId?: string | number
   roomName?: string
   serviceTypeId?: string | number
   serviceTypeIds?: Array<string | number>
   serviceTypes?: Array<string | number | TicketSettingsRoomServiceOption>
   services?: Array<string | number | TicketSettingsRoomServiceOption>
+  ticketIssueEnabled?: boolean
   title?: string
 }
 
@@ -107,6 +111,7 @@ export type QueueListener = (tickets: ArchitectureTicket[]) => void
 export type QueueApi = {
   getQueueSnapshot: () => Promise<QueueSnapshot>
   getBoardSnapshot: (roomId?: string | number) => Promise<QueueSnapshot>
+  getPeriodAnalytics: (period: SharedAnalyticsPeriod) => Promise<QueueSnapshot['analytics']>
   getRoomQueueSnapshot: (roomId: string | number) => Promise<QueueSnapshot>
   createTicket: (input: SharedTicketCreateInput) => Promise<QueueSnapshot>
   createKioskTicket: (input: SharedTicketCreateInput) => Promise<QueueSnapshot>

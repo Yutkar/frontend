@@ -1,9 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { AnalyticsCharts } from '@features/analytics/AnalyticsCharts'
+import {
+  analyticsPeriodLabels,
+  createPeriodAnalyticsFromTickets,
+  getTicketsForAnalyticsPeriod,
+} from '@features/analytics/periodAnalytics'
+import { queueService } from '@services/queueService'
 import { DashboardKpis } from '@widgets'
 import { useCurrentTime } from '@shared/utils'
+import type { AnalyticsPeriod, AnalyticsPoint } from '@shared/types'
 import { useQueueStore } from '@store/queue'
+
+const analyticsPeriods: AnalyticsPeriod[] = ['day', 'week', 'month']
 
 export function AnalyticsPage() {
   const analytics = useQueueStore((state) => state.analytics)
@@ -13,13 +22,50 @@ export function AnalyticsPage() {
   const refreshAnalyticsData = useQueueStore((state) => state.refreshAnalyticsData)
   const rooms = useQueueStore((state) => state.rooms)
   const tickets = useQueueStore((state) => state.tickets)
+  const [period, setPeriod] = useState<AnalyticsPeriod>('day')
+  const [periodAnalytics, setPeriodAnalytics] = useState<AnalyticsPoint[]>([])
+  const [periodError, setPeriodError] = useState<string | null>(null)
   const location = useLocation()
   const now = useCurrentTime()
   const hasAnalyticsData = analytics.length > 0 || tickets.length > 0 || rooms.length > 0
+  const fallbackPeriodAnalytics = useMemo(
+    () => createPeriodAnalyticsFromTickets(tickets, period, now),
+    [now, period, tickets],
+  )
+  const chartAnalytics = fallbackPeriodAnalytics.length > 0
+    ? fallbackPeriodAnalytics
+    : periodAnalytics.length > 0
+      ? periodAnalytics
+      : analytics
+  const periodTickets = useMemo(
+    () => getTicketsForAnalyticsPeriod(tickets, period, now),
+    [now, period, tickets],
+  )
 
   useEffect(() => {
+    let active = true
+
+    setPeriodError(null)
     void refreshAnalyticsData()
-  }, [location.key, refreshAnalyticsData])
+    queueService
+      .getPeriodAnalytics(period)
+      .then((nextAnalytics) => {
+        if (active) {
+          setPeriodAnalytics(nextAnalytics)
+        }
+      })
+      .catch((loadError) => {
+        console.error('Analytics period load failed', loadError)
+        if (active) {
+          setPeriodAnalytics([])
+          setPeriodError('Не удалось загрузить аналитику за выбранный период. Используем данные талонов.')
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [period, location.key, refreshAnalyticsData])
 
   useEffect(() => {
     const handleFocus = () => {
@@ -55,8 +101,24 @@ export function AnalyticsPage() {
         </section>
       ) : hasAnalyticsData ? (
         <>
-          <DashboardKpis />
-          <AnalyticsCharts analytics={analytics} now={now} rooms={rooms} tickets={tickets} />
+          <section className="analytics-period-panel">
+            <label className="field">
+              <span>Период аналитики</span>
+              <select
+                onChange={(event) => setPeriod(event.target.value as AnalyticsPeriod)}
+                value={period}
+              >
+                {analyticsPeriods.map((item) => (
+                  <option key={item} value={item}>
+                    {analyticsPeriodLabels[item]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {periodError ? <div className="modal-info">{periodError}</div> : null}
+          </section>
+          <DashboardKpis rooms={rooms} tickets={periodTickets} />
+          <AnalyticsCharts analytics={chartAnalytics} now={now} rooms={rooms} tickets={periodTickets} />
         </>
       ) : !loading && hydrated ? (
         <section className="empty-state compact-empty">

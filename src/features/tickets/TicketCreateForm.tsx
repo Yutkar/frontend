@@ -10,6 +10,7 @@ import {
   getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
+  isRoomAvailableForTicket,
 } from './ticketFormOptions'
 
 const priorities: TicketPriority[] = ['low', 'normal', 'high', 'critical']
@@ -37,7 +38,8 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
   const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
   const rooms = useMemo(
-    () => getRoomsForService(options, selectedServiceType?.id),
+    () => getRoomsForService(options, selectedServiceType?.id)
+      .filter((room) => isRoomAvailableForTicket(room, [])),
     [options, selectedServiceType?.id],
   )
   const selectedRoomExists = useMemo(

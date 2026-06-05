@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { TicketPrintPreview, type TicketPrintData } from '@features/tickets/TicketPrintPreview'
 import {
+  getAutoRoomForService,
+  getAvailableServiceTypes,
   getPriorityLabel,
   getRoomsForService,
   getServiceOptionLabel,
@@ -23,6 +25,8 @@ const emptyOptions: TicketSettingsOptions = {
 
 export function KioskPage() {
   const loadQueue = useQueueStore((state) => state.loadQueue)
+  const queueRooms = useQueueStore((state) => state.rooms)
+  const queueTickets = useQueueStore((state) => state.tickets)
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -42,6 +46,7 @@ export function KioskPage() {
     let active = true
 
     setLoadingOptions(true)
+    void loadQueue({ force: true, successMessage: 'Данные киоска обновлены' })
     loadTicketOptions()
       .then((nextOptions) => {
         if (active) {
@@ -63,21 +68,35 @@ export function KioskPage() {
     return () => {
       active = false
     }
-  }, [loadTicketOptions])
+  }, [loadQueue, loadTicketOptions])
 
-  const serviceTypes = useMemo(() => getServiceTypes(options), [options])
+  const serviceTypes = useMemo(
+    () => getAvailableServiceTypes(options, queueRooms, queueTickets),
+    [options, queueRooms, queueTickets],
+  )
   const selectedServiceType = serviceTypes.find(
     (serviceType) => String(serviceType.id) === selectedServiceTypeId,
-  ) ?? serviceTypes[0]
-  const rooms = useMemo(
-    () => getRoomsForService(options, selectedServiceType?.id),
-    [options, selectedServiceType?.id],
   )
-  const selectedRoom = rooms[0]
+  const rooms = useMemo(
+    () => getRoomsForService(options, selectedServiceType?.id, queueRooms),
+    [options, queueRooms, selectedServiceType?.id],
+  )
+  const selectedRoom = useMemo(
+    () => getAutoRoomForService(rooms, queueRooms, queueTickets),
+    [queueRooms, queueTickets, rooms],
+  )
 
   useEffect(() => {
-    if (!selectedServiceTypeId && serviceTypes[0]) {
+    const selectedServiceAvailable = serviceTypes.some(
+      (serviceType) => String(serviceType.id) === selectedServiceTypeId,
+    )
+
+    if ((!selectedServiceTypeId || !selectedServiceAvailable) && serviceTypes[0]) {
       setSelectedServiceTypeId(String(serviceTypes[0].id))
+    }
+
+    if (serviceTypes.length === 0 && selectedServiceTypeId) {
+      setSelectedServiceTypeId('')
     }
   }, [selectedServiceTypeId, serviceTypes])
 
@@ -126,11 +145,15 @@ export function KioskPage() {
     setLoading(true)
 
     try {
+      await loadQueue({ force: true, successMessage: 'Данные киоска обновлены' })
       const latestOptions = await loadTicketOptions()
+      const latestRooms = useQueueStore.getState().rooms
+      const latestTickets = useQueueStore.getState().tickets
       const latestServiceType = getServiceTypes(latestOptions).find(
         (serviceType) => String(serviceType.id) === String(selectedServiceType.id),
       )
-      const latestRoom = getRoomsForService(latestOptions, latestServiceType?.id)[0]
+      const latestServiceRooms = getRoomsForService(latestOptions, latestServiceType?.id, latestRooms)
+      const latestRoom = getAutoRoomForService(latestServiceRooms, latestRooms, latestTickets)
 
       if (!latestServiceType || !latestRoom) {
         setError('Нет доступных кабинетов для выбранной услуги')
@@ -180,7 +203,10 @@ export function KioskPage() {
         </div>
 
         {error ? <div className="modal-error">{error}</div> : null}
-        {selectedServiceType && rooms.length === 0 ? (
+        {!loadingOptions && serviceTypes.length === 0 ? (
+          <div className="modal-error">Сейчас нет доступных услуг. Обратитесь к администратору.</div>
+        ) : null}
+        {selectedServiceType && !selectedRoom ? (
           <div className="modal-error">Нет доступных кабинетов для выбранной услуги</div>
         ) : null}
 

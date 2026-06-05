@@ -7,6 +7,7 @@ import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord 
 type BoardScreen = {
   id: string
   name: string
+  roomIds?: string[]
   roomNames: string[]
 }
 
@@ -50,10 +51,17 @@ export function BoardSettingsSection() {
 
   function getScreenUrl(screen: BoardScreen): string {
     const base = window.location.origin
-    if (screen.roomNames.length === 1) {
-      return `${base}/board?room=${encodeURIComponent(screen.roomNames[0])}`
+    const roomIds = screen.roomIds?.length
+      ? screen.roomIds
+      : activeRooms
+        .filter((room) => screen.roomNames.includes(getRoomName(room)))
+        .map((room) => String(room.id))
+
+    if (roomIds.length === 1) {
+      return `${base}/board?roomId=${encodeURIComponent(roomIds[0])}`
     }
-    return `${base}/board?rooms=${screen.roomNames.map(encodeURIComponent).join(',')}`
+
+    return `${base}/board`
   }
 
   async function copyUrl(url: string) {
@@ -64,9 +72,12 @@ export function BoardSettingsSection() {
 
   function addScreen() {
     if (!newScreenName.trim() || newScreenRooms.length === 0) return
+    const roomIds = activeRooms
+      .filter((room) => newScreenRooms.includes(getRoomName(room)))
+      .map((room) => String(room.id))
     const newScreens = [
       ...screens,
-      { id: String(Date.now()), name: newScreenName.trim(), roomNames: newScreenRooms },
+      { id: String(Date.now()), name: newScreenName.trim(), roomIds, roomNames: newScreenRooms },
     ]
     setScreens(newScreens)
     saveScreens(newScreens)
@@ -140,7 +151,7 @@ export function BoardSettingsSection() {
                   {/* Отдельные кабинеты */}
                   {activeRooms.map((room) => {
                     const name = getRoomName(room)
-                    const url = `${window.location.origin}/board?room=${encodeURIComponent(name)}`
+                    const url = `${window.location.origin}/board?roomId=${encodeURIComponent(String(room.id))}`
                     return (
                       <tr key={String(room.id)}>
                         <td>{name}</td>

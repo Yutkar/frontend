@@ -48,6 +48,8 @@ export type BackendRoom = {
   active?: boolean
   id?: number | string
   isActive?: boolean
+  isTicketIssueEnabled?: boolean
+  kioskEnabled?: boolean
   name?: string
   room_id?: number | string
   room_name?: string
@@ -58,6 +60,7 @@ export type BackendRoom = {
   serviceTypeIds?: Array<number | string>
   serviceTypes?: unknown[]
   status?: string
+  ticketIssueEnabled?: boolean
   title?: string
 }
 
@@ -384,6 +387,14 @@ function getBackendRoomActive(room?: BackendRoom | null): boolean {
   }
 
   return room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted'
+}
+
+function getBackendRoomTicketIssueEnabled(room?: BackendRoom | null): boolean {
+  if (!room) {
+    return true
+  }
+
+  return (room.ticketIssueEnabled ?? room.isTicketIssueEnabled ?? room.kioskEnabled) !== false
 }
 
 export function toBackendRooms(value: unknown): BackendRoom[] {
@@ -721,10 +732,14 @@ export function toSharedRooms(
     }
 
     const isActive = getBackendRoomActive(room)
+    const ticketIssueEnabled = getBackendRoomTicketIssueEnabled(room)
 
     rooms.set(id, {
       id,
+      active: isActive,
       isActive,
+      isTicketIssueEnabled: room.isTicketIssueEnabled,
+      kioskEnabled: room.kioskEnabled,
       name: getBackendRoomName(room),
       department: getBackendRoomName(room),
       serviceTypeId: room.serviceTypeId,
@@ -733,6 +748,7 @@ export function toSharedRooms(
       services: room.services as Room['services'],
       specialistName: getBackendRoomName(room),
       status: isActive ? 'open' : 'paused',
+      ticketIssueEnabled,
       loadPercent: 0,
       workload: 0,
     })
@@ -756,7 +772,10 @@ export function toSharedRooms(
     rooms.set(id, {
       ...existingRoom,
       id,
+      active: existingRoom?.active ?? existingRoom?.isActive ?? true,
       isActive: existingRoom?.isActive ?? true,
+      isTicketIssueEnabled: existingRoom?.isTicketIssueEnabled,
+      kioskEnabled: existingRoom?.kioskEnabled,
       name: existingRoom?.name ?? stat.roomName,
       department: existingRoom?.department ?? stat.roomName,
       serviceTypeId: existingRoom?.serviceTypeId,
@@ -765,6 +784,7 @@ export function toSharedRooms(
       services: existingRoom?.services,
       specialistName: existingRoom?.specialistName ?? stat.roomName,
       status: 'open',
+      ticketIssueEnabled: existingRoom?.ticketIssueEnabled ?? true,
       loadPercent: workload,
       workload,
     })
@@ -786,7 +806,10 @@ export function toSharedRooms(
 
     rooms.set(roomId, {
       id: roomId,
+      active: getBackendRoomActive(ticket.room),
       isActive: getBackendRoomActive(ticket.room),
+      isTicketIssueEnabled: ticket.room?.isTicketIssueEnabled,
+      kioskEnabled: ticket.room?.kioskEnabled,
       name: roomName,
       department: serviceType,
       serviceTypeId: ticket.room?.serviceTypeId,
@@ -795,6 +818,7 @@ export function toSharedRooms(
       services: ticket.room?.services as Room['services'],
       specialistName: roomName,
       status: getBackendRoomActive(ticket.room) ? 'open' : 'paused',
+      ticketIssueEnabled: getBackendRoomTicketIssueEnabled(ticket.room),
       loadPercent: 0,
       workload: 0,
     })

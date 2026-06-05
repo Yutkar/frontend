@@ -5,7 +5,7 @@ import {
   type QueueListener,
   type QueueOverloadRoom,
 } from './api'
-import type { QueueSnapshot } from '@shared/types'
+import type { AnalyticsPeriod, AnalyticsPoint, QueueSnapshot } from '@shared/types'
 import { withOperationalRefresh } from './syncService'
 import type { QueueStats, Room, Ticket } from '../types'
 
@@ -16,6 +16,15 @@ export const queueService = {
     } catch (error) {
       console.error('queueService.getBoardSnapshot failed', error)
       throw toServiceError(error, 'Не удалось получить данные табло')
+    }
+  },
+
+  async getPeriodAnalytics(period: AnalyticsPeriod): Promise<AnalyticsPoint[]> {
+    try {
+      return await queueApi.getPeriodAnalytics(period)
+    } catch (error) {
+      console.error('queueService.getPeriodAnalytics failed', error)
+      throw toServiceError(error, 'Не удалось получить аналитику за период')
     }
   },
 

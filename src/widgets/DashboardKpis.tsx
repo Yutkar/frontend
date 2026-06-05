@@ -7,12 +7,20 @@ import {
   Stethoscope,
 } from 'lucide-react'
 import { t } from '@shared/locales/useLocale'
+import type { Room, Ticket } from '@shared/types'
 import { KPIWidget } from '@shared/ui/components'
 import { useQueueStore } from '@store/queue'
 
-export function DashboardKpis() {
-  const rooms = useQueueStore((state) => state.rooms)
-  const tickets = useQueueStore((state) => state.tickets)
+type DashboardKpisProps = {
+  rooms?: Room[]
+  tickets?: Ticket[]
+}
+
+export function DashboardKpis({ rooms: inputRooms, tickets: inputTickets }: DashboardKpisProps = {}) {
+  const storeRooms = useQueueStore((state) => state.rooms)
+  const storeTickets = useQueueStore((state) => state.tickets)
+  const rooms = inputRooms ?? storeRooms
+  const tickets = inputTickets ?? storeTickets
   const activeRooms = rooms.filter((room) => room.isActive !== false && room.status !== 'paused').length
   const waitingTickets = tickets.filter((ticket) => ticket.status === 'waiting').length
   const calledTickets = tickets.filter((ticket) => ticket.status === 'called').length

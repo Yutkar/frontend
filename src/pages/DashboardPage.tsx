@@ -324,8 +324,19 @@ export function DashboardPage() {
           </div>
           <div className="ticket-filters" aria-label="Фильтры талонов">
             <div className="ticket-filters-header">
-              <SlidersHorizontal size={16} />
-              <span>Фильтры</span>
+              <div>
+                <SlidersHorizontal size={16} />
+                <span>Фильтры</span>
+              </div>
+              <Button
+                disabled={!hasActiveFilters}
+                icon={<RotateCcw size={15} />}
+                onClick={() => setFilters({ ...emptyTicketFilters })}
+                size="sm"
+                variant="secondary"
+              >
+                Сбросить фильтры
+              </Button>
             </div>
             <div className="ticket-filters-grid">
               <label className="field">
@@ -431,17 +442,6 @@ export function DashboardPage() {
                   value={filters.ticketNumber}
                 />
               </label>
-
-              <div className="ticket-filter-actions">
-                <Button
-                  disabled={!hasActiveFilters}
-                  icon={<RotateCcw size={15} />}
-                  onClick={() => setFilters({ ...emptyTicketFilters })}
-                  variant="ghost"
-                >
-                  Сбросить фильтры
-                </Button>
-              </div>
             </div>
           </div>
           <QueueTableBase

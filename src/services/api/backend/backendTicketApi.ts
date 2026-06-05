@@ -23,6 +23,8 @@ type BackendRoomOption = {
   active?: boolean
   id: string | number
   isActive?: boolean
+  isTicketIssueEnabled?: boolean
+  kioskEnabled?: boolean
   name?: string
   roomId?: string | number
   roomName?: string
@@ -31,6 +33,7 @@ type BackendRoomOption = {
   serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   status?: string
+  ticketIssueEnabled?: boolean
   title?: string
 }
 
@@ -164,6 +167,18 @@ async function createBackendTicket(
 }
 
 function isBackendRoomAcceptingTickets(room: BackendRoomOption): boolean {
+  const issueEnabled = room.ticketIssueEnabled ?? room.isTicketIssueEnabled ?? room.kioskEnabled
+
+  if (issueEnabled === false) {
+    return false
+  }
+
+  return room.isActive
+    ?? room.active
+    ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted')
+}
+
+function getBackendRoomOptionActive(room: BackendRoomOption): boolean {
   return room.isActive
     ?? room.active
     ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted')
@@ -270,7 +285,10 @@ function toSettingsOptions(
   return {
     rooms: rooms.map((room) => ({
       id: String(room.id ?? room.roomId ?? room._id),
-      isActive: room.isActive ?? room.active ?? true,
+      active: getBackendRoomOptionActive(room),
+      isActive: getBackendRoomOptionActive(room),
+      isTicketIssueEnabled: room.isTicketIssueEnabled,
+      kioskEnabled: room.kioskEnabled,
       name: room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия',
       roomId: room.roomId,
       roomName: room.roomName,
@@ -278,6 +296,7 @@ function toSettingsOptions(
       serviceTypeIds: room.serviceTypeIds ?? (room.serviceTypes as any[])?.map((s: any) => s.serviceTypeId ?? s.id).filter(Boolean),
       serviceTypes: room.serviceTypes,
       services: room.services,
+      ticketIssueEnabled: room.ticketIssueEnabled,
       title: room.title,
     })),
     serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({

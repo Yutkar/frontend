@@ -9,8 +9,9 @@ import { ManagersSection } from './AdminManagersPage'
 import { RoomsSection } from './AdminRoomsPage'
 import { StaffSection } from './AdminStaffPage'
 import { BoardSettingsSection } from './AdminBoardSettingsPage'
+import { QueueRoutingSection } from './AdminQueueRoutingPage'
 
-type AdminSectionId = 'rooms' | 'staff' | 'managers' | 'board'
+type AdminSectionId = 'rooms' | 'routing' | 'staff' | 'managers' | 'board'
 
 type AdminSectionConfig = {
   id: AdminSectionId
@@ -27,6 +28,7 @@ type AdminSummary = {
 
 const adminSections: AdminSectionConfig[] = [
   { id: 'rooms', label: 'Кабинеты', roles: ['admin', 'manager'] },
+  { id: 'routing', label: 'Настройки очередей', roles: ['admin', 'manager'] },
   { id: 'staff', label: 'Персонал', roles: ['admin', 'manager'] },
   { id: 'managers', label: 'Менеджеры', roles: ['admin'] },
   { id: 'board', label: 'Табло', roles: ['admin', 'manager'] },
@@ -131,6 +133,7 @@ export function AdminPage() {
       </nav>
 
       {selectedSection?.id === 'rooms' ? <RoomsSection onRoomsChange={handleRoomsChange} /> : null}
+      {selectedSection?.id === 'routing' ? <QueueRoutingSection onRoutingChange={handleRoomsChange} /> : null}
       {selectedSection?.id === 'staff' ? (
         <StaffSection onStaffChange={handleAdminDataChange} refreshKey={roomsVersion} />
       ) : null}

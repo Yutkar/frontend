@@ -97,7 +97,15 @@ function findRoom(roomId?: string): SharedRoom | undefined {
 }
 
 function isRoomAcceptingTickets(room?: SharedRoom): boolean {
-  return Boolean(room && room.isActive !== false && room.status !== 'paused')
+  return Boolean(
+    room &&
+    room.active !== false &&
+    room.isActive !== false &&
+    room.ticketIssueEnabled !== false &&
+    room.isTicketIssueEnabled !== false &&
+    room.kioskEnabled !== false &&
+    room.status !== 'paused',
+  )
 }
 
 export function assertMockRoomAcceptsTickets(roomId?: string | number): void {
@@ -168,9 +176,16 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
   const isActive = getRecordActive(record)
   const name = getRecordText(record, ['name', 'title', 'roomName'], currentRoom?.name ?? `Кабинет ${id}`)
   const nextRoom: SharedRoom = {
+    active: isActive,
     department: getRecordText(record, ['department'], currentRoom?.department ?? name),
     id,
     isActive,
+    isTicketIssueEnabled: typeof record.isTicketIssueEnabled === 'boolean'
+      ? record.isTicketIssueEnabled
+      : currentRoom?.isTicketIssueEnabled,
+    kioskEnabled: typeof record.kioskEnabled === 'boolean'
+      ? record.kioskEnabled
+      : currentRoom?.kioskEnabled,
     loadPercent: currentRoom?.loadPercent ?? 0,
     name,
     serviceTypeIds: Array.isArray(record.serviceTypeIds)
@@ -184,6 +199,9 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
       : currentRoom?.services,
     specialistName: currentRoom?.specialistName ?? name,
     status: isActive ? currentRoom?.status === 'busy' ? 'busy' : 'open' : 'paused',
+    ticketIssueEnabled: typeof record.ticketIssueEnabled === 'boolean'
+      ? record.ticketIssueEnabled
+      : currentRoom?.ticketIssueEnabled,
     workload: currentRoom?.workload ?? 0,
   }
 

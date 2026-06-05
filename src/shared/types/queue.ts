@@ -10,6 +10,8 @@ export type TicketStatus =
 
 export type TicketPriority = 'low' | 'normal' | 'above_normal' | 'high' | 'critical'
 
+export type AnalyticsPeriod = 'day' | 'week' | 'month'
+
 export type ServiceType =
   | 'registration'
   | 'consultation'
@@ -47,11 +49,15 @@ export type Room = {
   department: string
   specialistName: string
   status: RoomStatus
+  active?: boolean
   isActive?: boolean
+  isTicketIssueEnabled?: boolean
+  kioskEnabled?: boolean
   serviceTypeId?: string | number
   serviceTypeIds?: Array<string | number>
   serviceTypes?: Array<string | number | { _id?: string | number; id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   services?: Array<string | number | { _id?: string | number; id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  ticketIssueEnabled?: boolean
   currentTicketId?: string
   workload?: number
   loadPercent: number

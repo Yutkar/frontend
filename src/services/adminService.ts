@@ -6,14 +6,17 @@ import {
   type AdminUserInput,
   type TicketSettingsServiceTypeOption,
 } from './api'
-import { withOperationalRefresh } from './syncService'
+import { refreshOperationalData, withOperationalRefresh } from './syncService'
 import type { User } from '@shared/types'
 
 export type AdminRoomPayload = {
   active?: boolean
   isActive?: boolean
+  isTicketIssueEnabled?: boolean
+  kioskEnabled?: boolean
   name: string
   serviceTypeIds?: Array<string | number>
+  ticketIssueEnabled?: boolean
 }
 
 export type AdminUserPayload = AdminUserInput & {
@@ -28,6 +31,39 @@ function onlySpecialists(users: User[]): User[] {
 
 function onlyManagers(users: User[]): User[] {
   return users.filter((user) => user.role === 'manager')
+}
+
+function normalizeId(value: string | number): string | number {
+  const numberValue = Number(value)
+
+  return Number.isFinite(numberValue) && String(value).trim() !== '' ? numberValue : value
+}
+
+function getRoomServiceTypeIds(room: AdminRecord): string[] {
+  const record = room as AdminRecord & {
+    serviceTypeId?: string | number
+    serviceTypeIds?: Array<string | number>
+    serviceTypes?: Array<string | number | { _id?: string | number; id?: string | number; serviceTypeId?: string | number }>
+    services?: Array<string | number | { _id?: string | number; id?: string | number; serviceTypeId?: string | number }>
+  }
+
+  if (record.serviceTypeId !== undefined) {
+    return [String(record.serviceTypeId)]
+  }
+
+  if (Array.isArray(record.serviceTypeIds)) {
+    return record.serviceTypeIds.map(String)
+  }
+
+  return [...(record.serviceTypes ?? []), ...(record.services ?? [])]
+    .map((serviceType) => {
+      if (typeof serviceType === 'string' || typeof serviceType === 'number') {
+        return String(serviceType)
+      }
+
+      return String(serviceType.serviceTypeId ?? serviceType.id ?? serviceType._id ?? '')
+    })
+    .filter(Boolean)
 }
 
 export const adminService = {
@@ -82,6 +118,43 @@ export const adminService = {
     } catch (error) {
       console.error('adminService.deleteRoom failed', error)
       throw toServiceError(error, 'Не удалось удалить кабинет')
+    }
+  },
+
+  async updateQueueRouting(serviceTypeId: string | number, roomIds: Array<string | number>): Promise<void> {
+    try {
+      const rooms = await adminApi.getRooms()
+      const selectedRoomIds = new Set(roomIds.map(String))
+      const normalizedServiceTypeId = String(serviceTypeId)
+
+      await Promise.all(rooms.map((room) => {
+        const roomId = String(room.id)
+        const currentServiceTypeIds = getRoomServiceTypeIds(room)
+        const nextServiceTypeIds = selectedRoomIds.has(roomId)
+          ? Array.from(new Set([...currentServiceTypeIds, normalizedServiceTypeId]))
+          : currentServiceTypeIds.filter((id) => id !== normalizedServiceTypeId)
+        const changed = nextServiceTypeIds.length !== currentServiceTypeIds.length ||
+          nextServiceTypeIds.some((id) => !currentServiceTypeIds.includes(id))
+
+        if (!changed) {
+          return Promise.resolve()
+        }
+
+        return adminApi.updateRoom(room.id, {
+          active: typeof room.active === 'boolean' ? room.active : undefined,
+          isActive: typeof room.isActive === 'boolean' ? room.isActive : undefined,
+          isTicketIssueEnabled: typeof room.isTicketIssueEnabled === 'boolean' ? room.isTicketIssueEnabled : undefined,
+          kioskEnabled: typeof room.kioskEnabled === 'boolean' ? room.kioskEnabled : undefined,
+          name: typeof room.name === 'string' ? room.name : String(room.id),
+          serviceTypeIds: nextServiceTypeIds.map(normalizeId),
+          ticketIssueEnabled: typeof room.ticketIssueEnabled === 'boolean' ? room.ticketIssueEnabled : undefined,
+        } as AdminRecordInput)
+      }))
+
+      await refreshOperationalData('Настройки очередей обновлены')
+    } catch (error) {
+      console.error('adminService.updateQueueRouting failed', error)
+      throw toServiceError(error, 'Не удалось сохранить настройки очереди')
     }
   },
 

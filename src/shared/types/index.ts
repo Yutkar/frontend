@@ -1,5 +1,6 @@
 export type {
   AnalyticsPoint,
+  AnalyticsPeriod,
   QueueEvent,
   QueueEventType,
   QueueKpi,
