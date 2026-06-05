@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Room, Ticket } from '@shared/types'
-import { formatTime } from '@shared/utils'
+import { formatRoomName, formatTime } from '@shared/utils'
 
 type CallBoardProps = {
   rooms: Room[]
@@ -17,40 +18,146 @@ function getCallTimestamp(ticket: Ticket): number {
 
 function getRoomName(ticket: Ticket, rooms: Room[]): string {
   if (ticket.roomName) {
-    return ticket.roomName
+    return formatRoomName({ id: ticket.roomId, name: ticket.roomName })
   }
   const room = rooms.find((item) => String(item.id) === String(ticket.roomId))
-  return room?.name ?? (ticket.roomId ? `Кабинет ${ticket.roomId}` : 'Кабинет не назначен')
+  return formatRoomName(room ?? { id: ticket.roomId })
 }
 
-const statusOrder: Record<string, number> = { called: 0, in_service: 1, completed: 2 }
+function getCallKey(ticket?: Ticket): string {
+  return ticket ? `${ticket.id}:${getCallTime(ticket)}` : ''
+}
+
+function getSpeechRoomName(roomName: string): string {
+  return roomName.replace(/^Кабинет/i, 'кабинет')
+}
 
 export function CallBoard({ rooms, tickets }: CallBoardProps) {
-  // Все талоны со всех кабинетов перемешаны по времени вызова
-  const allTickets = tickets
-    .filter((ticket) => ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'completed')
-    .sort((left, right) => {
-      const statusDiff = (statusOrder[left.status] ?? 3) - (statusOrder[right.status] ?? 3)
-      if (statusDiff !== 0) return statusDiff
-      return getCallTimestamp(right) - getCallTimestamp(left)
-    })
+  const [highlightedCallKey, setHighlightedCallKey] = useState('')
+  const [soundBlocked, setSoundBlocked] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(false)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const hasRenderedRef = useRef(false)
+  const previousCallKeyRef = useRef('')
 
-  const currentCall = allTickets.find(
-    (ticket) => ticket.status === 'called' || ticket.status === 'in_service'
+  const currentCall = useMemo(
+    () => tickets
+      .filter((ticket) => ticket.status === 'called')
+      .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))[0],
+    [tickets],
   )
+  const currentCallKey = getCallKey(currentCall)
+  const currentCallNumber = currentCall?.number ?? ''
+  const currentCallRoomName = currentCall ? getRoomName(currentCall, rooms) : ''
 
-  const recentCalls = allTickets
-    .filter((ticket) => ticket.status === 'completed')
-    .slice(0, 9)
+  const recentCalls = tickets
+    .filter((ticket) =>
+      ticket.calledAt &&
+      (ticket.status === 'called' || ticket.status === 'no_show'),
+    )
+    .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
+    .slice(0, 10)
+
+  async function playBeep() {
+    const AudioContextConstructor = window.AudioContext
+      ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+
+    if (!AudioContextConstructor) {
+      return
+    }
+
+    const audioContext = audioContextRef.current ?? new AudioContextConstructor()
+    audioContextRef.current = audioContext
+
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+
+    const oscillator = audioContext.createOscillator()
+    const gain = audioContext.createGain()
+
+    oscillator.type = 'sine'
+    oscillator.frequency.value = 880
+    gain.gain.setValueAtTime(0.001, audioContext.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.32)
+    oscillator.connect(gain)
+    gain.connect(audioContext.destination)
+    oscillator.start()
+    oscillator.stop(audioContext.currentTime + 0.34)
+  }
+
+  async function announceCall(ticketNumber: string, roomName: string) {
+    if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(
+        `Талон ${ticketNumber}, ${getSpeechRoomName(roomName)}`,
+      )
+      utterance.lang = 'ru-RU'
+      utterance.rate = 0.92
+      window.speechSynthesis.speak(utterance)
+      return
+    }
+
+    await playBeep()
+  }
+
+  async function enableSound() {
+    try {
+      await playBeep()
+      setSoundBlocked(false)
+      setSoundEnabled(true)
+    } catch (error) {
+      console.error('Board sound enable failed', error)
+      setSoundBlocked(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!currentCallKey) {
+      previousCallKeyRef.current = ''
+      hasRenderedRef.current = true
+      return
+    }
+
+    const previousCallKey = previousCallKeyRef.current
+    const shouldHighlight = hasRenderedRef.current && previousCallKey !== currentCallKey
+
+    previousCallKeyRef.current = currentCallKey
+    hasRenderedRef.current = true
+
+    if (!shouldHighlight) {
+      return
+    }
+
+    setHighlightedCallKey(currentCallKey)
+    const highlightTimeout = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
+
+    if (soundEnabled) {
+      void announceCall(currentCallNumber, currentCallRoomName).catch((error) => {
+        console.error('Board call announce failed', error)
+        setSoundBlocked(true)
+      })
+    }
+
+    return () => window.clearTimeout(highlightTimeout)
+  }, [currentCallKey, currentCallNumber, currentCallRoomName, soundEnabled])
 
   return (
     <div className="tv-grid">
       <section className="tv-current">
         <span className="tv-section-label">Сейчас вызывается</span>
+        {!soundEnabled || soundBlocked ? (
+          <button className="tv-sound-button" onClick={() => void enableSound()} type="button">
+            Включить звук
+          </button>
+        ) : null}
         {currentCall ? (
-          <article className="tv-call-card tv-call-featured">
+          <article
+            className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
+          >
             <strong>{currentCall.number}</strong>
-            <span>{getRoomName(currentCall, rooms)}</span>
+            <span>{currentCallRoomName}</span>
             <time>{formatTime(getCallTime(currentCall))}</time>
           </article>
         ) : (
@@ -66,6 +173,7 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
               <strong>{ticket.number}</strong>
               <span>{getRoomName(ticket, rooms)}</span>
               <time>{formatTime(getCallTime(ticket))}</time>
+              {ticket.status === 'no_show' ? <em>Не явился</em> : null}
             </div>
           ))
         ) : (

@@ -12,6 +12,7 @@ import { ticketService } from '@services/ticketService'
 import type { TicketSettingsOptions } from '@services/api'
 import type { Ticket } from '@shared/types'
 import { Button } from '@shared/ui/components'
+import { formatRoomName } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
 const emptyOptions: TicketSettingsOptions = {
@@ -102,7 +103,7 @@ export function KioskPage() {
     return {
       date: new Date(createdTicket.createdAt),
       priorityLabel: getPriorityLabel(createdTicket.priority),
-      roomName: room?.name ?? 'Не назначен',
+      roomName: formatRoomName(room ?? { id: createdTicket.roomId, name: createdTicket.roomName }),
       serviceName: selectedServiceType
         ? getServiceOptionLabel(selectedServiceType)
         : 'Консультация',

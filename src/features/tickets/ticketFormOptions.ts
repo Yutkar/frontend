@@ -34,6 +34,8 @@ export const ticketStatuses: TicketStatus[] = [
 ]
 
 export const fallbackServiceTypes = fallbackServiceTypeOptions
+export const activeQueueStatuses = new Set<TicketStatus>(['created', 'waiting', 'called', 'in_service', 'redirected'])
+const overloadLoadPercent = 75
 
 export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption): string {
   if (!option) {
@@ -65,15 +67,17 @@ function normalizeServiceId(value?: string | number | null): string {
 
 function getFallbackRoomServiceIds(room: Room): string[] {
   const record = room as Room & {
+    serviceTypeId?: string | number
     serviceTypeIds?: Array<string | number>
-    serviceTypes?: Array<string | number | { id?: string | number; serviceTypeId?: string | number }>
-    services?: Array<string | number | { id?: string | number; serviceTypeId?: string | number }>
+    serviceTypes?: Array<string | number | { _id?: string | number; id?: string | number; serviceTypeId?: string | number }>
+    services?: Array<string | number | { _id?: string | number; id?: string | number; serviceTypeId?: string | number }>
   }
 
   return getRoomServiceIds(record)
 }
 
 export function getRoomServiceIds(room: TicketSettingsRoomOption): string[] {
+  const singleId = normalizeServiceId(room.serviceTypeId)
   const explicitIds = Array.isArray(room.serviceTypeIds)
     ? room.serviceTypeIds.map(normalizeServiceId)
     : []
@@ -83,10 +87,10 @@ export function getRoomServiceIds(room: TicketSettingsRoomOption): string[] {
         return normalizeServiceId(service)
       }
 
-      return normalizeServiceId(service.id ?? service.serviceTypeId ?? service.name ?? service.title)
+      return normalizeServiceId(service.serviceTypeId ?? service.id ?? service._id ?? service.name ?? service.title)
     })
 
-  return Array.from(new Set([...explicitIds, ...nestedServices].filter(Boolean)))
+  return Array.from(new Set([singleId, ...explicitIds, ...nestedServices].filter(Boolean)))
 }
 
 export function roomSupportsService(
@@ -110,9 +114,13 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
       id: room.id,
       isActive: room.isActive,
       name: room.name,
+      roomId: room.roomId,
+      roomName: room.roomName,
+      serviceTypeId: room.serviceTypeId,
       serviceTypeIds: room.serviceTypeIds,
       serviceTypes: room.serviceTypes,
       services: room.services,
+      title: room.title,
     }))
 
   fallbackRooms
@@ -122,7 +130,10 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
         mergedRooms.push({
           id: room.id,
           name: room.name,
+          serviceTypeId: room.serviceTypeId,
           serviceTypeIds: getFallbackRoomServiceIds(room),
+          serviceTypes: room.serviceTypes,
+          services: room.services,
         })
       }
     })
@@ -156,4 +167,71 @@ export function getSpecialistsForRoom(
   return specialists.filter((specialist) => (
     normalizeServiceId(specialist.roomId ?? specialist.assignedRoomId) === selectedRoomId
   ))
+}
+
+export function getRoomLoadPercent(room: TicketSettingsRoomOption, fallbackRooms: Room[]): number {
+  const roomId = normalizeServiceId(room.id)
+  const fallbackRoom = fallbackRooms.find((item) => normalizeServiceId(item.id) === roomId)
+  const roomWithLoad = room as TicketSettingsRoomOption & {
+    loadPercent?: number
+    workload?: number
+  }
+
+  return fallbackRoom?.loadPercent ?? roomWithLoad.loadPercent ?? fallbackRoom?.workload ?? roomWithLoad.workload ?? 0
+}
+
+export function isRoomAvailableForTicket(room: TicketSettingsRoomOption, fallbackRooms: Room[]): boolean {
+  const roomId = normalizeServiceId(room.id)
+  const fallbackRoom = fallbackRooms.find((item) => normalizeServiceId(item.id) === roomId)
+  const isActive = room.isActive !== false &&
+    room.active !== false &&
+    fallbackRoom?.isActive !== false &&
+    fallbackRoom?.status !== 'paused'
+
+  return isActive && getRoomLoadPercent(room, fallbackRooms) < overloadLoadPercent
+}
+
+export function getRoomQueueCount(roomId: string | number, tickets: Array<{ roomId?: string | number; status: TicketStatus }>): number {
+  const normalizedRoomId = normalizeServiceId(roomId)
+
+  return tickets.filter((ticket) =>
+    normalizeServiceId(ticket.roomId) === normalizedRoomId && activeQueueStatuses.has(ticket.status),
+  ).length
+}
+
+export function getAutoRoomForService(
+  rooms: TicketSettingsRoomOption[],
+  fallbackRooms: Room[],
+  tickets: Array<{ roomId?: string | number; status: TicketStatus }>,
+): TicketSettingsRoomOption | undefined {
+  return [...rooms]
+    .filter((room) => isRoomAvailableForTicket(room, fallbackRooms))
+    .sort((left, right) => {
+      const leftId = normalizeServiceId(left.id)
+      const rightId = normalizeServiceId(right.id)
+      const queueDelta = getRoomQueueCount(leftId, tickets) - getRoomQueueCount(rightId, tickets)
+
+      if (queueDelta !== 0) {
+        return queueDelta
+      }
+
+      const loadDelta = getRoomLoadPercent(left, fallbackRooms) - getRoomLoadPercent(right, fallbackRooms)
+
+      if (loadDelta !== 0) {
+        return loadDelta
+      }
+
+      return left.name.localeCompare(right.name, 'ru')
+    })[0]
+}
+
+export function getAutoSpecialistForRoom(
+  roomId: string | number,
+  specialists: TicketSettingsUserOption[],
+): TicketSettingsUserOption | undefined {
+  const normalizedRoomId = normalizeServiceId(roomId)
+
+  return specialists.find((specialist) =>
+    normalizeServiceId(specialist.roomId ?? specialist.assignedRoomId) === normalizedRoomId,
+  )
 }

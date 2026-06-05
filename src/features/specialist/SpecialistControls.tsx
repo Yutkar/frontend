@@ -1,11 +1,18 @@
-import { useMemo, useState } from 'react'
-import { CheckCircle2, FastForward, Play, RotateCcw, UserX } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { CheckCircle2, FastForward, Play, RotateCcw, Shuffle, UserX, X } from 'lucide-react'
 import { ticketService } from '@services/ticketService'
-import type { Room, Ticket, TicketPriority } from '@shared/types'
+import type { TicketSettingsOptions } from '@services/api'
+import type { RedirectTicketInput, Room, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
-import { useCurrentTime } from '@shared/utils'
+import { formatRoomName, useCurrentTime } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
+import {
+  getAutoRoomForService,
+  getRoomsForService,
+  getServiceOptionLabel,
+  getServiceTypes,
+} from '@features/tickets/ticketFormOptions'
 
 type SpecialistControlsProps = {
   room: Room
@@ -21,13 +28,225 @@ const priorityOrder: Record<TicketPriority, number> = {
 
 const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'no_show', 'redirected'] as const
 
+const emptyTicketSettingsOptions: TicketSettingsOptions = {
+  rooms: [],
+  serviceTypes: [],
+  specialists: [],
+}
+
+function normalizeId(value?: string | number | null): string {
+  return value == null ? '' : String(value)
+}
+
+type RedirectPatientModalProps = {
+  fallbackRooms: Room[]
+  onClose: () => void
+  onRedirect: (input: RedirectTicketInput) => Promise<void>
+  open: boolean
+  ticket: Ticket | null
+  tickets: Ticket[]
+}
+
+function RedirectPatientModal({
+  fallbackRooms,
+  onClose,
+  onRedirect,
+  open,
+  ticket,
+  tickets,
+}: RedirectPatientModalProps) {
+  const [error, setError] = useState<string | null>(null)
+  const [loadingOptions, setLoadingOptions] = useState(false)
+  const [note, setNote] = useState('')
+  const [options, setOptions] = useState<TicketSettingsOptions>(emptyTicketSettingsOptions)
+  const [saving, setSaving] = useState(false)
+  const [serviceTypeId, setServiceTypeId] = useState('')
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    setError(null)
+    setNote('')
+    setOptions(emptyTicketSettingsOptions)
+    setSaving(false)
+    setServiceTypeId('')
+  }, [open])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    let active = true
+
+    setLoadingOptions(true)
+    ticketService
+      .getTicketSettingsOptions()
+      .then((nextOptions) => {
+        if (active) {
+          setOptions(nextOptions)
+        }
+      })
+      .catch((loadError) => {
+        console.error('Redirect options load failed', loadError)
+        if (active) {
+          setError('Не удалось загрузить услуги для перенаправления.')
+          setOptions(emptyTicketSettingsOptions)
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoadingOptions(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [open])
+
+  const serviceTypes = useMemo(() => getServiceTypes(options), [options])
+  const selectedServiceType = serviceTypes.find((serviceType) => String(serviceType.id) === serviceTypeId)
+  const rooms = useMemo(
+    () => getRoomsForService(options, selectedServiceType?.id, fallbackRooms),
+    [fallbackRooms, options, selectedServiceType?.id],
+  )
+  const autoRoom = useMemo(
+    () => getAutoRoomForService(rooms, fallbackRooms, tickets),
+    [fallbackRooms, rooms, tickets],
+  )
+  const noRoomAvailable = Boolean(selectedServiceType && !autoRoom && !loadingOptions)
+  const isBusy = saving || loadingOptions
+
+  if (!open || !ticket) {
+    return null
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!ticket) {
+      return
+    }
+
+    if (!selectedServiceType) {
+      setError('Выберите новую услугу.')
+      return
+    }
+
+    if (!autoRoom) {
+      setError('Нет доступного кабинета для выбранной услуги')
+      return
+    }
+
+    const trimmedNote = note.trim()
+
+    setError(null)
+    setSaving(true)
+
+    try {
+      await onRedirect({
+        comment: trimmedNote || undefined,
+        note: trimmedNote || undefined,
+        reason: trimmedNote || 'Перенаправление пациента',
+        roomId: normalizeId(autoRoom.id),
+        serviceTypeId: selectedServiceType.id,
+        ticketId: ticket.id,
+      })
+      onClose()
+    } catch (redirectError) {
+      console.error('Redirect patient failed', redirectError)
+      setError('Не удалось перенаправить пациента.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div aria-modal="true" className="modal-backdrop" role="dialog">
+      <form className="ticket-settings-modal" onSubmit={handleSubmit}>
+        <header className="modal-header">
+          <div>
+            <span className="eyebrow">
+              <Shuffle size={14} />
+              Перенаправление
+            </span>
+            <h2>Перенаправить пациента</h2>
+          </div>
+          <button
+            aria-label="Отмена"
+            className="modal-close"
+            disabled={saving}
+            onClick={onClose}
+            type="button"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        {error ? <div className="modal-error">{error}</div> : null}
+        {!error && noRoomAvailable ? (
+          <div className="modal-error">Нет доступного кабинета для выбранной услуги</div>
+        ) : null}
+        {!error && autoRoom ? (
+          <div className="modal-info">Кабинет выбран автоматически: {formatRoomName(autoRoom)}</div>
+        ) : null}
+
+        <div className="settings-form-grid">
+          <label className="field service-type-field">
+            <span>Новая услуга</span>
+            <select
+              disabled={isBusy || serviceTypes.length === 0}
+              onChange={(event) => {
+                setServiceTypeId(event.target.value)
+                setError(null)
+              }}
+              value={serviceTypeId}
+            >
+              <option value="">Выберите услугу</option>
+              {serviceTypes.map((serviceType) => (
+                <option key={String(serviceType.id)} value={String(serviceType.id)}>
+                  {getServiceOptionLabel(serviceType)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field settings-comment-field">
+            <span>Примечание</span>
+            <input
+              disabled={isBusy}
+              onChange={(event) => setNote(event.target.value)}
+              value={note}
+            />
+          </label>
+        </div>
+
+        <footer className="modal-actions">
+          <Button disabled={saving} onClick={onClose} variant="ghost">
+            Отмена
+          </Button>
+          <Button disabled={isBusy || !selectedServiceType || !autoRoom} type="submit" variant="primary">
+            {saving ? 'Перенаправляем...' : 'Перенаправить'}
+          </Button>
+        </footer>
+      </form>
+    </div>
+  )
+}
+
 export function SpecialistControls({ room }: SpecialistControlsProps) {
   const [returnError, setReturnError] = useState<string | null>(null)
   const [returningTicketId, setReturningTicketId] = useState<string | null>(null)
+  const [redirectTicketItem, setRedirectTicketItem] = useState<Ticket | null>(null)
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const completeService = useQueueStore((state) => state.completeService)
   const loadQueue = useQueueStore((state) => state.loadQueue)
   const loading = useQueueStore((state) => state.loading)
+  const redirectTicket = useQueueStore((state) => state.redirectTicket)
+  const rooms = useQueueStore((state) => state.rooms)
   const skipTicket = useQueueStore((state) => state.skipTicket)
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
@@ -98,13 +317,23 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
     }
   }
 
+  const handleRedirectTicket = async (input: RedirectTicketInput) => {
+    await redirectTicket(input)
+    await loadQueue({ force: true, successMessage: 'Пациент перенаправлен' })
+  }
+
+  const openRedirectModal = (ticket: Ticket) => {
+    setRedirectTicketItem(ticket)
+    void loadQueue({ force: true, successMessage: 'Данные для перенаправления обновлены' })
+  }
+
   return (
     <div className="specialist-workspace">
       <section className="specialist-panel specialist-current-panel">
         <div className="panel-header">
           <div>
             <span className="eyebrow">{room.department}</span>
-            <h2>{room.name}</h2>
+            <h2>{formatRoomName(room)}</h2>
           </div>
           <Button
             disabled={loading || Boolean(currentTicket) || waitingTickets.length === 0}
@@ -128,12 +357,20 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
                     <Button disabled={loading} icon={<UserX size={17} />} onClick={() => void skipTicket(currentTicket.id)} variant="danger">
                       {t.specialist.noShow}
                     </Button>
+                    <Button disabled={loading} icon={<Shuffle size={17} />} onClick={() => openRedirectModal(currentTicket)} variant="secondary">
+                      {t.specialist.redirectPatient}
+                    </Button>
                   </>
                 ) : null}
                 {currentTicket.status === 'in_service' ? (
-                  <Button disabled={loading} icon={<CheckCircle2 size={17} />} onClick={() => void completeService(currentTicket.id)} variant="primary">
-                    {t.specialist.complete}
-                  </Button>
+                  <>
+                    <Button disabled={loading} icon={<CheckCircle2 size={17} />} onClick={() => void completeService(currentTicket.id)} variant="primary">
+                      {t.specialist.complete}
+                    </Button>
+                    <Button disabled={loading} icon={<Shuffle size={17} />} onClick={() => openRedirectModal(currentTicket)} variant="secondary">
+                      {t.specialist.redirectPatient}
+                    </Button>
+                  </>
                 ) : null}
               </div>
             }
@@ -213,6 +450,14 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           )}
         </section>
       </aside>
+      <RedirectPatientModal
+        fallbackRooms={rooms}
+        onClose={() => setRedirectTicketItem(null)}
+        onRedirect={handleRedirectTicket}
+        open={Boolean(redirectTicketItem)}
+        ticket={redirectTicketItem}
+        tickets={tickets}
+      />
     </div>
   )
 }

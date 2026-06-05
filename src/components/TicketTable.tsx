@@ -1,5 +1,5 @@
 import type { Ticket } from '../types'
-import { formatWaitingTime, getWaitingMinutes, useCurrentTime } from '@shared/utils'
+import { formatRoomName, formatWaitingTime, getWaitingMinutes, useCurrentTime } from '@shared/utils'
 import { StatusBadge } from './StatusBadge'
 
 const priorityLabels: Record<Ticket['priority'], string> = {
@@ -43,7 +43,7 @@ export function TicketTable({
                 <strong>{ticket.number}</strong>
               </td>
               <td>{ticket.serviceType.name}</td>
-              <td>{ticket.room.name}</td>
+              <td>{formatRoomName(ticket.room)}</td>
               <td>{priorityLabels[ticket.priority]}</td>
               <td>{formatWaitingTime(getWaitingMinutes(ticket, now))}</td>
               <td>

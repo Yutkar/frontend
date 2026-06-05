@@ -48,9 +48,10 @@ export type Room = {
   specialistName: string
   status: RoomStatus
   isActive?: boolean
+  serviceTypeId?: string | number
   serviceTypeIds?: Array<string | number>
-  serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
-  services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  serviceTypes?: Array<string | number | { _id?: string | number; id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  services?: Array<string | number | { _id?: string | number; id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   currentTicketId?: string
   workload?: number
   loadPercent: number
@@ -124,6 +125,9 @@ export type TicketCreateInput = {
 
 export type RedirectTicketInput = {
   ticketId: string
-  roomId: string
-  reason: string
+  roomId: string | number
+  reason?: string
+  serviceTypeId?: string | number
+  note?: string
+  comment?: string
 }

@@ -203,6 +203,12 @@ function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOp
 }
 
 function getServiceTypeIds(record: UnknownRecord): Array<string | number> {
+  const singleServiceTypeId = record.serviceTypeId ?? record.service_type_id
+
+  if (typeof singleServiceTypeId === 'string' || typeof singleServiceTypeId === 'number') {
+    return [singleServiceTypeId]
+  }
+
   const rawServiceTypeIds = record.serviceTypeIds
     ?? record.serviceIds
     ?? record.servicesIds

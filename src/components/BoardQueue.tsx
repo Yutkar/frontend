@@ -1,4 +1,5 @@
 import type { Ticket } from '../types'
+import { formatRoomName } from '@shared/utils'
 
 type BoardQueueProps = {
   tickets: Ticket[]
@@ -16,7 +17,7 @@ export function BoardQueue({ tickets }: BoardQueueProps) {
         <article className="board-current-call">
           <span>Текущий вызов</span>
           <strong>{currentTicket.number}</strong>
-          <p>{currentTicket.room.name}</p>
+          <p>{formatRoomName(currentTicket.room)}</p>
         </article>
       ) : (
         <p>Вызовы пациентов появятся здесь после подключения серверной части.</p>
@@ -27,7 +28,7 @@ export function BoardQueue({ tickets }: BoardQueueProps) {
           {visibleTickets.slice(0, 4).map((ticket) => (
             <article key={ticket.id}>
               <strong>{ticket.number}</strong>
-              <span>{ticket.room.name}</span>
+              <span>{formatRoomName(ticket.room)}</span>
             </article>
           ))}
         </div>

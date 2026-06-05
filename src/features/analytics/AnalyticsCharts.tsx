@@ -1,6 +1,6 @@
 import type { AnalyticsPoint, Room, Ticket } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { formatWaitingTime, getAverageWaitingMinutes } from '@shared/utils'
+import { formatRoomName, formatWaitingTime, getAverageWaitingMinutes } from '@shared/utils'
 
 type AnalyticsChartsProps = {
   analytics: AnalyticsPoint[]
@@ -210,7 +210,7 @@ export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsCha
 
             return (
               <article className="room-load-card" key={room.id}>
-                <span>{room.name}</span>
+                <span>{formatRoomName(room)}</span>
                 <strong>{room.loadPercent}%</strong>
                 <small>Статус кабинета: {t.status[room.status]}</small>
                 <small>

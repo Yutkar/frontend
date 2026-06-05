@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Room, Ticket } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { formatTime, formatWaitingTime, getServiceTypeLabel, getWaitingMinutes } from '@shared/utils'
+import { formatRoomName, formatTime, formatWaitingTime, getServiceTypeLabel, getWaitingMinutes } from '@shared/utils'
 import { StatusBadge } from './StatusBadge'
 
 type TicketCardProps = {
@@ -42,7 +42,7 @@ export function TicketCard({ actionSlot, compact = false, now, room, ticket }: T
         </span>
         <span>
           <small>{t.tickets.room}</small>
-          {room?.name ?? t.tickets.unassigned}
+          {formatRoomName(room ?? { id: ticket.roomId, name: ticket.roomName })}
           {room?.isActive === false || room?.status === 'paused' ? ' · Кабинет закрыт' : ''}
         </span>
       </div>

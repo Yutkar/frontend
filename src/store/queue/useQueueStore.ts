@@ -48,6 +48,7 @@ const emptyKpi: QueueKpi = {
 
 const defaultSuccessMessage = 'Данные успешно обновлены'
 const defaultErrorMessage = 'Не удалось загрузить данные'
+const roomSnapshotRetainedStatuses = new Set<Ticket['status']>(['no_show'])
 
 function getQueueErrorMessage(error: unknown): string {
   return getApiErrorMessage(error, defaultErrorMessage)
@@ -65,6 +66,22 @@ function isRecommendationResolveUnsupported(error: unknown): boolean {
   const status = getHttpStatus(error)
 
   return status === 404 || status === 405 || status === 501
+}
+
+function mergeRoomSnapshotTickets(
+  currentTickets: Ticket[],
+  snapshotTickets: Ticket[],
+  roomId: string | number,
+): Ticket[] {
+  const roomIdValue = String(roomId)
+  const snapshotTicketIds = new Set(snapshotTickets.map((ticket) => ticket.id))
+  const retainedTickets = currentTickets.filter((ticket) =>
+    String(ticket.roomId) === roomIdValue &&
+    roomSnapshotRetainedStatuses.has(ticket.status) &&
+    !snapshotTicketIds.has(ticket.id),
+  )
+
+  return [...snapshotTickets, ...retainedTickets]
 }
 
 export const useQueueStore = create<QueueState>((set, get) => ({
@@ -174,6 +191,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     set({ error: null, loading: true, statusMessage: null })
     try {
       const snapshot = await queueApi.getRoomQueueSnapshot(roomId)
+      const currentTickets = get().tickets
       const roomIdValue = String(roomId)
       const currentRoom = get().rooms.find((room) => String(room.id) === roomIdValue)
       const snapshotHasRoom = snapshot.rooms.some((room) => String(room.id) === roomIdValue)
@@ -184,6 +202,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         lastUpdatedAt: new Date().toISOString(),
         loading: false,
         rooms: snapshotHasRoom || !currentRoom ? snapshot.rooms : [currentRoom, ...snapshot.rooms],
+        tickets: mergeRoomSnapshotTickets(currentTickets, snapshot.tickets, roomId),
         statusMessage: defaultSuccessMessage,
       })
     } catch (error) {

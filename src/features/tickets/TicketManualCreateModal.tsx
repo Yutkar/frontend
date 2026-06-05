@@ -4,8 +4,6 @@ import { ticketService } from '@services/ticketService'
 import type {
   TicketCreateSettingsPayload,
   TicketSettingsOptions,
-  TicketSettingsRoomOption,
-  TicketSettingsUserOption,
 } from '@services/api'
 import type {
   Room,
@@ -15,6 +13,8 @@ import type {
 } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import {
+  getAutoRoomForService,
+  getAutoSpecialistForRoom,
   getPriorityLabel,
   getRoomsForService,
   getServiceOptionLabel,
@@ -36,72 +36,8 @@ const emptyOptions: TicketSettingsOptions = {
   specialists: [],
 }
 
-const activeQueueStatuses = new Set(['created', 'waiting', 'called', 'in_service', 'redirected'])
-const overloadLoadPercent = 75
-
 function normalizeId(value?: string | number | null): string {
   return value == null ? '' : String(value)
-}
-
-function getRoomLoadPercent(room: TicketSettingsRoomOption, fallbackRooms: Room[]): number {
-  const fallbackRoom = fallbackRooms.find((item) => item.id === normalizeId(room.id))
-  const roomWithLoad = room as TicketSettingsRoomOption & {
-    loadPercent?: number
-    workload?: number
-  }
-
-  return fallbackRoom?.loadPercent ?? roomWithLoad.loadPercent ?? fallbackRoom?.workload ?? roomWithLoad.workload ?? 0
-}
-
-function isRoomAvailable(room: TicketSettingsRoomOption, fallbackRooms: Room[]): boolean {
-  const fallbackRoom = fallbackRooms.find((item) => item.id === normalizeId(room.id))
-  const isActive = room.isActive !== false &&
-    room.active !== false &&
-    fallbackRoom?.isActive !== false &&
-    fallbackRoom?.status !== 'paused'
-
-  return isActive && getRoomLoadPercent(room, fallbackRooms) < overloadLoadPercent
-}
-
-function getRoomQueueCount(roomId: string, tickets: Ticket[]): number {
-  return tickets.filter((ticket) =>
-    normalizeId(ticket.roomId) === roomId && activeQueueStatuses.has(ticket.status),
-  ).length
-}
-
-function getAutoRoom(
-  rooms: TicketSettingsRoomOption[],
-  fallbackRooms: Room[],
-  tickets: Ticket[],
-): TicketSettingsRoomOption | undefined {
-  return [...rooms]
-    .filter((room) => isRoomAvailable(room, fallbackRooms))
-    .sort((left, right) => {
-      const leftId = normalizeId(left.id)
-      const rightId = normalizeId(right.id)
-      const queueDelta = getRoomQueueCount(leftId, tickets) - getRoomQueueCount(rightId, tickets)
-
-      if (queueDelta !== 0) {
-        return queueDelta
-      }
-
-      const loadDelta = getRoomLoadPercent(left, fallbackRooms) - getRoomLoadPercent(right, fallbackRooms)
-
-      if (loadDelta !== 0) {
-        return loadDelta
-      }
-
-      return left.name.localeCompare(right.name, 'ru')
-    })[0]
-}
-
-function getAutoDoctor(
-  roomId: string,
-  specialists: TicketSettingsUserOption[],
-): TicketSettingsUserOption | undefined {
-  return specialists.find((specialist) =>
-    normalizeId(specialist.roomId ?? specialist.assignedRoomId) === roomId,
-  )
 }
 
 export function TicketManualCreateModal({
@@ -170,11 +106,11 @@ export function TicketManualCreateModal({
     [fallbackRooms, options, selectedServiceType?.id],
   )
   const autoRoom = useMemo(
-    () => getAutoRoom(rooms, fallbackRooms, tickets),
+    () => getAutoRoomForService(rooms, fallbackRooms, tickets),
     [fallbackRooms, rooms, tickets],
   )
   const autoDoctor = useMemo(
-    () => autoRoom ? getAutoDoctor(normalizeId(autoRoom.id), options.specialists) : undefined,
+    () => autoRoom ? getAutoSpecialistForRoom(autoRoom.id, options.specialists) : undefined,
     [autoRoom, options.specialists],
   )
   const noRoomAvailable = Boolean(selectedServiceType && !autoRoom && !loadingOptions)

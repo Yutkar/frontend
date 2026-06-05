@@ -5,7 +5,7 @@ import type { TicketSettingsOptions } from '@services/api'
 import type { TicketCreateInput, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
-import { getPriorityMeta } from '@shared/utils'
+import { formatRoomName, getPriorityMeta } from '@shared/utils'
 import {
   getRoomsForService,
   getServiceOptionLabel,
@@ -165,7 +165,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
             {rooms.length > 0 ? (
               rooms.map((room) => (
                 <option key={room.id} value={room.id}>
-                  {room.name}
+                  {formatRoomName(room)}
                 </option>
               ))
             ) : (

@@ -26,7 +26,7 @@ import { ticketService } from '@services/ticketService'
 import { t } from '@shared/locales/useLocale'
 import type { Ticket, TicketPriority, TicketStatus } from '@shared/types'
 import { Button, QueueTableBase, TicketCard } from '@shared/ui/components'
-import { getWaitingMinutes, useCurrentTime } from '@shared/utils'
+import { formatRoomName, getWaitingMinutes, useCurrentTime } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 import { DashboardKpis, RecentCallsWidget, RoomLoadWidget } from '@widgets'
@@ -339,7 +339,7 @@ export function DashboardPage() {
                   <option value="">Все кабинеты</option>
                   {roomFilterOptions.map((room) => (
                     <option key={normalizeFilterValue(room.id)} value={normalizeFilterValue(room.id)}>
-                      {room.name}
+                      {formatRoomName(room)}
                     </option>
                   ))}
                 </select>

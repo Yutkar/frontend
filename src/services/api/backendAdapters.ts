@@ -15,6 +15,7 @@ import {
   getAverageWaitingMinutes,
   getWaitingMinutes,
 } from '@shared/utils/time'
+import { formatRoomName } from '@shared/utils/room'
 import { planRoomLoads } from '@shared/utils/queuePlanning'
 import type {
   Room as ArchitectureRoom,
@@ -52,6 +53,7 @@ export type BackendRoom = {
   room_name?: string
   roomId?: number | string
   roomName?: string
+  serviceTypeId?: number | string
   services?: unknown[]
   serviceTypeIds?: Array<number | string>
   serviceTypes?: unknown[]
@@ -293,7 +295,12 @@ function getBackendRoomId(room?: BackendRoom | null): string {
 }
 
 function getBackendRoomName(room?: BackendRoom | null): string {
-  return room?.name ?? room?.title ?? room?.roomName ?? room?.room_name ?? 'Кабинет без названия'
+  return formatRoomName({
+    id: room?.id ?? room?.roomId ?? room?.room_id ?? room?._id,
+    name: room?.name,
+    roomName: room?.roomName ?? room?.room_name,
+    title: room?.title,
+  })
 }
 
 export function getBackendTicketRoomId(ticket: BackendTicket): string {
@@ -322,19 +329,28 @@ function getBackendTicketRoomName(ticket: BackendTicket): string {
   const nestedRoomName = ticket.room?.name ?? ticket.room?.title ?? ticket.room?.roomName ?? ticket.room?.room_name
 
   if (nestedRoomName) {
-    return nestedRoomName
+    return formatRoomName({
+      id: getBackendRoomId(ticket.room),
+      name: nestedRoomName,
+    })
   }
 
   const directRoomName = ticket.roomName?.trim()
 
   if (directRoomName) {
-    return directRoomName
+    return formatRoomName({
+      id: getBackendTicketRoomId(ticket),
+      name: directRoomName,
+    })
   }
 
   const snakeRoomName = ticket.room_name?.trim()
 
   if (snakeRoomName) {
-    return snakeRoomName
+    return formatRoomName({
+      id: getBackendTicketRoomId(ticket),
+      name: snakeRoomName,
+    })
   }
 
   const assignedRoomName = ticket.assignedRoom?.name
@@ -343,12 +359,15 @@ function getBackendTicketRoomName(ticket: BackendTicket): string {
     ?? ticket.assignedRoom?.room_name
 
   if (assignedRoomName) {
-    return assignedRoomName
+    return formatRoomName({
+      id: getBackendRoomId(ticket.assignedRoom),
+      name: assignedRoomName,
+    })
   }
 
   const roomId = getBackendTicketRoomId(ticket)
 
-  return roomId ? `Кабинет ${roomId}` : 'Не назначен'
+  return formatRoomName({ id: roomId })
 }
 
 function getBackendRoomActive(room?: BackendRoom | null): boolean {
@@ -420,7 +439,7 @@ function getBackendUpdatedAt(ticket: BackendTicket): string | undefined {
 }
 
 function getBackendBoardCalledAt(ticket: BackendTicket): string | undefined {
-  return getBackendCalledAt(ticket) ?? getBackendUpdatedAt(ticket) ?? getBackendCreatedAt(ticket)
+  return getBackendCalledAt(ticket)
 }
 
 function getBackendStartedAt(ticket: BackendTicket): string | undefined {
@@ -708,6 +727,7 @@ export function toSharedRooms(
       isActive,
       name: getBackendRoomName(room),
       department: getBackendRoomName(room),
+      serviceTypeId: room.serviceTypeId,
       serviceTypeIds: room.serviceTypeIds,
       serviceTypes: room.serviceTypes as Room['serviceTypes'],
       services: room.services as Room['services'],
@@ -739,6 +759,7 @@ export function toSharedRooms(
       isActive: existingRoom?.isActive ?? true,
       name: existingRoom?.name ?? stat.roomName,
       department: existingRoom?.department ?? stat.roomName,
+      serviceTypeId: existingRoom?.serviceTypeId,
       serviceTypeIds: existingRoom?.serviceTypeIds,
       serviceTypes: existingRoom?.serviceTypes,
       services: existingRoom?.services,
@@ -768,6 +789,7 @@ export function toSharedRooms(
       isActive: getBackendRoomActive(ticket.room),
       name: roomName,
       department: serviceType,
+      serviceTypeId: ticket.room?.serviceTypeId,
       serviceTypeIds: ticket.room?.serviceTypeIds,
       serviceTypes: ticket.room?.serviceTypes as Room['serviceTypes'],
       services: ticket.room?.services as Room['services'],
@@ -1356,9 +1378,11 @@ export function toBoardQueueSnapshot(value: unknown): QueueSnapshot {
   const rooms = toBackendRooms(value)
   const boardTickets = tickets
     .map(normalizeBoardTicket)
-    .filter((ticket) => ticket.status === 'called')
+    .filter((ticket) =>
+      ticket.calledAt &&
+      (ticket.status === 'called' || ticket.status === 'no_show'),
+    )
     .sort((left, right) => getBoardTicketSortTime(right) - getBoardTicketSortTime(left))
-    .slice(0, 11)
 
   return {
     tickets: boardTickets,

@@ -26,6 +26,7 @@ type BackendRoomOption = {
   name?: string
   roomId?: string | number
   roomName?: string
+  serviceTypeId?: string | number
   serviceTypeIds?: Array<string | number>
   serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
@@ -271,9 +272,13 @@ function toSettingsOptions(
       id: String(room.id ?? room.roomId ?? room._id),
       isActive: room.isActive ?? room.active ?? true,
       name: room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия',
+      roomId: room.roomId,
+      roomName: room.roomName,
+      serviceTypeId: room.serviceTypeId,
       serviceTypeIds: room.serviceTypeIds ?? (room.serviceTypes as any[])?.map((s: any) => s.serviceTypeId ?? s.id).filter(Boolean),
       serviceTypes: room.serviceTypes,
       services: room.services,
+      title: room.title,
     })),
     serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({
       code: toServiceCode(serviceType),

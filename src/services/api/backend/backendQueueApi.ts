@@ -1,4 +1,4 @@
-import type { QueueSnapshot } from '@shared/types'
+import type { QueueSnapshot, RedirectTicketInput } from '@shared/types'
 import type { QueueStats, Room, Ticket } from '../../../types'
 import {
   toArchitectureRooms,
@@ -23,7 +23,7 @@ import { apiClient, publicApiClient } from '../client'
 import type { QueueApi, QueueOverloadRoom } from '../types'
 import { requestTicketReturn } from './ticketReturnFallback'
 
-const roomVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+const roomVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected', 'no_show'] as const
 const analyticsPaths = [
   '/analytics/dashboard',
   '/analytics/rooms',
@@ -38,6 +38,13 @@ type TicketCreateBody = {
   priority: number
   roomId?: number
   serviceTypeId: number | string
+}
+
+type BackendRedirectBody = {
+  newRoomId: string | number
+  serviceTypeId?: string | number
+  note?: string
+  comment?: string
 }
 
 async function loadQueueSnapshot(ticketPath = '/tickets') {
@@ -360,15 +367,46 @@ function toOverloadRooms(overload: BackendOverloadRoom[]): QueueOverloadRoom[] {
   }))
 }
 
+function toBackendRoomId(roomId: string | number): string | number {
+  const numericRoomId = Number(roomId)
+
+  return Number.isFinite(numericRoomId) ? numericRoomId : roomId
+}
+
+function toRedirectBody(input: RedirectTicketInput, includeOptional = true): BackendRedirectBody {
+  const note = input.note?.trim()
+  const comment = input.comment?.trim() ?? input.reason?.trim()
+
+  return {
+    newRoomId: toBackendRoomId(input.roomId),
+    ...(includeOptional && input.serviceTypeId !== undefined ? { serviceTypeId: input.serviceTypeId } : {}),
+    ...(includeOptional && note ? { note } : {}),
+    ...(includeOptional && comment ? { comment } : {}),
+  }
+}
+
 export const backendQueueApi: QueueApi = {
   getQueueSnapshot() {
     return loadQueueSnapshot()
   },
 
-  async getBoardSnapshot() {
-    const response = await publicApiClient.get<unknown>('/queue/board')
+  async getBoardSnapshot(roomId?: string | number) {
+    const response = await publicApiClient.get<unknown>(
+      roomId ? `/queue/board/${roomId}` : '/queue/board',
+    )
+    const snapshot = toBoardQueueSnapshot(response.data)
 
-    return toBoardQueueSnapshot(response.data)
+    if (!roomId) {
+      return snapshot
+    }
+
+    const roomIdValue = String(roomId)
+
+    return {
+      ...snapshot,
+      rooms: snapshot.rooms.filter((room) => String(room.id) === roomIdValue),
+      tickets: snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomIdValue),
+    }
   },
 
   async getRoomQueueSnapshot(roomId: string | number) {
@@ -477,9 +515,12 @@ export const backendQueueApi: QueueApi = {
   },
 
   async redirectTicket(input) {
-    await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, {
-      newRoomId: Number(input.roomId),
-    })
+    try {
+      await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input))
+    } catch (error) {
+      console.warn('backendQueueApi.redirectTicket: extended payload failed, retrying with newRoomId only', error)
+      await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input, false))
+    }
 
     return loadQueueSnapshot()
   },

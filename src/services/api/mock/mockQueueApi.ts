@@ -22,8 +22,20 @@ export const mockQueueApi: QueueApi = {
     return Promise.resolve(getQueueSnapshot())
   },
 
-  getBoardSnapshot() {
-    return Promise.resolve(getQueueSnapshot())
+  getBoardSnapshot(roomId?: string | number) {
+    const snapshot = getQueueSnapshot()
+
+    if (!roomId) {
+      return Promise.resolve(snapshot)
+    }
+
+    const roomIdValue = String(roomId)
+
+    return Promise.resolve({
+      ...snapshot,
+      rooms: snapshot.rooms.filter((room) => room.id === roomIdValue),
+      tickets: snapshot.tickets.filter((ticket) => ticket.roomId === roomIdValue),
+    })
   },
 
   getRoomQueueSnapshot(roomId: string | number) {
@@ -80,7 +92,7 @@ export const mockQueueApi: QueueApi = {
   },
 
   redirectTicket(input) {
-    redirectSharedTicket(input.ticketId, input.roomId)
+    redirectSharedTicket(input.ticketId, input.roomId, input.serviceTypeId)
 
     return Promise.resolve(getQueueSnapshot())
   },

@@ -14,6 +14,7 @@ import type {
 } from '@shared/types'
 import {
   formatWaitingTime,
+  formatRoomName,
   getServiceTypeLabel,
   getWaitingMinutes,
   useCurrentTime,
@@ -294,7 +295,7 @@ export function TicketSettingsModal({
               <option value="">Не назначен</option>
               {rooms.map((room) => (
                 <option key={String(room.id)} value={String(room.id)}>
-                  {room.name}
+                  {formatRoomName(room)}
                 </option>
               ))}
             </select>

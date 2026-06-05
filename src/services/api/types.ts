@@ -38,6 +38,7 @@ export type TicketSettingsUserOption = {
 }
 
 export type TicketSettingsRoomServiceOption = {
+  _id?: string | number
   id?: string | number
   name?: string
   serviceTypeId?: string | number
@@ -47,9 +48,13 @@ export type TicketSettingsRoomServiceOption = {
 export type TicketSettingsRoomOption = Pick<SharedRoom, 'id' | 'name'> & {
   active?: boolean
   isActive?: boolean
+  roomId?: string | number
+  roomName?: string
+  serviceTypeId?: string | number
   serviceTypeIds?: Array<string | number>
   serviceTypes?: Array<string | number | TicketSettingsRoomServiceOption>
   services?: Array<string | number | TicketSettingsRoomServiceOption>
+  title?: string
 }
 
 export type TicketSettingsOptions = {
@@ -101,7 +106,7 @@ export type QueueListener = (tickets: ArchitectureTicket[]) => void
 
 export type QueueApi = {
   getQueueSnapshot: () => Promise<QueueSnapshot>
-  getBoardSnapshot: () => Promise<QueueSnapshot>
+  getBoardSnapshot: (roomId?: string | number) => Promise<QueueSnapshot>
   getRoomQueueSnapshot: (roomId: string | number) => Promise<QueueSnapshot>
   createTicket: (input: SharedTicketCreateInput) => Promise<QueueSnapshot>
   createKioskTicket: (input: SharedTicketCreateInput) => Promise<QueueSnapshot>

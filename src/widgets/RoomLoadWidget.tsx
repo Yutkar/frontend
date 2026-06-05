@@ -1,6 +1,6 @@
 import type { Room, Ticket } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { formatWaitingTime, getAverageWaitingMinutes } from '@shared/utils'
+import { formatRoomName, formatWaitingTime, getAverageWaitingMinutes } from '@shared/utils'
 
 type RoomLoadWidgetProps = {
   now?: number
@@ -44,7 +44,7 @@ export function RoomLoadWidget({ now, rooms, tickets = [] }: RoomLoadWidgetProps
             return (
               <article className="room-row" key={room.id}>
                 <div>
-                  <strong>{room.name}</strong>
+                  <strong>{formatRoomName(room)}</strong>
                   <span>{room.department}</span>
                 </div>
                 <div className="load-track">

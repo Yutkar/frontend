@@ -1,12 +1,15 @@
 import type { AdminRecord, TicketSettingsServiceTypeOption } from '@services/api'
 import type { Role, User } from '@shared/types'
+import { formatRoomName } from '@shared/utils'
 
 export type AdminRoomRecord = AdminRecord & {
   active?: boolean
   isActive?: boolean
   name?: string
   roomName?: string
+  roomId?: string | number
   services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  serviceTypeId?: string | number
   serviceTypeIds?: Array<string | number>
   serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
   status?: string
@@ -20,11 +23,7 @@ export const roleLabels: Record<Role, string> = {
 }
 
 export function getRoomName(room?: AdminRoomRecord): string {
-  if (!room) {
-    return 'Кабинет не назначен'
-  }
-
-  return room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия'
+  return formatRoomName(room)
 }
 
 export function getRoomActive(room: AdminRoomRecord): boolean {
@@ -32,6 +31,10 @@ export function getRoomActive(room: AdminRoomRecord): boolean {
 }
 
 export function getRoomServiceTypeIds(room: AdminRoomRecord): string[] {
+  if (room.serviceTypeId !== undefined) {
+    return [String(room.serviceTypeId)]
+  }
+
   if (Array.isArray(room.serviceTypeIds)) {
     return room.serviceTypeIds.map(String)
   }

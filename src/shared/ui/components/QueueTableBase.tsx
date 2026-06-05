@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Room, Ticket } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { formatWaitingTime, getServiceTypeLabel, getWaitingMinutes } from '@shared/utils'
+import { formatRoomName, formatWaitingTime, getServiceTypeLabel, getWaitingMinutes } from '@shared/utils'
 import { StatusBadge } from './StatusBadge'
 
 type QueueTableBaseProps = {
@@ -64,7 +64,7 @@ export function QueueTableBase({
                   <StatusBadge priority={ticket.priority} />
                 </td>
                 <td>
-                  {room?.name ?? '-'}
+                  {formatRoomName(room ?? { id: ticket.roomId, name: ticket.roomName })}
                   {room?.isActive === false || room?.status === 'paused' ? (
                     <span className="queue-room-warning">Кабинет закрыт</span>
                   ) : null}

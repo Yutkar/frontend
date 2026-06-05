@@ -6,6 +6,7 @@ import { t } from '@shared/locales/useLocale'
 import type { QueueRecommendation } from '@shared/types'
 import {
   formatTime,
+  formatRoomName,
   formatWaitingTime,
   getPriorityMeta,
   getServiceTypeLabel,
@@ -303,7 +304,10 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                             </div>
                             <div>
                               <dt>Кабинет</dt>
-                              <dd>{recommendation.relatedRoomName ?? 'Не назначен'}</dd>
+                              <dd>{formatRoomName({
+                                id: recommendation.relatedRoomId,
+                                name: recommendation.relatedRoomName,
+                              })}</dd>
                             </div>
                             <div>
                               <dt>Приоритет</dt>
@@ -324,7 +328,10 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                           <dl className="notification-details">
                             <div>
                               <dt>Кабинет</dt>
-                              <dd>{recommendation.relatedRoomName}</dd>
+                              <dd>{formatRoomName({
+                                id: recommendation.relatedRoomId,
+                                name: recommendation.relatedRoomName,
+                              })}</dd>
                             </div>
                           </dl>
                         ) : null}

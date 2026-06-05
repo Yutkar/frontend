@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { AlertTriangle, Check, ExternalLink, Info, Siren } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { QueueRecommendation, Room } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
 import {
   formatTime,
+  formatRoomName,
   formatWaitingTime,
   getPriorityMeta,
   getServiceTypeLabel,
@@ -95,7 +95,10 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
 
       {activeRecommendations.map((recommendation) => {
         const room = rooms.find((item) => item.id === recommendation.relatedRoomId)
-        const roomName = recommendation.relatedRoomName ?? room?.name
+        const roomName = formatRoomName(room ?? {
+          id: recommendation.relatedRoomId,
+          name: recommendation.relatedRoomName,
+        })
 
         return (
           <article
@@ -107,7 +110,7 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
               <header>
                 <div>
                   <span className="eyebrow">
-                    {roomName ?? t.system.systemLabel} / {formatTime(recommendation.createdAt)}
+                    {roomName} / {formatTime(recommendation.createdAt)}
                   </span>
                   <h2>{getRecommendationTitle(recommendation, now)}</h2>
                 </div>
@@ -121,7 +124,7 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
                   </div>
                   <div>
                     <dt>Кабинет</dt>
-                    <dd>{roomName ?? 'Не назначен'}</dd>
+                    <dd>{roomName}</dd>
                   </div>
                   <div>
                     <dt>Приоритет</dt>

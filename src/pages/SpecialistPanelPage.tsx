@@ -6,7 +6,7 @@ import { adminService } from '@services/adminService'
 import { t } from '@shared/locales/useLocale'
 import type { Room, User } from '@shared/types'
 import { Button, StatusBadge } from '@shared/ui/components'
-import { getServiceTypeLabel } from '@shared/utils'
+import { formatRoomName, getServiceTypeLabel } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 
@@ -44,7 +44,7 @@ function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
         </div>
         <div>
           <dt>Кабинет</dt>
-          <dd>{room.name}</dd>
+          <dd>{formatRoomName(room)}</dd>
         </div>
         <div>
           <dt>Специальность</dt>

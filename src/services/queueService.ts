@@ -10,9 +10,9 @@ import { withOperationalRefresh } from './syncService'
 import type { QueueStats, Room, Ticket } from '../types'
 
 export const queueService = {
-  async getBoardSnapshot(): Promise<QueueSnapshot> {
+  async getBoardSnapshot(roomId?: string | number): Promise<QueueSnapshot> {
     try {
-      return await queueApi.getBoardSnapshot()
+      return await queueApi.getBoardSnapshot(roomId)
     } catch (error) {
       console.error('queueService.getBoardSnapshot failed', error)
       throw toServiceError(error, 'Не удалось получить данные табло')

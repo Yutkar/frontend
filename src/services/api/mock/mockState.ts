@@ -380,11 +380,18 @@ export function updateSharedTicketStatus(
   return clone(ticket)
 }
 
-export function redirectSharedTicket(id: string, newRoomId: string | number): SharedTicket {
+export function redirectSharedTicket(
+  id: string,
+  newRoomId: string | number,
+  serviceTypeId?: string | number,
+): SharedTicket {
   const ticket = findSharedTicket(id)
 
   ticket.status = 'redirected'
   ticket.roomId = String(newRoomId)
+  if (serviceTypeId !== undefined) {
+    ticket.serviceType = sharedServiceTypeByArchitectureId[String(serviceTypeId)] ?? ticket.serviceType
+  }
   pushEvent(ticket, 'redirected')
   refreshQueueSnapshot()
 
