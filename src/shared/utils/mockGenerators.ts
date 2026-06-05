@@ -41,13 +41,16 @@ export function createMockTicket(input: TicketCreateInput, queueLength: number):
 export function createQueueEvent(
   type: QueueEventType,
   message: string,
-  payload: Pick<QueueEvent, 'ticketId' | 'ticketNumber' | 'roomId' | 'specialistId'> = {},
+  payload: Partial<Pick<QueueEvent, 'ticketId' | 'ticketNumber' | 'roomId' | 'roomName' | 'specialistId' | 'status'>> = {},
 ): QueueEvent {
+  const createdAt = new Date().toISOString()
+
   return {
     id: `event-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     type,
     message,
-    occurredAt: new Date().toISOString(),
+    createdAt,
+    occurredAt: createdAt,
     ...payload,
   }
 }
