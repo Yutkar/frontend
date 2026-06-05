@@ -21,8 +21,10 @@ export type AdminRoomPayload = {
 
 export type AdminUserPayload = AdminUserInput & {
   assignedRoomId?: string | number
+  assignedRoomIds?: Array<string | number>
   email?: string
   roomId?: string | number
+  roomIds?: Array<string | number>
 }
 
 function onlySpecialists(users: User[]): User[] {

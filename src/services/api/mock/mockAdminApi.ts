@@ -16,6 +16,7 @@ let staff: AdminRecord[] = [
     name: mockUsers.specialist.name,
     role: mockUsers.specialist.role,
     roomId: mockUsers.specialist.roomId,
+    roomIds: mockUsers.specialist.roomIds ?? (mockUsers.specialist.roomId ? [mockUsers.specialist.roomId] : []),
   },
 ]
 let users = Object.values(mockUsers)
@@ -30,6 +31,22 @@ function nextId(prefix: string): string {
 
 function resolveInputId(input: AdminRecordInput, prefix: string): string | number {
   return typeof input.id === 'string' || typeof input.id === 'number' ? input.id : nextId(prefix)
+}
+
+function normalizeRoomIds(record: Partial<User> | AdminRecordInput): string[] {
+  const roomIds = [
+    record.roomId,
+    record.assignedRoomId,
+    ...(Array.isArray(record.roomIds) ? record.roomIds : []),
+    ...(Array.isArray(record.assignedRoomIds) ? record.assignedRoomIds : []),
+  ]
+
+  return Array.from(new Set(
+    roomIds
+      .filter((id): id is string | number => typeof id === 'string' || typeof id === 'number')
+      .map(String)
+      .filter(Boolean),
+  ))
 }
 
 function upsertRecord(
@@ -57,6 +74,8 @@ function deleteRecord(collection: AdminRecord[], id: string | number): AdminReco
 }
 
 function createUserRecord(input: AdminUserInput): User {
+  const roomIds = normalizeRoomIds(input)
+  const primaryRoomId = roomIds[0]
   const user: User = {
     avatarInitials: input.avatarInitials ?? input.name.slice(0, 2).toUpperCase(),
     department: input.department ?? 'SmartQ',
@@ -64,8 +83,10 @@ function createUserRecord(input: AdminUserInput): User {
     id: input.id ?? nextId('user'),
     name: input.name,
     role: input.role,
-    assignedRoomId: input.roomId,
-    roomId: input.roomId,
+    assignedRoomId: primaryRoomId,
+    assignedRoomIds: roomIds,
+    roomId: primaryRoomId,
+    roomIds,
   }
 
   users = [...users, user]
@@ -80,6 +101,7 @@ function createUserRecord(input: AdminUserInput): User {
         name: user.name,
         role: user.role,
         roomId: user.roomId,
+        roomIds: user.roomIds,
       },
     ]
   }
@@ -94,11 +116,19 @@ function updateUserRecord(id: string | number, input: Partial<AdminUserInput>): 
     throw new Error(`User ${id} was not found.`)
   }
 
+  const roomIds = normalizeRoomIds({
+    ...users[index],
+    ...input,
+  })
+  const primaryRoomId = roomIds[0]
+
   users[index] = {
     ...users[index],
     ...input,
-    assignedRoomId: input.roomId ?? input.assignedRoomId ?? users[index].assignedRoomId,
-    roomId: input.roomId ?? input.assignedRoomId ?? users[index].roomId,
+    assignedRoomId: primaryRoomId,
+    assignedRoomIds: roomIds,
+    roomId: primaryRoomId,
+    roomIds,
   }
 
   const staffIndex = staff.findIndex((member) => String(member.id) === String(id))
@@ -107,8 +137,10 @@ function updateUserRecord(id: string | number, input: Partial<AdminUserInput>): 
     staff[staffIndex] = {
       ...staff[staffIndex],
       ...input,
-      assignedRoomId: input.roomId ?? input.assignedRoomId ?? staff[staffIndex].assignedRoomId,
-      roomId: input.roomId ?? input.assignedRoomId ?? staff[staffIndex].roomId,
+      assignedRoomId: primaryRoomId,
+      assignedRoomIds: roomIds,
+      roomId: primaryRoomId,
+      roomIds,
     }
   }
 
@@ -198,7 +230,9 @@ export const mockAdminApi: AdminApi = {
   assignDoctorToRoom(userId, roomId) {
     return Promise.resolve(updateUserRecord(userId, {
       assignedRoomId: String(roomId),
+      assignedRoomIds: [String(roomId)],
       roomId: String(roomId),
+      roomIds: [String(roomId)],
     }))
   },
 }

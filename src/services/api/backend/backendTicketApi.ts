@@ -45,9 +45,13 @@ type BackendServiceTypeOption = {
 
 type BackendUserOption = {
   assignedRoomId?: string | number
+  assignedRoomIds?: Array<string | number>
+  assignedRooms?: Array<{ _id?: string | number; id?: string | number; roomId?: string | number }>
   id: string | number
   name?: string
   roomId?: string | number
+  roomIds?: Array<string | number>
+  rooms?: Array<{ _id?: string | number; id?: string | number; roomId?: string | number }>
   role?: TicketSettingsUserOption['role']
   fullName?: string
 }
@@ -282,6 +286,15 @@ function toSettingsOptions(
   serviceTypes: BackendServiceTypeOption[],
   users: BackendUserOption[],
 ): TicketSettingsOptions {
+  const getUserRoomIds = (user: BackendUserOption) => Array.from(new Set([
+    user.roomId,
+    user.assignedRoomId,
+    ...(user.roomIds ?? []),
+    ...(user.assignedRoomIds ?? []),
+    ...(user.rooms ?? []).map((room) => room.id ?? room.roomId ?? room._id),
+    ...(user.assignedRooms ?? []).map((room) => room.id ?? room.roomId ?? room._id),
+  ].filter((roomId): roomId is string | number => typeof roomId === 'string' || typeof roomId === 'number')))
+
   return {
     rooms: rooms.map((room) => ({
       id: String(room.id ?? room.roomId ?? room._id),
@@ -304,13 +317,19 @@ function toSettingsOptions(
       id: serviceType.id,
       name: serviceType.name ?? serviceType.code ?? `Услуга ${serviceType.id}`,
     })),
-    specialists: users.map((user) => ({
-      assignedRoomId: user.assignedRoomId,
-      id: user.id,
-      name: user.name ?? user.fullName ?? `Специалист ${user.id}`,
-      role: user.role,
-      roomId: user.roomId,
-    })),
+    specialists: users.map((user) => {
+      const userRoomIds = getUserRoomIds(user)
+
+      return {
+        assignedRoomId: user.assignedRoomId ?? userRoomIds[0],
+        assignedRoomIds: userRoomIds,
+        id: user.id,
+        name: user.name ?? user.fullName ?? `Специалист ${user.id}`,
+        role: user.role,
+        roomId: user.roomId ?? userRoomIds[0],
+        roomIds: userRoomIds,
+      }
+    }),
   }
 }
 

@@ -16,6 +16,7 @@ export type Visit = {
 
 export type VisitFilters = {
   roomId?: string
+  roomIds?: string[]
   userId?: string
 }
 
@@ -42,10 +43,13 @@ function formatVisitTime(timestamp: number): string {
 }
 
 function matchesVisitFilters(ticket: Ticket, filters: VisitFilters): boolean {
-  const roomMatches = filters.roomId ? ticket.roomId === filters.roomId : false
+  const filterRoomIds = filters.roomIds?.length ? filters.roomIds : filters.roomId ? [filters.roomId] : []
+  const roomMatches = filterRoomIds.length > 0 && ticket.roomId
+    ? filterRoomIds.includes(ticket.roomId)
+    : false
   const userMatches = filters.userId ? ticket.assignedTo === filters.userId : false
 
-  if (!filters.roomId && !filters.userId) {
+  if (filterRoomIds.length === 0 && !filters.userId) {
     return true
   }
 

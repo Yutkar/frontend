@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { PageHeader, ResourceBanner } from '@components'
 import { visitService, type Visit } from '@services/visitService'
 import type { ServiceType } from '@shared/types'
@@ -27,19 +27,32 @@ function getVisitServiceLabel(service?: string): string {
     : service
 }
 
+function getUserRoomIds(user?: { assignedRoomId?: string; assignedRoomIds?: string[]; roomId?: string; roomIds?: string[] } | null): string[] {
+  if (!user) {
+    return []
+  }
+
+  return Array.from(new Set([
+    user.roomId,
+    user.assignedRoomId,
+    ...(user.roomIds ?? []),
+    ...(user.assignedRoomIds ?? []),
+  ].filter((roomId): roomId is string => Boolean(roomId))))
+}
+
 export function VisitHistoryPage() {
   const user = useGlobalStore((state) => state.user)
-  const specialistRoomId = user?.roomId ?? user?.assignedRoomId
+  const specialistRoomIds = useMemo(() => getUserRoomIds(user), [user])
   const loadVisits = useCallback(async (): Promise<Visit[]> => {
     if (!user) {
       return emptyVisits
     }
 
     return visitService.getTodayVisits({
-      roomId: specialistRoomId,
+      roomIds: specialistRoomIds,
       userId: user.id,
     })
-  }, [specialistRoomId, user])
+  }, [specialistRoomIds, user])
   const { data: visits, loading, error } = useServiceResource(loadVisits, emptyVisits)
 
   return (

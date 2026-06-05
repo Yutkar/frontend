@@ -21,6 +21,7 @@ export const mockUsers: Record<Role, User> = {
     role: 'specialist',
     department: 'Консультация',
     roomId: 'room-203',
+    roomIds: ['room-203', 'room-214'],
     avatarInitials: 'СВ',
   },
 }
@@ -75,7 +76,12 @@ export function registerUser(name: string, email: string, password: string, role
     role,
     department: makeDepartment(role),
     avatarInitials: makeAvatarInitials(name),
-    ...(role === 'specialist' ? { roomId: `room-${210 + Object.keys(mockStoredUsers).length}` } : {}),
+    ...(role === 'specialist'
+      ? {
+          roomId: `room-${210 + Object.keys(mockStoredUsers).length}`,
+          roomIds: [`room-${210 + Object.keys(mockStoredUsers).length}`],
+        }
+      : {}),
   }
 
   mockStoredUsers[normalizedEmail] = user

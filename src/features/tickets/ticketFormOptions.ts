@@ -162,6 +162,15 @@ export function getSpecialists(options: TicketSettingsOptions): TicketSettingsUs
   return options.specialists
 }
 
+export function getSpecialistRoomIds(specialist: TicketSettingsUserOption): string[] {
+  return Array.from(new Set([
+    normalizeServiceId(specialist.roomId),
+    normalizeServiceId(specialist.assignedRoomId),
+    ...(specialist.roomIds ?? []).map(normalizeServiceId),
+    ...(specialist.assignedRoomIds ?? []).map(normalizeServiceId),
+  ].filter(Boolean)))
+}
+
 export function getSpecialistsForRoom(
   options: TicketSettingsOptions,
   roomId?: string | number,
@@ -174,7 +183,7 @@ export function getSpecialistsForRoom(
   }
 
   return specialists.filter((specialist) => (
-    normalizeServiceId(specialist.roomId ?? specialist.assignedRoomId) === selectedRoomId
+    getSpecialistRoomIds(specialist).includes(selectedRoomId)
   ))
 }
 
@@ -255,7 +264,7 @@ export function getAutoSpecialistForRoom(
   const normalizedRoomId = normalizeServiceId(roomId)
 
   return specialists.find((specialist) =>
-    normalizeServiceId(specialist.roomId ?? specialist.assignedRoomId) === normalizedRoomId,
+    getSpecialistRoomIds(specialist).includes(normalizedRoomId),
   )
 }
 

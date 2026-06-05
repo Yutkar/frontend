@@ -15,6 +15,8 @@ type UnknownRecord = Record<string, unknown>
 type BackendUser = Partial<User> & {
   assignedRoom?: UnknownRecord | null
   assignedRoomId?: string | number | null
+  assignedRoomIds?: Array<string | number> | null
+  assignedRooms?: UnknownRecord[] | null
   email?: string
   firstName?: string
   fullName?: string
@@ -22,6 +24,8 @@ type BackendUser = Partial<User> & {
   lastName?: string
   room?: UnknownRecord | null
   roomId?: string | number | null
+  roomIds?: Array<string | number> | null
+  rooms?: UnknownRecord[] | null
   username?: string
   _id?: string | number
 }
@@ -273,12 +277,27 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
 }
 
 function getRoomId(user: BackendUser): string | undefined {
-  const roomId = user.roomId
-    ?? user.assignedRoomId
-    ?? (isRecord(user.room) ? user.room.id : undefined)
-    ?? (isRecord(user.assignedRoom) ? user.assignedRoom.id : undefined)
+  return getRoomIds(user)[0]
+}
 
-  return roomId == null ? undefined : String(roomId)
+function getRoomIds(user: BackendUser): string[] {
+  const roomIds = [
+    user.roomId,
+    user.assignedRoomId,
+    ...(user.roomIds ?? []),
+    ...(user.assignedRoomIds ?? []),
+    ...(user.rooms ?? []).map((room) => room.id ?? room.roomId ?? room._id),
+    ...(user.assignedRooms ?? []).map((room) => room.id ?? room.roomId ?? room._id),
+    isRecord(user.room) ? user.room.id ?? user.room.roomId ?? user.room._id : undefined,
+    isRecord(user.assignedRoom) ? user.assignedRoom.id ?? user.assignedRoom.roomId ?? user.assignedRoom._id : undefined,
+  ]
+
+  return Array.from(new Set(
+    roomIds
+      .filter((roomId): roomId is string | number => typeof roomId === 'string' || typeof roomId === 'number')
+      .map(String)
+      .filter(Boolean),
+  ))
 }
 
 function toUser(user: BackendUser, fallbackRole: Role = 'specialist'): User {
@@ -291,9 +310,11 @@ function toUser(user: BackendUser, fallbackRole: Role = 'specialist'): User {
     ?? getText(user.email)
     ?? 'Без имени'
   const roomId = getRoomId(user)
+  const roomIds = getRoomIds(user)
 
   return {
     assignedRoomId: roomId,
+    assignedRoomIds: roomIds,
     avatarInitials: user.avatarInitials ?? getAvatarInitials(name),
     department: user.department ?? (role === 'manager' ? 'Управление очередью' : 'Кабинет'),
     email: getText(user.email),
@@ -301,6 +322,7 @@ function toUser(user: BackendUser, fallbackRole: Role = 'specialist'): User {
     name,
     role,
     roomId,
+    roomIds,
   }
 }
 
@@ -312,10 +334,17 @@ function hasUserId(user: User): boolean {
   return user.id.trim() !== '' && user.id !== 'undefined' && user.id !== 'null'
 }
 
-function getDesiredRoomId(input: Partial<AdminUserInput>): string | number | undefined {
-  const roomId = input.roomId ?? input.assignedRoomId
+function getDesiredRoomIds(input: Partial<AdminUserInput>): Array<string | number> {
+  const roomIds = [
+    input.roomId,
+    input.assignedRoomId,
+    ...(input.roomIds ?? []),
+    ...(input.assignedRoomIds ?? []),
+  ]
 
-  return typeof roomId === 'string' || typeof roomId === 'number' ? roomId : undefined
+  return Array.from(new Set(roomIds.filter((roomId): roomId is string | number => (
+    typeof roomId === 'string' || typeof roomId === 'number'
+  ))))
 }
 
 function toRegisterPayload(input: AdminUserInput) {
@@ -328,7 +357,12 @@ function toRegisterPayload(input: AdminUserInput) {
 }
 
 function toUserUpdatePayload(input: Partial<AdminUserInput>) {
-  const roomId = getDesiredRoomId(input)
+  const roomIds = getDesiredRoomIds(input)
+  const roomId = roomIds[0]
+  const hasRoomAssignmentInput = 'roomId' in input ||
+    'assignedRoomId' in input ||
+    'roomIds' in input ||
+    'assignedRoomIds' in input
   const payload: UnknownRecord = {}
 
   if (input.name?.trim()) {
@@ -347,9 +381,11 @@ function toUserUpdatePayload(input: Partial<AdminUserInput>) {
     payload.password = input.password.trim()
   }
 
-  if (roomId) {
-    payload.assignedRoomId = normalizeIdValue(roomId)
-    payload.roomId = normalizeIdValue(roomId)
+  if (hasRoomAssignmentInput) {
+    payload.assignedRoomId = roomId ? normalizeIdValue(roomId) : null
+    payload.assignedRoomIds = normalizeIdList(roomIds)
+    payload.roomId = roomId ? normalizeIdValue(roomId) : null
+    payload.roomIds = normalizeIdList(roomIds)
   }
 
   return payload
@@ -488,23 +524,39 @@ async function resolveCreatedUser(input: AdminUserInput, response: BackendUserRe
     email: input.email,
     name: input.name,
     role: input.role,
-    roomAssignmentPending: Boolean(getDesiredRoomId(input)),
+    roomAssignmentPending: getDesiredRoomIds(input).length > 0,
   }
 
   return user
 }
 
 async function assignUserToRoom(userId: string | number, roomId: string | number) {
-  const normalizedRoomId = normalizeIdValue(roomId)
+  return assignUserToRooms(userId, [roomId])
+}
+
+async function assignUserToRooms(userId: string | number, roomIds: Array<string | number>) {
+  const normalizedRoomIds = normalizeIdList(roomIds)
+  const normalizedRoomId = normalizedRoomIds[0]
   const response = await requestFirst([
     () => apiClient
-      .patch<BackendUserResponse>(`/users/${userId}`, { roomId: normalizedRoomId })
+      .patch<BackendUserResponse>(`/users/${userId}`, {
+        assignedRoomId: normalizedRoomId,
+        assignedRoomIds: normalizedRoomIds,
+        roomId: normalizedRoomId,
+        roomIds: normalizedRoomIds,
+      })
       .then((result) => result.data),
     () => apiClient
-      .patch<BackendUserResponse>(`/users/${userId}`, { assignedRoomId: normalizedRoomId })
+      .patch<BackendUserResponse>(`/users/${userId}`, {
+        assignedRoomId: normalizedRoomId,
+        assignedRoomIds: normalizedRoomIds,
+      })
       .then((result) => result.data),
     () => apiClient
-      .patch<BackendUserResponse>(`/staff/${userId}`, { roomId: normalizedRoomId })
+      .patch<BackendUserResponse>(`/staff/${userId}`, {
+        roomId: normalizedRoomId,
+        roomIds: normalizedRoomIds,
+      })
       .then((result) => result.data),
   ])
 
@@ -631,7 +683,7 @@ export const backendAdminApi: AdminApi = {
   },
 
   async createUser(input: AdminUserInput) {
-    const desiredRoomId = getDesiredRoomId(input)
+    const desiredRoomIds = getDesiredRoomIds(input)
     let response: BackendUserResponse
 
     try {
@@ -647,7 +699,7 @@ export const backendAdminApi: AdminApi = {
 
     await verifyCreatedCredentials(input.email, input.password)
 
-    if (!desiredRoomId) {
+    if (desiredRoomIds.length === 0) {
       return createdUser
     }
 
@@ -659,7 +711,7 @@ export const backendAdminApi: AdminApi = {
     }
 
     try {
-      return await assignUserToRoom(createdUser.id, desiredRoomId)
+      return await assignUserToRooms(createdUser.id, desiredRoomIds)
     } catch (error) {
       console.warn('backendAdminApi.createUser: room assignment failed after user creation', error)
 

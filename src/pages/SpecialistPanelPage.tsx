@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Power, PowerOff } from 'lucide-react'
 import { SpecialistControls } from '@features/specialist/SpecialistControls'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
@@ -55,6 +55,46 @@ function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
   )
 }
 
+function getUserRoomIds(user?: User | null): string[] {
+  if (!user) {
+    return []
+  }
+
+  return Array.from(new Set([
+    user.roomId,
+    user.assignedRoomId,
+    ...(user.roomIds ?? []),
+    ...(user.assignedRoomIds ?? []),
+  ].filter((roomId): roomId is string => Boolean(roomId))))
+}
+
+function SpecialistRoomSelect({
+  onChange,
+  roomId,
+  rooms,
+}: {
+  onChange: (roomId: string) => void
+  roomId: string
+  rooms: Room[]
+}) {
+  if (rooms.length <= 1) {
+    return null
+  }
+
+  return (
+    <label className="field specialist-room-select">
+      <span>Кабинет</span>
+      <select onChange={(event) => onChange(event.target.value)} value={roomId}>
+        {rooms.map((room) => (
+          <option key={room.id} value={room.id}>
+            {formatRoomName(room)}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 function SpecialistRoomToggle({ onChanged, room }: { onChanged: (room: Room) => Promise<void>; room: Room }) {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -108,14 +148,21 @@ export function SpecialistPanelPage() {
 
   const [roomOverride, setRoomOverride] = useState<Room | null>(null)
   const [roomStatusChecked, setRoomStatusChecked] = useState(false)
+  const [selectedRoomId, setSelectedRoomId] = useState('')
   const user = useGlobalStore((state) => state.user)
   const hydrated = useQueueStore((state) => state.hydrated)
   const loadRoomNoShowTickets = useQueueStore((state) => state.loadRoomNoShowTickets)
   const loadRoomQueue = useQueueStore((state) => state.loadRoomQueue)
   const loading = useQueueStore((state) => state.loading)
   const rooms = useQueueStore((state) => state.rooms)
-  const specialistRoomId = user?.roomId ?? user?.assignedRoomId
+  const specialistRoomIds = useMemo(() => getUserRoomIds(user), [user])
+  const specialistRoomId = specialistRoomIds.includes(selectedRoomId)
+    ? selectedRoomId
+    : specialistRoomIds[0]
   const storeRoom = rooms.find((item) => item.id === specialistRoomId)
+  const assignedRooms = specialistRoomIds
+    .map((roomId) => rooms.find((item) => item.id === roomId))
+    .filter((item): item is Room => Boolean(item))
   const room = storeRoom
     ? roomOverride && roomOverride.id === storeRoom.id
       ? { ...storeRoom, ...roomOverride }
@@ -124,6 +171,17 @@ export function SpecialistPanelPage() {
       ? roomOverride
       : undefined
   const roomInactive = room?.isActive === false || room?.status === 'paused'
+
+  useEffect(() => {
+    if (!specialistRoomIds.length) {
+      setSelectedRoomId('')
+      return
+    }
+
+    if (!specialistRoomIds.includes(selectedRoomId)) {
+      setSelectedRoomId(specialistRoomIds[0])
+    }
+  }, [selectedRoomId, specialistRoomIds])
 
   async function refreshSpecialistRoom(nextRoom?: Room) {
     if (nextRoom) {
@@ -200,6 +258,14 @@ export function SpecialistPanelPage() {
       <section className="specialist-header">
         <SpecialistUserSummary room={room} user={user} />
         <div className="specialist-header-actions">
+          <SpecialistRoomSelect
+            onChange={(nextRoomId) => {
+              setRoomOverride(null)
+              setSelectedRoomId(nextRoomId)
+            }}
+            roomId={specialistRoomId}
+            rooms={assignedRooms}
+          />
           <StatusBadge
             label={roomInactive ? 'Выдача остановлена' : t.status[room.status]}
             tone={roomInactive ? 'warning' : 'success'}

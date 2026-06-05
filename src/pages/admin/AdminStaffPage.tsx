@@ -8,7 +8,7 @@ import {
   getRoomActive,
   getRoomName,
   getUserLogin,
-  getUserRoomId,
+  getUserRoomIds,
   roleLabels,
   type AdminRoomRecord,
 } from './adminPageHelpers'
@@ -18,7 +18,7 @@ type StaffFormState = {
   name: string
   password: string
   role: 'specialist'
-  roomId: string
+  roomIds: string[]
 }
 
 const emptyForm: StaffFormState = {
@@ -26,7 +26,7 @@ const emptyForm: StaffFormState = {
   name: '',
   password: '',
   role: 'specialist',
-  roomId: '',
+  roomIds: [],
 }
 
 type StaffSectionProps = {
@@ -81,9 +81,18 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
       name: staffMember.name,
       password: '',
       role: 'specialist',
-      roomId: getUserRoomId(staffMember),
+      roomIds: getUserRoomIds(staffMember),
     })
     setSuccessMessage(null)
+  }
+
+  function toggleRoom(roomId: string) {
+    setForm((current) => ({
+      ...current,
+      roomIds: current.roomIds.includes(roomId)
+        ? current.roomIds.filter((id) => id !== roomId)
+        : [...current.roomIds, roomId],
+    }))
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -102,13 +111,16 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
     setSaving(true)
     setError(null)
 
+    const primaryRoomId = form.roomIds[0]
     const payload = {
-      assignedRoomId: form.roomId || undefined,
+      assignedRoomId: primaryRoomId,
+      assignedRoomIds: form.roomIds,
       email: form.login.trim(),
       name: form.name.trim(),
       password: form.password.trim() || undefined,
       role: form.role,
-      roomId: form.roomId || undefined,
+      roomId: primaryRoomId,
+      roomIds: form.roomIds,
     }
 
     try {
@@ -153,6 +165,14 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
 
   function getRoomLabel(roomId?: string) {
     return getRoomName(rooms.find((room) => String(room.id) === roomId))
+  }
+
+  function getRoomLabels(roomIds: string[]) {
+    if (roomIds.length === 0) {
+      return getRoomLabel(undefined)
+    }
+
+    return roomIds.map(getRoomLabel).join(', ')
   }
 
   return (
@@ -200,7 +220,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                       <td>{staffMember.name}</td>
                       <td>{getUserLogin(staffMember)}</td>
                       <td>{roleLabels[staffMember.role]}</td>
-                      <td>{getRoomLabel(getUserRoomId(staffMember))}</td>
+                      <td>{getRoomLabels(getUserRoomIds(staffMember))}</td>
                       <td>
                         <div className="button-row">
                           <Button onClick={() => handleEdit(staffMember)} size="sm" variant="secondary">
@@ -275,20 +295,23 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
               </select>
             </label>
 
-            <label className="field">
-              <span>Кабинет</span>
-              <select
-                onChange={(event) => setForm((current) => ({ ...current, roomId: event.target.value }))}
-                value={form.roomId}
-              >
-                <option value="">Не назначен</option>
-                {rooms.filter(getRoomActive).map((room) => (
-                  <option key={String(room.id)} value={String(room.id)}>
-                    {getRoomName(room)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <fieldset className="admin-checkbox-group">
+              <legend>Кабинеты</legend>
+              {rooms.filter(getRoomActive).map((room) => {
+                const roomId = String(room.id)
+
+                return (
+                  <label key={roomId}>
+                    <input
+                      checked={form.roomIds.includes(roomId)}
+                      onChange={() => toggleRoom(roomId)}
+                      type="checkbox"
+                    />
+                    <span>{getRoomName(room)}</span>
+                  </label>
+                )
+              })}
+            </fieldset>
 
             <div className="modal-actions">
               <Button disabled={saving} onClick={resetForm} variant="ghost">

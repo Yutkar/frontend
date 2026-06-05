@@ -32,10 +32,12 @@ export type TicketSettingsServiceTypeOption = {
 
 export type TicketSettingsUserOption = {
   assignedRoomId?: string | number
+  assignedRoomIds?: Array<string | number>
   id: string | number
   name: string
   role?: SharedUser['role']
   roomId?: string | number
+  roomIds?: Array<string | number>
 }
 
 export type TicketSettingsRoomServiceOption = {
@@ -157,10 +159,12 @@ export type AdminRecord = {
 export type AdminRecordInput = Record<string, unknown>
 
 export type AdminUserInput = Partial<SharedUser> & {
+  assignedRoomIds?: Array<string | number>
   email?: string
   name: string
   password?: string
   role: SharedUser['role']
+  roomIds?: Array<string | number>
 }
 
 export type AdminApi = {

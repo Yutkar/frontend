@@ -9,7 +9,9 @@ export type User = {
   role: Role
   department: string
   roomId?: string
+  roomIds?: string[]
   assignedRoomId?: string
+  assignedRoomIds?: string[]
   roomAssignmentPending?: boolean
   avatarInitials: string
 }

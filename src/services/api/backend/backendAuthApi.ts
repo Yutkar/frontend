@@ -4,6 +4,7 @@ import type { AuthApi } from '../types'
 
 type BackendUser = {
   assignedRoomId?: number | string | null
+  assignedRoomIds?: Array<number | string> | null
   avatarInitials?: string
   department?: string
   id?: number | string
@@ -13,6 +14,8 @@ type BackendUser = {
     id?: number | string | null
   } | null
   roomId?: number | string | null
+  roomIds?: Array<number | string> | null
+  rooms?: Array<{ id?: number | string | null; roomId?: number | string | null }> | null
 }
 
 type BackendAuthResponse = BackendUser & {
@@ -66,9 +69,25 @@ function getToken(response: BackendAuthResponse): string | undefined {
 }
 
 function getRoomId(user?: BackendUser): string | undefined {
-  const roomId = user?.roomId ?? user?.assignedRoomId ?? user?.room?.id
+  return getRoomIds(user)[0]
+}
 
-  return roomId == null ? undefined : String(roomId)
+function getRoomIds(user?: BackendUser): string[] {
+  const roomIds = [
+    user?.roomId,
+    user?.assignedRoomId,
+    ...(user?.roomIds ?? []),
+    ...(user?.assignedRoomIds ?? []),
+    ...(user?.rooms ?? []).map((room) => room.id ?? room.roomId),
+    user?.room?.id,
+  ]
+
+  return Array.from(new Set(
+    roomIds
+      .filter((roomId): roomId is string | number => typeof roomId === 'string' || typeof roomId === 'number')
+      .map(String)
+      .filter(Boolean),
+  ))
 }
 
 function toUserFromBackendUser(user: BackendUser, fallbackRole: Role = 'manager'): User {
@@ -82,6 +101,7 @@ function toUserFromBackendUser(user: BackendUser, fallbackRole: Role = 'manager'
     role: resolvedRole,
     department: user.department ?? defaults.department,
     roomId: getRoomId(user),
+    roomIds: getRoomIds(user),
     avatarInitials: user.avatarInitials ?? getAvatarInitials(resolvedName),
   }
 }
@@ -99,6 +119,7 @@ function toUser(response: BackendAuthResponse, email?: string, name?: string): U
     role: resolvedRole,
     department: backendUser.department ?? defaults.department,
     roomId: getRoomId(backendUser),
+    roomIds: getRoomIds(backendUser),
     avatarInitials: backendUser.avatarInitials ?? getAvatarInitials(resolvedName),
   }
 }

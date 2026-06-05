@@ -79,7 +79,16 @@ export function getServiceTypeNames(
 }
 
 export function getUserRoomId(user: User): string {
-  return user.roomId ?? user.assignedRoomId ?? ''
+  return getUserRoomIds(user)[0] ?? ''
+}
+
+export function getUserRoomIds(user: User): string[] {
+  return Array.from(new Set([
+    user.roomId,
+    user.assignedRoomId,
+    ...(user.roomIds ?? []),
+    ...(user.assignedRoomIds ?? []),
+  ].filter((id): id is string => Boolean(id))))
 }
 
 export function getUserLogin(user: User): string {

@@ -1131,6 +1131,11 @@ h3 {
   gap: 10px;
 }
 
+.specialist-room-select {
+  margin: 0;
+  min-width: 220px;
+}
+
 .specialist-room-toggle .modal-error {
   max-width: 280px;
 }

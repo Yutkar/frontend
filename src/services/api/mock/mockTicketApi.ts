@@ -108,9 +108,11 @@ export const mockTicketApi: TicketApi = {
         .filter((user) => user.role === 'specialist')
         .map((user) => ({
           assignedRoomId: user.assignedRoomId,
+          assignedRoomIds: user.assignedRoomIds,
           id: user.id,
           name: user.name,
           roomId: user.roomId,
+          roomIds: user.roomIds,
           role: user.role,
         })),
     })
