@@ -2,6 +2,7 @@ type TicketWaitingSource = {
   calledAt?: string | null
   completedAt?: string | null
   createdAt?: string | null
+  hasActualCreatedAt?: boolean | null
   serviceStartedAt?: string | null
   startedAt?: string | null
   status?: string | null
@@ -23,6 +24,10 @@ export function getWaitingMinutes(
   ticket: TicketWaitingSource,
   now: number | Date = Date.now(),
 ): number | null {
+  if (ticket.hasActualCreatedAt === false) {
+    return null
+  }
+
   const createdAt = parseTimestamp(ticket.createdAt)
 
   if (createdAt === undefined) {

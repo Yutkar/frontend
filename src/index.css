@@ -1592,6 +1592,46 @@ h3 {
   justify-content: flex-end;
 }
 
+.ticket-filters {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
+.ticket-filters-header {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  font-size: 14px;
+  font-weight: 850;
+  gap: 8px;
+}
+
+.ticket-filters-grid {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+}
+
+.ticket-filters .field input,
+.ticket-filters .field select {
+  background: var(--surface);
+}
+
+.ticket-filter-actions {
+  display: flex;
+}
+
+.ticket-filter-actions .button {
+  width: 100%;
+}
+
 .live-queue-page {
   display: flex;
   flex-direction: column;
@@ -3061,6 +3101,7 @@ h3 {
   .status-rail,
   .analytics-grid,
   .form-grid,
+  .ticket-filters-grid,
   .settings-form-grid,
   .ticket-card-grid,
   .room-load-grid,

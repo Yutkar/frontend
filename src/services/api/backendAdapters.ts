@@ -62,11 +62,16 @@ export type BackendRoom = {
 export type BackendTicket = {
   assignedRoom?: BackendRoom | null
   assignedRoomId?: number | string | null
+  assignedTo?: number | string | null
+  assigned_to?: number | string | null
   called_at?: string | null
+  doctor?: { _id?: number | string; id?: number | string } | null
+  doctorId?: number | string | null
+  doctor_id?: number | string | null
   id: number | string
   number?: string
   priority?: number
-  status?: BackendTicketStatus
+  status?: BackendTicketStatus | string
   etaMinutes?: number | null
   waitMinutes?: number | null
   serviceTypeId?: number | string
@@ -90,6 +95,12 @@ export type BackendTicket = {
   service?: BackendServiceType
   room?: BackendRoom | null
   roomName?: string | null
+  specialist?: { _id?: number | string; id?: number | string } | null
+  specialistId?: number | string | null
+  specialist_id?: number | string | null
+  user?: { _id?: number | string; id?: number | string } | null
+  userId?: number | string | null
+  user_id?: number | string | null
 }
 
 export type BackendQueueStats = {
@@ -392,6 +403,10 @@ function getBackendTicketNumber(ticket: BackendTicket): string {
   return ticket.number ?? ticket.ticketNumber ?? `Талон ${toId(ticket.id)}`
 }
 
+function hasBackendCreatedAt(ticket: BackendTicket): boolean {
+  return Boolean(ticket.createdAt ?? ticket.created_at)
+}
+
 function getBackendCreatedAt(ticket: BackendTicket): string {
   return ticket.createdAt ?? ticket.created_at ?? new Date().toISOString()
 }
@@ -414,6 +429,25 @@ function getBackendStartedAt(ticket: BackendTicket): string | undefined {
 
 function getBackendCompletedAt(ticket: BackendTicket): string | undefined {
   return ticket.completedAt ?? ticket.completed_at ?? undefined
+}
+
+function getBackendTicketAssigneeId(ticket: BackendTicket): string {
+  return toId(
+    ticket.assignedTo
+      ?? ticket.assigned_to
+      ?? ticket.doctorId
+      ?? ticket.doctor_id
+      ?? ticket.specialistId
+      ?? ticket.specialist_id
+      ?? ticket.userId
+      ?? ticket.user_id
+      ?? ticket.doctor?.id
+      ?? ticket.doctor?._id
+      ?? ticket.specialist?.id
+      ?? ticket.specialist?._id
+      ?? ticket.user?.id
+      ?? ticket.user?._id,
+  )
 }
 
 export function toBackendServiceTypeId(serviceType: ServiceType): number {
@@ -472,12 +506,44 @@ export function toArchitecturePriority(priority = 2): ArchitectureTicketPriority
   return 'normal'
 }
 
-export function toSharedStatus(status?: BackendTicketStatus): TicketStatus {
-  return status ?? 'waiting'
+export function toSharedStatus(status?: BackendTicketStatus | string): TicketStatus {
+  const normalizedStatus = status?.trim().toLowerCase().replace(/-/g, '_')
+
+  if (normalizedStatus === 'created') {
+    return 'waiting'
+  }
+
+  if (
+    normalizedStatus === 'completed' ||
+    normalizedStatus === 'complete' ||
+    normalizedStatus === 'finished' ||
+    normalizedStatus === 'done'
+  ) {
+    return 'completed'
+  }
+
+  if (normalizedStatus === 'in_service' || normalizedStatus === 'service') {
+    return 'in_service'
+  }
+
+  if (normalizedStatus === 'no_show' || normalizedStatus === 'noshow') {
+    return 'no_show'
+  }
+
+  if (
+    normalizedStatus === 'waiting' ||
+    normalizedStatus === 'called' ||
+    normalizedStatus === 'cancelled' ||
+    normalizedStatus === 'redirected'
+  ) {
+    return normalizedStatus
+  }
+
+  return 'waiting'
 }
 
-export function toArchitectureStatus(status?: BackendTicketStatus): ArchitectureTicketStatus {
-  return status ?? 'waiting'
+export function toArchitectureStatus(status?: BackendTicketStatus | string): ArchitectureTicketStatus {
+  return toSharedStatus(status) as ArchitectureTicketStatus
 }
 
 export function toSharedServiceType(ticket: BackendTicket): ServiceType {
@@ -495,21 +561,26 @@ export function toSharedServiceType(ticket: BackendTicket): ServiceType {
 export function toSharedTicket(ticket: BackendTicket): Ticket {
   const serviceType = toSharedServiceType(ticket)
   const roomId = getBackendTicketRoomId(ticket)
+  const serviceTypeId = toId(ticket.serviceTypeId ?? ticket.serviceType?.id ?? ticket.service?.id)
+  const assignedTo = getBackendTicketAssigneeId(ticket)
 
   return {
     id: toId(ticket.id),
     number: getBackendTicketNumber(ticket),
     patientName: `Пациент ${getBackendTicketNumber(ticket)}`,
     serviceType,
+    serviceTypeId: serviceTypeId || undefined,
     priority: toSharedPriority(ticket.priority),
     status: toSharedStatus(ticket.status),
     createdAt: getBackendCreatedAt(ticket),
+    hasActualCreatedAt: hasBackendCreatedAt(ticket),
     calledAt: getBackendCalledAt(ticket),
     startedAt: getBackendStartedAt(ticket),
     completedAt: getBackendCompletedAt(ticket),
     updatedAt: getBackendUpdatedAt(ticket),
     roomId: roomId || undefined,
     roomName: getBackendTicketRoomName(ticket),
+    assignedTo: assignedTo || undefined,
     etaMinutes: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
   }
 }
@@ -1085,6 +1156,10 @@ function getPositiveDiffMinutes(start?: string, end?: string): number | null {
 }
 
 function getActualWaitingMinutes(ticket: Ticket, now = Date.now()): number | null {
+  if (ticket.hasActualCreatedAt === false) {
+    return null
+  }
+
   const createdAt = parseAnalyticsTimestamp(ticket.createdAt)
 
   if (createdAt === undefined) {

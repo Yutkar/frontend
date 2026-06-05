@@ -47,9 +47,13 @@ const emptyOptions: TicketSettingsOptions = {
 function getFallbackServiceType(ticket: Ticket) {
   return {
     code: ticket.serviceType,
-    id: ticket.serviceType,
+    id: ticket.serviceTypeId ?? ticket.serviceType,
     name: getServiceTypeLabel(ticket.serviceType),
   }
+}
+
+function getEditableStatus(status: TicketStatus): TicketStatus {
+  return status === 'created' ? 'waiting' : status
 }
 
 export function TicketSettingsModal({
@@ -83,8 +87,8 @@ export function TicketSettingsModal({
     setError(null)
     setPriority(ticket.priority)
     setRoomId(ticket.roomId ?? '')
-    setServiceTypeId(ticket.serviceType)
-    setStatus(ticket.status)
+    setServiceTypeId(String(ticket.serviceTypeId ?? ticket.serviceType))
+    setStatus(getEditableStatus(ticket.status))
   }, [open, ticket])
 
   useEffect(() => {
@@ -210,7 +214,7 @@ export function TicketSettingsModal({
       roomId: roomId || undefined,
       serviceType: selectedServiceType?.code ?? (serviceTypeId as ServiceType),
       serviceTypeId: selectedServiceType?.id ?? serviceTypeId,
-      status,
+      status: getEditableStatus(status),
     }
 
     setError(null)

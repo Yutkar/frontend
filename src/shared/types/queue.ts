@@ -25,9 +25,11 @@ export type Ticket = {
   number: string
   patientName: string
   serviceType: ServiceType
+  serviceTypeId?: string | number
   priority: TicketPriority
   status: TicketStatus
   createdAt: string
+  hasActualCreatedAt?: boolean
   calledAt?: string
   startedAt?: string
   completedAt?: string

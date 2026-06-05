@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownUp,
   PlusCircle,
   Radio,
+  RotateCcw,
   SlidersHorizontal,
   UserX,
   XCircle,
@@ -10,6 +11,17 @@ import {
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
 import { TicketManualCreateModal } from '@features/tickets/TicketManualCreateModal'
 import { TicketSettingsModal } from '@features/tickets/TicketSettingsModal'
+import {
+  getPriorityLabel,
+  getRooms,
+  getServiceOptionLabel,
+  getServiceTypes,
+  getSpecialists,
+  getStatusLabel,
+  ticketPriorities,
+  ticketStatuses,
+} from '@features/tickets/ticketFormOptions'
+import type { TicketSettingsOptions } from '@services/api'
 import { ticketService } from '@services/ticketService'
 import { t } from '@shared/locales/useLocale'
 import type { Ticket, TicketPriority, TicketStatus } from '@shared/types'
@@ -43,10 +55,40 @@ const statusOrder: Record<TicketStatus, number> = {
 const closedTicketStatuses: TicketStatus[] = ['completed', 'cancelled', 'no_show']
 const noShowStatuses: TicketStatus[] = ['waiting', 'called', 'redirected']
 
+type TicketFilterState = {
+  doctorId: string
+  priority: string
+  roomId: string
+  serviceTypeId: string
+  status: string
+  ticketNumber: string
+}
+
+const emptyTicketFilters: TicketFilterState = {
+  doctorId: '',
+  priority: '',
+  roomId: '',
+  serviceTypeId: '',
+  status: '',
+  ticketNumber: '',
+}
+
+const emptyFilterOptions: TicketSettingsOptions = {
+  rooms: [],
+  serviceTypes: [],
+  specialists: [],
+}
+
+function normalizeFilterValue(value?: string | number | null): string {
+  return value == null ? '' : String(value)
+}
+
 export function DashboardPage() {
   useQueueBootstrap({ force: true })
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [filters, setFilters] = useState<TicketFilterState>(emptyTicketFilters)
+  const [filterOptions, setFilterOptions] = useState<TicketSettingsOptions>(emptyFilterOptions)
   const [sortBy, setSortBy] = useState<QueueSort>('priority')
   const [settingsTicket, setSettingsTicket] = useState<Ticket | undefined>()
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -72,9 +114,89 @@ export function DashboardPage() {
   const canMarkTicketNoShow = user?.role === 'admin' || user?.role === 'specialist'
   const canUseQueueActions = user?.role === 'admin'
   const visibleSuccessMessage = successMessage ?? statusMessage
+  const hasActiveFilters = Object.values(filters).some((value) => value.trim() !== '')
+
+  useEffect(() => {
+    let active = true
+
+    ticketService
+      .getTicketSettingsOptions()
+      .then((nextOptions) => {
+        if (active) {
+          setFilterOptions(nextOptions)
+        }
+      })
+      .catch((loadError) => {
+        console.error('Dashboard ticket filters load failed', loadError)
+        if (active) {
+          setFilterOptions(emptyFilterOptions)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const roomFilterOptions = useMemo(
+    () => getRooms(filterOptions, rooms),
+    [filterOptions, rooms],
+  )
+  const serviceFilterOptions = useMemo(
+    () => getServiceTypes(filterOptions),
+    [filterOptions],
+  )
+  const specialistFilterOptions = useMemo(
+    () => getSpecialists(filterOptions),
+    [filterOptions],
+  )
+  const showDoctorFilter = specialistFilterOptions.length > 0
+
+  const filteredTickets = useMemo(() => {
+    const ticketNumberQuery = filters.ticketNumber.trim().toLowerCase()
+    const selectedServiceType = serviceFilterOptions.find(
+      (serviceType) => normalizeFilterValue(serviceType.id) === filters.serviceTypeId,
+    )
+
+    return tickets.filter((ticket) => {
+      if (filters.roomId && normalizeFilterValue(ticket.roomId) !== filters.roomId) {
+        return false
+      }
+
+      if (filters.serviceTypeId) {
+        const ticketServiceTypeId = normalizeFilterValue(ticket.serviceTypeId)
+        const hasMatchingServiceTypeId = ticketServiceTypeId === filters.serviceTypeId
+        const hasMatchingServiceCode = selectedServiceType
+          ? ticket.serviceType === selectedServiceType.code
+          : false
+
+        if (!hasMatchingServiceTypeId && !hasMatchingServiceCode) {
+          return false
+        }
+      }
+
+      if (filters.status && ticket.status !== filters.status) {
+        return false
+      }
+
+      if (filters.priority && ticket.priority !== filters.priority) {
+        return false
+      }
+
+      if (filters.doctorId && normalizeFilterValue(ticket.assignedTo) !== filters.doctorId) {
+        return false
+      }
+
+      if (ticketNumberQuery && !ticket.number.toLowerCase().includes(ticketNumberQuery)) {
+        return false
+      }
+
+      return true
+    })
+  }, [filters, serviceFilterOptions, tickets])
 
   const sortedTickets = useMemo(() => {
-    return [...tickets].sort((left, right) => {
+    return [...filteredTickets].sort((left, right) => {
       if (sortBy === 'eta') {
         return (getWaitingMinutes(left, now) ?? 0) - (getWaitingMinutes(right, now) ?? 0)
       }
@@ -85,7 +207,7 @@ export function DashboardPage() {
 
       return priorityOrder[left.priority] - priorityOrder[right.priority]
     })
-  }, [now, sortBy, tickets])
+  }, [filteredTickets, now, sortBy])
 
   async function handleTicketSaved() {
     await loadQueue({ force: true, successMessage: 'Талон успешно сохранён' })
@@ -195,6 +317,128 @@ export function DashboardPage() {
               ) : null}
             </div>
           </div>
+          <div className="ticket-filters" aria-label="Фильтры талонов">
+            <div className="ticket-filters-header">
+              <SlidersHorizontal size={16} />
+              <span>Фильтры</span>
+            </div>
+            <div className="ticket-filters-grid">
+              <label className="field">
+                <span>Кабинет</span>
+                <select
+                  onChange={(event) => {
+                    setFilters((current) => ({ ...current, roomId: event.target.value }))
+                  }}
+                  value={filters.roomId}
+                >
+                  <option value="">Все кабинеты</option>
+                  {roomFilterOptions.map((room) => (
+                    <option key={normalizeFilterValue(room.id)} value={normalizeFilterValue(room.id)}>
+                      {room.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Тип услуги</span>
+                <select
+                  onChange={(event) => {
+                    setFilters((current) => ({ ...current, serviceTypeId: event.target.value }))
+                  }}
+                  value={filters.serviceTypeId}
+                >
+                  <option value="">Все услуги</option>
+                  {serviceFilterOptions.map((serviceType) => (
+                    <option
+                      key={normalizeFilterValue(serviceType.id)}
+                      value={normalizeFilterValue(serviceType.id)}
+                    >
+                      {getServiceOptionLabel(serviceType)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Статус</span>
+                <select
+                  onChange={(event) => {
+                    setFilters((current) => ({ ...current, status: event.target.value }))
+                  }}
+                  value={filters.status}
+                >
+                  <option value="">Все статусы</option>
+                  {ticketStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {getStatusLabel(status)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Приоритет</span>
+                <select
+                  onChange={(event) => {
+                    setFilters((current) => ({ ...current, priority: event.target.value }))
+                  }}
+                  value={filters.priority}
+                >
+                  <option value="">Все приоритеты</option>
+                  {ticketPriorities.map((priority) => (
+                    <option key={priority} value={priority}>
+                      {getPriorityLabel(priority)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {showDoctorFilter ? (
+                <label className="field">
+                  <span>Врач</span>
+                  <select
+                    onChange={(event) => {
+                      setFilters((current) => ({ ...current, doctorId: event.target.value }))
+                    }}
+                    value={filters.doctorId}
+                  >
+                    <option value="">Все врачи</option>
+                    {specialistFilterOptions.map((specialist) => (
+                      <option
+                        key={normalizeFilterValue(specialist.id)}
+                        value={normalizeFilterValue(specialist.id)}
+                      >
+                        {specialist.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              <label className="field">
+                <span>Номер талона</span>
+                <input
+                  onChange={(event) => {
+                    setFilters((current) => ({ ...current, ticketNumber: event.target.value }))
+                  }}
+                  placeholder="A023"
+                  value={filters.ticketNumber}
+                />
+              </label>
+
+              <div className="ticket-filter-actions">
+                <Button
+                  disabled={!hasActiveFilters}
+                  icon={<RotateCcw size={15} />}
+                  onClick={() => setFilters({ ...emptyTicketFilters })}
+                  variant="ghost"
+                >
+                  Сбросить фильтры
+                </Button>
+              </div>
+            </div>
+          </div>
           <QueueTableBase
             actionSlot={(ticket) => {
               const isFinalTicket = closedTicketStatuses.includes(ticket.status)
@@ -256,6 +500,7 @@ export function DashboardPage() {
                 </div>
               )
             }}
+            emptyTitle={hasActiveFilters ? 'По выбранным фильтрам талоны не найдены' : undefined}
             onSelectTicket={(ticket) => selectTicket(ticket.id)}
             now={now}
             rooms={rooms}

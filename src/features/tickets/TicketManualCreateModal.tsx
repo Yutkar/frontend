@@ -9,7 +9,6 @@ import type {
   Room,
   ServiceType,
   TicketPriority,
-  TicketStatus,
 } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import {
@@ -18,9 +17,7 @@ import {
   getServiceOptionLabel,
   getServiceTypes,
   getSpecialistsForRoom,
-  getStatusLabel,
   ticketPriorities,
-  ticketStatuses,
 } from './ticketFormOptions'
 
 type TicketManualCreateModalProps = {
@@ -50,7 +47,6 @@ export function TicketManualCreateModal({
   const [roomId, setRoomId] = useState('')
   const [saving, setSaving] = useState(false)
   const [serviceTypeId, setServiceTypeId] = useState('')
-  const [status, setStatus] = useState<TicketStatus>('waiting')
 
   useEffect(() => {
     if (!open) {
@@ -63,7 +59,6 @@ export function TicketManualCreateModal({
     setRoomId('')
     setSaving(false)
     setServiceTypeId('')
-    setStatus('waiting')
   }, [open])
 
   useEffect(() => {
@@ -112,7 +107,7 @@ export function TicketManualCreateModal({
     () => rooms.some((room) => String(room.id) === roomId),
     [roomId, rooms],
   )
-  const canCreateTicket = Boolean(selectedServiceType && selectedRoomExists && priority && status)
+  const canCreateTicket = Boolean(selectedServiceType && selectedRoomExists && priority)
 
   useEffect(() => {
     const hasSelectedServiceType = serviceTypes.some(
@@ -173,7 +168,7 @@ export function TicketManualCreateModal({
       roomId: roomId || undefined,
       serviceType: selectedServiceType.code ?? (serviceTypeId as ServiceType),
       serviceTypeId: selectedServiceType.id,
-      status,
+      status: 'waiting',
     }
 
     setError(null)
@@ -287,21 +282,6 @@ export function TicketManualCreateModal({
               {ticketPriorities.map((item) => (
                 <option key={item} value={item}>
                   {getPriorityLabel(item)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Статус</span>
-            <select
-              disabled={isBusy}
-              onChange={(event) => setStatus(event.target.value as TicketStatus)}
-              value={status}
-            >
-              {ticketStatuses.map((item) => (
-                <option key={item} value={item}>
-                  {getStatusLabel(item)}
                 </option>
               ))}
             </select>

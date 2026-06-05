@@ -24,7 +24,6 @@ export const ticketPriorities: TicketPriority[] = [
 ]
 
 export const ticketStatuses: TicketStatus[] = [
-  'created',
   'waiting',
   'called',
   'in_service',
