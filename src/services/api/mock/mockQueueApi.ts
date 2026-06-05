@@ -49,8 +49,22 @@ export const mockQueueApi: QueueApi = {
     return Promise.resolve({
       ...snapshot,
       rooms: snapshot.rooms.filter((room) => room.id === roomIdValue),
-      tickets: snapshot.tickets.filter((ticket) => ticket.roomId === roomIdValue),
+      tickets: snapshot.tickets.filter((ticket) =>
+        ticket.roomId === roomIdValue &&
+        ['waiting', 'called', 'in_service', 'redirected'].includes(ticket.status),
+      ),
     })
+  },
+
+  getRoomNoShowTickets(roomId: string | number) {
+    const roomIdValue = String(roomId)
+
+    return Promise.resolve(
+      getQueueSnapshot().tickets.filter((ticket) =>
+        ticket.roomId === roomIdValue &&
+        ticket.status === 'no_show',
+      ),
+    )
   },
 
   createTicket(input) {

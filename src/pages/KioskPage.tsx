@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { TicketPrintPreview, type TicketPrintData } from '@features/tickets/TicketPrintPreview'
 import {
   getAutoRoomForService,
@@ -189,6 +189,15 @@ export function KioskPage() {
             <strong>{createdTicket.number}</strong>
           </div>
           <TicketPrintPreview data={printData} onPrint={resetKiosk} />
+          <Button
+            className="kiosk-back-button"
+            icon={<ArrowLeft size={20} />}
+            onClick={resetKiosk}
+            size="lg"
+            variant="secondary"
+          >
+            Назад
+          </Button>
         </section>
       </main>
     )

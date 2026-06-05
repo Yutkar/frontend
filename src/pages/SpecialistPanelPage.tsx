@@ -110,6 +110,7 @@ export function SpecialistPanelPage() {
   const [roomStatusChecked, setRoomStatusChecked] = useState(false)
   const user = useGlobalStore((state) => state.user)
   const hydrated = useQueueStore((state) => state.hydrated)
+  const loadRoomNoShowTickets = useQueueStore((state) => state.loadRoomNoShowTickets)
   const loadRoomQueue = useQueueStore((state) => state.loadRoomQueue)
   const loading = useQueueStore((state) => state.loading)
   const rooms = useQueueStore((state) => state.rooms)
@@ -130,7 +131,10 @@ export function SpecialistPanelPage() {
     }
 
     if (specialistRoomId) {
-      await loadRoomQueue(specialistRoomId)
+      await Promise.all([
+        loadRoomQueue(specialistRoomId),
+        loadRoomNoShowTickets(specialistRoomId),
+      ])
     }
   }
 
@@ -146,7 +150,10 @@ export function SpecialistPanelPage() {
     setRoomStatusChecked(false)
 
     async function refreshRoomQueue() {
-      await loadRoomQueue(roomId)
+      await Promise.all([
+        loadRoomQueue(roomId),
+        loadRoomNoShowTickets(roomId),
+      ])
 
       if (active) {
         setRoomStatusChecked(true)
@@ -162,7 +169,7 @@ export function SpecialistPanelPage() {
       active = false
       window.clearInterval(interval)
     }
-  }, [loadRoomQueue, specialistRoomId])
+  }, [loadRoomNoShowTickets, loadRoomQueue, specialistRoomId])
 
   if (!user) {
     return null

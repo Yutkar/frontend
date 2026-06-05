@@ -26,7 +26,7 @@ const priorityOrder: Record<TicketPriority, number> = {
   low: 4,
 }
 
-const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'no_show', 'redirected'] as const
+const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
 
 const emptyTicketSettingsOptions: TicketSettingsOptions = {
   rooms: [],
@@ -243,9 +243,12 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const [redirectTicketItem, setRedirectTicketItem] = useState<Ticket | null>(null)
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const completeService = useQueueStore((state) => state.completeService)
+  const activeTickets = useQueueStore((state) => state.activeTickets)
   const loadQueue = useQueueStore((state) => state.loadQueue)
   const loading = useQueueStore((state) => state.loading)
+  const noShowTickets = useQueueStore((state) => state.noShowTickets)
   const redirectTicket = useQueueStore((state) => state.redirectTicket)
+  const returnTicket = useQueueStore((state) => state.returnTicket)
   const rooms = useQueueStore((state) => state.rooms)
   const skipTicket = useQueueStore((state) => state.skipTicket)
   const startService = useQueueStore((state) => state.startService)
@@ -254,11 +257,11 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
 
   const roomTickets = useMemo(
     () =>
-      tickets.filter((ticket) =>
+      activeTickets.filter((ticket) =>
         String(ticket.roomId) === String(room.id) &&
         specialistVisibleStatuses.includes(ticket.status as (typeof specialistVisibleStatuses)[number]),
       ),
-    [room.id, tickets],
+    [activeTickets, room.id],
   )
 
   const currentTicket = useMemo<Ticket | undefined>(
@@ -287,9 +290,10 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         }),
     [roomTickets],
   )
-  const noShowTickets = useMemo(
+  const roomNoShowTickets = useMemo(
     () =>
-      roomTickets
+      noShowTickets
+        .filter((ticket) => String(ticket.roomId) === String(room.id))
         .filter((ticket) => ticket.status === 'no_show')
         .sort((left, right) => {
           const leftDate = left.updatedAt ?? left.calledAt ?? left.createdAt
@@ -297,7 +301,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
 
           return new Date(rightDate).getTime() - new Date(leftDate).getTime()
         }),
-    [roomTickets],
+    [noShowTickets, room.id],
   )
 
   const handleReturnTicket = async (ticketId: string) => {
@@ -305,8 +309,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
     setReturningTicketId(ticketId)
 
     try {
-      await ticketService.returnTicket(ticketId)
-      await loadQueue({ force: true, successMessage: 'Пациент возвращён в лист ожидания' })
+      await returnTicket(ticketId, room.id)
     } catch (error) {
       console.error('Specialist return ticket failed', error)
       setReturnError(
@@ -415,14 +418,14 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
               <span className="eyebrow">{t.specialist.returnPatientQueue}</span>
               <h2>{t.specialist.noShowPatients}</h2>
             </div>
-            <strong className="waiting-count">{noShowTickets.length}</strong>
+            <strong className="waiting-count">{roomNoShowTickets.length}</strong>
           </div>
 
           {returnError ? <div className="modal-error">{returnError}</div> : null}
 
-          {noShowTickets.length > 0 ? (
+          {roomNoShowTickets.length > 0 ? (
             <div className="specialist-waiting-list">
-              {noShowTickets.map((ticket) => (
+              {roomNoShowTickets.map((ticket) => (
                 <TicketCard
                   actionSlot={
                     <div className="button-row">

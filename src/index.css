@@ -2934,19 +2934,6 @@ h3 {
   text-transform: uppercase;
 }
 
-.tv-sound-button {
-  align-self: flex-end;
-  background: #1769aa;
-  border: 0;
-  border-radius: var(--radius);
-  color: #ffffff;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 900;
-  min-height: 42px;
-  padding: 0 16px;
-}
-
 .tv-call-card {
   align-items: center;
   background: #ffffff;
@@ -3655,6 +3642,10 @@ h3 {
   width: 100%;
 }
 
+.kiosk-back-button {
+  min-width: min(100%, 260px);
+}
+
 @keyframes notification-popover-in {
   from {
     opacity: 0;
@@ -3752,6 +3743,7 @@ h3 {
   .kiosk-result > svg,
   .kiosk-result-label,
   .kiosk-ticket-number,
+  .kiosk-back-button,
   .ticket-print-button {
     display: none;
   }

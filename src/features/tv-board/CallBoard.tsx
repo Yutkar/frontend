@@ -25,7 +25,7 @@ function getRoomName(ticket: Ticket, rooms: Room[]): string {
 }
 
 function getCallKey(ticket?: Ticket): string {
-  return ticket ? `${ticket.id}:${getCallTime(ticket)}` : ''
+  return ticket ? `${ticket.id}:${ticket.calledAt ?? ticket.createdAt}` : ''
 }
 
 function getSpeechRoomName(roomName: string): string {
@@ -34,8 +34,6 @@ function getSpeechRoomName(roomName: string): string {
 
 export function CallBoard({ rooms, tickets }: CallBoardProps) {
   const [highlightedCallKey, setHighlightedCallKey] = useState('')
-  const [soundBlocked, setSoundBlocked] = useState(false)
-  const [soundEnabled, setSoundEnabled] = useState(false)
   const audioContextRef = useRef<AudioContext | null>(null)
   const hasRenderedRef = useRef(false)
   const previousCallKeyRef = useRef('')
@@ -102,17 +100,6 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
     await playBeep()
   }
 
-  async function enableSound() {
-    try {
-      await playBeep()
-      setSoundBlocked(false)
-      setSoundEnabled(true)
-    } catch (error) {
-      console.error('Board sound enable failed', error)
-      setSoundBlocked(true)
-    }
-  }
-
   useEffect(() => {
     if (!currentCallKey) {
       previousCallKeyRef.current = ''
@@ -133,25 +120,15 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
     setHighlightedCallKey(currentCallKey)
     const highlightTimeout = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
 
-    if (soundEnabled) {
-      void announceCall(currentCallNumber, currentCallRoomName).catch((error) => {
-        console.error('Board call announce failed', error)
-        setSoundBlocked(true)
-      })
-    }
+    void announceCall(currentCallNumber, currentCallRoomName).catch(() => undefined)
 
     return () => window.clearTimeout(highlightTimeout)
-  }, [currentCallKey, currentCallNumber, currentCallRoomName, soundEnabled])
+  }, [currentCallKey, currentCallNumber, currentCallRoomName])
 
   return (
     <div className="tv-grid">
       <section className="tv-current">
         <span className="tv-section-label">Сейчас вызывается</span>
-        {!soundEnabled || soundBlocked ? (
-          <button className="tv-sound-button" onClick={() => void enableSound()} type="button">
-            Включить звук
-          </button>
-        ) : null}
         {currentCall ? (
           <article
             className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
