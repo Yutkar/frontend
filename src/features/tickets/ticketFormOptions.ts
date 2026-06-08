@@ -7,12 +7,15 @@ import type {
 import { fallbackServiceTypeOptions } from '@services/api/serviceTypeCatalog'
 import type {
   Room,
+  Ticket,
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
 import {
   getPriorityMeta,
+  getRoomWorkloadRisk,
   getTicketStatusMeta,
+  isWithinWorkHours,
 } from '@shared/utils'
 
 export const ticketPriorities: TicketPriority[] = [
@@ -131,6 +134,8 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
       services: room.services,
       ticketIssueEnabled: room.ticketIssueEnabled,
       title: room.title,
+      workEndTime: room.workEndTime,
+      workStartTime: room.workStartTime,
     }))
 
   fallbackRooms
@@ -149,6 +154,8 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
           ticketIssueEnabled: room.ticketIssueEnabled,
           isTicketIssueEnabled: room.isTicketIssueEnabled,
           kioskEnabled: room.kioskEnabled,
+          workEndTime: room.workEndTime,
+          workStartTime: room.workStartTime,
         })
       }
     })
@@ -208,16 +215,48 @@ export function isRoomTicketIssueEnabled(room: TicketSettingsRoomOption, fallbac
   return issueEnabled !== false
 }
 
-export function isRoomAvailableForTicket(room: TicketSettingsRoomOption, fallbackRooms: Room[]): boolean {
+function getFallbackRoom(room: TicketSettingsRoomOption, fallbackRooms: Room[]): Room | undefined {
   const roomId = normalizeServiceId(room.id)
-  const fallbackRoom = fallbackRooms.find((item) => normalizeServiceId(item.id) === roomId)
+
+  return fallbackRooms.find((item) => normalizeServiceId(item.id) === roomId)
+}
+
+function mergeRoomWithFallback(room: TicketSettingsRoomOption, fallbackRooms: Room[]): TicketSettingsRoomOption {
+  const fallbackRoom = getFallbackRoom(room, fallbackRooms)
+
+  return {
+    ...fallbackRoom,
+    ...room,
+    workEndTime: room.workEndTime ?? fallbackRoom?.workEndTime,
+    workStartTime: room.workStartTime ?? fallbackRoom?.workStartTime,
+  }
+}
+
+export function isRoomAvailableForTicket(
+  room: TicketSettingsRoomOption,
+  fallbackRooms: Room[],
+  tickets: Array<{ roomId?: string | number; status: TicketStatus }> = [],
+  averageServiceMinutes = 10,
+  now: Date | number = new Date(),
+): boolean {
+  const fallbackRoom = getFallbackRoom(room, fallbackRooms)
+  const roomWithFallback = mergeRoomWithFallback(room, fallbackRooms)
   const isActive = room.isActive !== false &&
     room.active !== false &&
     fallbackRoom?.active !== false &&
     fallbackRoom?.isActive !== false &&
     fallbackRoom?.status !== 'paused'
+  const risk = getRoomWorkloadRisk(
+    { id: room.id, workEndTime: roomWithFallback.workEndTime, workStartTime: roomWithFallback.workStartTime },
+    tickets as Ticket[],
+    { averageServiceMinutes, includeNextTicket: true, now },
+  )
 
-  return isActive && isRoomTicketIssueEnabled(room, fallbackRooms) && getRoomLoadPercent(room, fallbackRooms) < overloadLoadPercent
+  return isActive &&
+    isRoomTicketIssueEnabled(room, fallbackRooms) &&
+    getRoomLoadPercent(room, fallbackRooms) < overloadLoadPercent &&
+    isWithinWorkHours(roomWithFallback, now) &&
+    !risk.isAtRisk
 }
 
 export function getRoomQueueCount(roomId: string | number, tickets: Array<{ roomId?: string | number; status: TicketStatus }>): number {
@@ -232,9 +271,11 @@ export function getAutoRoomForService(
   rooms: TicketSettingsRoomOption[],
   fallbackRooms: Room[],
   tickets: Array<{ roomId?: string | number; status: TicketStatus }>,
+  averageServiceMinutes = 10,
+  now: Date | number = new Date(),
 ): TicketSettingsRoomOption | undefined {
   return [...rooms]
-    .filter((room) => isRoomAvailableForTicket(room, fallbackRooms))
+    .filter((room) => isRoomAvailableForTicket(room, fallbackRooms, tickets, averageServiceMinutes, now))
     .sort((left, right) => {
       const leftId = normalizeServiceId(left.id)
       const rightId = normalizeServiceId(right.id)
@@ -272,7 +313,8 @@ export function getAvailableServiceTypes(
 ): TicketSettingsServiceTypeOption[] {
   return getServiceTypes(options).filter((serviceType) => {
     const serviceRooms = getRoomsForService(options, serviceType.id, fallbackRooms)
+    const averageServiceMinutes = serviceType.averageDurationMinutes ?? 10
 
-    return Boolean(getAutoRoomForService(serviceRooms, fallbackRooms, tickets))
+    return Boolean(getAutoRoomForService(serviceRooms, fallbackRooms, tickets, averageServiceMinutes))
   })
 }

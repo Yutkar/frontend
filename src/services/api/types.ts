@@ -65,6 +65,8 @@ export type TicketSettingsRoomOption = Pick<SharedRoom, 'id' | 'name'> & {
   services?: Array<string | number | TicketSettingsRoomServiceOption>
   ticketIssueEnabled?: boolean
   title?: string
+  workEndTime?: string
+  workStartTime?: string
 }
 
 export type TicketSettingsOptions = {

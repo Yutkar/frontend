@@ -68,6 +68,8 @@ export type Room = {
   currentTicketId?: string
   workload?: number
   loadPercent: number
+  workEndTime?: string
+  workStartTime?: string
 }
 
 export type QueueEventType =

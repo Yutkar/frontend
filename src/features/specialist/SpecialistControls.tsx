@@ -5,7 +5,13 @@ import type { TicketSettingsOptions, TicketSettingsServiceTypeOption } from '@se
 import type { RedirectTicketInput, Room, ServiceType, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
-import { formatDuration, formatRoomName, useCurrentTime } from '@shared/utils'
+import {
+  formatDuration,
+  formatRoomName,
+  getRoomWorkloadRisk,
+  normalizeWorkTime,
+  useCurrentTime,
+} from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 import {
   getAutoRoomForService,
@@ -92,6 +98,33 @@ function getCompletedAverageMinutes(tickets: Ticket[], roomId: string | number):
   return Math.max(1, Math.round(total / serviceDurations.length))
 }
 
+function formatWorkDuration(minutes?: number): string {
+  if (minutes === undefined) {
+    return 'Весь день'
+  }
+
+  return minutes > 0 ? formatDuration(minutes) : '0 мин'
+}
+
+function getRoomWorkTimeText(room: Room): string {
+  const workStartTime = normalizeWorkTime(room.workStartTime)
+  const workEndTime = normalizeWorkTime(room.workEndTime)
+
+  if (workStartTime && workEndTime) {
+    return `работает с ${workStartTime} до ${workEndTime}`
+  }
+
+  if (workStartTime) {
+    return `работает с ${workStartTime}`
+  }
+
+  if (workEndTime) {
+    return `работает до ${workEndTime}`
+  }
+
+  return 'работает весь день'
+}
+
 type RedirectPatientModalProps = {
   fallbackRooms: Room[]
   onClose: () => void
@@ -168,8 +201,13 @@ function RedirectPatientModal({
     [fallbackRooms, options, selectedServiceType?.id],
   )
   const autoRoom = useMemo(
-    () => getAutoRoomForService(rooms, fallbackRooms, tickets),
-    [fallbackRooms, rooms, tickets],
+    () => getAutoRoomForService(
+      rooms,
+      fallbackRooms,
+      tickets,
+      selectedServiceType?.averageDurationMinutes ?? fallbackServiceMinutes,
+    ),
+    [fallbackRooms, rooms, selectedServiceType?.averageDurationMinutes, tickets],
   )
   const noRoomAvailable = Boolean(selectedServiceType && !autoRoom && !loadingOptions)
   const isBusy = saving || loadingOptions
@@ -399,6 +437,16 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
       queueDurationMinutes,
     }
   }, [completedAverageMinutes, queueServiceTypes, roomTickets])
+  const workTimeCalculation = useMemo(() => getRoomWorkloadRisk(room, tickets, {
+    averageServiceMinutes: queueCalculation.averageServiceMinutes,
+    now,
+    queueDurationMinutes: queueCalculation.queueDurationMinutes,
+  }), [now, queueCalculation.averageServiceMinutes, queueCalculation.queueDurationMinutes, room, tickets])
+  const workTimeStatus = workTimeCalculation.isAtRisk
+    ? 'Не успевает обслужить очередь'
+    : workTimeCalculation.isWorkingNow
+      ? 'Нагрузка в норме'
+      : 'Сейчас не работает'
 
   const handleReturnTicket = async (ticketId: string) => {
     setReturnError(null)
@@ -511,6 +559,41 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
               </dd>
             </div>
           </dl>
+        </section>
+
+        <section className="specialist-side-section working-hours-section">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">График места обслуживания</span>
+              <h2>Рабочее время</h2>
+            </div>
+          </div>
+          <dl className="queue-calculation-list">
+            <div>
+              <dt>График</dt>
+              <dd>{getRoomWorkTimeText(room)}</dd>
+            </div>
+            <div>
+              <dt>Осталось до закрытия</dt>
+              <dd>{formatWorkDuration(workTimeCalculation.remainingWorkMinutes)}</dd>
+            </div>
+            <div>
+              <dt>Очередь займёт</dt>
+              <dd>{formatWorkDuration(workTimeCalculation.queueDurationMinutes)}</dd>
+            </div>
+            <div>
+              <dt>Статус</dt>
+              <dd>{workTimeStatus}</dd>
+            </div>
+          </dl>
+          {workTimeCalculation.isAtRisk ? (
+            <div className="modal-error">
+              Очередь не успевает обслужиться до конца рабочего времени. Рекомендуется закрыть выдачу талонов.
+            </div>
+          ) : null}
+          {!workTimeCalculation.isWorkingNow ? (
+            <div className="modal-info">Место обслуживания сейчас не работает.</div>
+          ) : null}
         </section>
 
         <section className="specialist-side-section">

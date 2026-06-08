@@ -3,7 +3,7 @@ import { ClipboardPlus } from 'lucide-react'
 import { ticketService } from '@services/ticketService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsOptions } from '@services/api'
-import type { TicketCreateInput, TicketPriority } from '@shared/types'
+import type { Room, Ticket, TicketCreateInput, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { formatRoomName, getPriorityMeta } from '@shared/utils'
@@ -17,8 +17,10 @@ import {
 const priorities: TicketPriority[] = ['low', 'normal', 'high', 'critical']
 
 type TicketCreateFormProps = {
+  fallbackRooms?: Room[]
   loading: boolean
   onSubmit: (input: TicketCreateInput) => Promise<void>
+  tickets?: Ticket[]
 }
 
 const emptyOptions: TicketSettingsOptions = {
@@ -27,7 +29,12 @@ const emptyOptions: TicketSettingsOptions = {
   specialists: [],
 }
 
-export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
+export function TicketCreateForm({
+  fallbackRooms = [],
+  loading,
+  onSubmit,
+  tickets = [],
+}: TicketCreateFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [patientName, setPatientName] = useState('')
   const [priority, setPriority] = useState<TicketPriority>('normal')
@@ -39,9 +46,14 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
   const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
   const rooms = useMemo(
-    () => getRoomsForService(options, selectedServiceType?.id)
-      .filter((room) => isRoomAvailableForTicket(room, [])),
-    [options, selectedServiceType?.id],
+    () => getRoomsForService(options, selectedServiceType?.id, fallbackRooms)
+      .filter((room) => isRoomAvailableForTicket(
+        room,
+        fallbackRooms,
+        tickets,
+        selectedServiceType?.averageDurationMinutes ?? 10,
+      )),
+    [fallbackRooms, options, selectedServiceType?.averageDurationMinutes, selectedServiceType?.id, tickets],
   )
   const selectedRoomExists = useMemo(
     () => rooms.some((room) => String(room.id) === roomId),

@@ -104,8 +104,13 @@ export function TicketManualCreateModal({
     [fallbackRooms, options, selectedServiceType?.id],
   )
   const autoRoom = useMemo(
-    () => getAutoRoomForService(rooms, fallbackRooms, tickets),
-    [fallbackRooms, rooms, tickets],
+    () => getAutoRoomForService(
+      rooms,
+      fallbackRooms,
+      tickets,
+      selectedServiceType?.averageDurationMinutes ?? 10,
+    ),
+    [fallbackRooms, rooms, selectedServiceType?.averageDurationMinutes, tickets],
   )
   const autoDoctor = useMemo(
     () => autoRoom ? getAutoSpecialistForRoom(autoRoom.id, options.specialists) : undefined,

@@ -17,6 +17,7 @@ import {
   getWaitingMinutes,
 } from '@shared/utils/time'
 import { formatRoomName } from '@shared/utils/room'
+import { createRoomWorkTimeRecommendation } from '@shared/utils/workingHours'
 import { ticketLanguageService } from '@services/ticketLanguageService'
 import { planRoomLoads } from '@shared/utils/queuePlanning'
 import type {
@@ -67,6 +68,10 @@ export type BackendRoom = {
   status?: string
   ticketIssueEnabled?: boolean
   title?: string
+  workEndTime?: string
+  workStartTime?: string
+  work_end_time?: string
+  work_start_time?: string
 }
 
 export type BackendTicket = {
@@ -791,6 +796,8 @@ export function toSharedRooms(
       ticketIssueEnabled,
       loadPercent: 0,
       workload: 0,
+      workEndTime: room.workEndTime ?? room.work_end_time,
+      workStartTime: room.workStartTime ?? room.work_start_time,
     })
   })
 
@@ -829,6 +836,8 @@ export function toSharedRooms(
       ticketIssueEnabled: existingRoom?.ticketIssueEnabled ?? true,
       loadPercent: workload,
       workload,
+      workEndTime: existingRoom?.workEndTime,
+      workStartTime: existingRoom?.workStartTime,
     })
   })
 
@@ -865,6 +874,8 @@ export function toSharedRooms(
       ticketIssueEnabled: getBackendRoomTicketIssueEnabled(ticket.room),
       loadPercent: 0,
       workload: 0,
+      workEndTime: ticket.room?.workEndTime ?? ticket.room?.work_end_time,
+      workStartTime: ticket.room?.workStartTime ?? ticket.room?.work_start_time,
     })
   })
 
@@ -1406,8 +1417,22 @@ export function toSharedRecommendations(
     .filter((room) => !existingRoomIds.has(toId(room.roomId)))
     .map(createOverloadRecommendation)
     .filter((recommendation) => !existingIds.has(recommendation.id))
+  const recommendationIds = new Set([
+    ...baseRecommendations,
+    ...highPriorityRecommendations,
+    ...overloadRecommendations,
+  ].map((recommendation) => recommendation.id))
+  const workTimeRecommendations = rooms
+    .map((room) => createRoomWorkTimeRecommendation(room, tickets))
+    .filter((recommendation): recommendation is QueueRecommendation => Boolean(recommendation))
+    .filter((recommendation) => !recommendationIds.has(recommendation.id))
 
-  return [...baseRecommendations, ...highPriorityRecommendations, ...overloadRecommendations]
+  return [
+    ...baseRecommendations,
+    ...highPriorityRecommendations,
+    ...overloadRecommendations,
+    ...workTimeRecommendations,
+  ]
 }
 
 export function toQueueSnapshot(

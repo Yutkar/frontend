@@ -20,6 +20,10 @@ export type AdminRoomRecord = AdminRecord & {
   status?: string
   ticketIssueEnabled?: boolean
   title?: string
+  workEndTime?: string
+  workStartTime?: string
+  work_end_time?: string
+  work_start_time?: string
 }
 
 export const roleLabels: Record<Role, string> = {

@@ -16,6 +16,17 @@ export {
 } from './time'
 export { useCurrentTime } from './useCurrentTime'
 export {
+  activeWorkloadStatuses,
+  createRoomWorkTimeRecommendation,
+  getActiveTicketsForRoom,
+  getRemainingWorkMinutes,
+  getRoomWorkloadRisk,
+  hasWorkHours,
+  isWithinWorkHours,
+  normalizeWorkTime,
+  parseWorkTimeMinutes,
+} from './workingHours'
+export {
   getPriorityMeta,
   getServiceTypeLabel,
   getTicketStatusMeta,

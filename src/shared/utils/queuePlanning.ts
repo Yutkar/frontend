@@ -1,4 +1,8 @@
 import type { Room, ServiceType, Ticket, TicketPriority } from '@shared/types'
+import {
+  getRemainingWorkMinutes as getRoomRemainingWorkMinutes,
+  isWithinWorkHours,
+} from './workingHours'
 
 const activeStatuses = new Set(['created', 'waiting', 'called', 'in_service', 'redirected'])
 const waitingStatuses = new Set(['created', 'waiting', 'redirected'])
@@ -54,7 +58,7 @@ function parseTimestamp(value?: string): number | undefined {
   return Number.isFinite(timestamp) ? timestamp : undefined
 }
 
-function getRemainingWorkMinutes(now: number | Date = Date.now(), endHour = defaultWorkdayEndHour): number {
+function getDefaultRemainingWorkMinutes(now: number | Date = Date.now(), endHour = defaultWorkdayEndHour): number {
   const nowDate = typeof now === 'number' ? new Date(now) : now
   const endDate = new Date(nowDate)
   endDate.setHours(endHour, 0, 0, 0)
@@ -200,11 +204,13 @@ export function planRoomLoads(
   tickets: Ticket[],
   now: number | Date = Date.now(),
 ): { rooms: PlannedRoom[]; tickets: Ticket[] } {
-  const remainingWorkMinutes = Math.max(
-    getRemainingWorkMinutes(now),
+  const defaultRemainingWorkMinutes = Math.max(
+    getDefaultRemainingWorkMinutes(now),
     fallbackRemainingWorkMinutes,
   )
-  const activeRooms = rooms.filter((room) => room.isActive !== false && room.status !== 'paused')
+  const activeRooms = rooms.filter((room) =>
+    room.isActive !== false && room.status !== 'paused' && isWithinWorkHours(room, now),
+  )
   const accumulators = new Map(rooms.map((room) => [room.id, createAccumulator(room)]))
   const activeAccumulators = activeRooms
     .map((room) => accumulators.get(room.id))
@@ -263,7 +269,7 @@ export function planRoomLoads(
         currentTicketId: undefined,
         loadPercent: 0,
         plannedServiceMinutes: 0,
-        remainingWorkMinutes,
+        remainingWorkMinutes: defaultRemainingWorkMinutes,
         status: 'paused',
         workload: 0,
       } satisfies PlannedRoom
@@ -278,9 +284,15 @@ export function planRoomLoads(
     const currentTicket = accumulator.assignedTickets.find((ticket) =>
       ['called', 'in_service'].includes(ticket.status),
     )
+    const explicitRemainingWorkMinutes = getRoomRemainingWorkMinutes(room, now)
+    const remainingWorkMinutes = explicitRemainingWorkMinutes === undefined
+      ? defaultRemainingWorkMinutes
+      : Math.max(0, explicitRemainingWorkMinutes)
+    const capacityMinutes = Math.max(1, remainingWorkMinutes)
+    const roomWorkingNow = isWithinWorkHours(room, now)
     const loadPercent = Math.min(
       100,
-      Math.round(((accumulator.serviceMinutes + averageWaitingMinutes) / remainingWorkMinutes) * 100),
+      Math.round(((accumulator.serviceMinutes + averageWaitingMinutes) / capacityMinutes) * 100),
     )
 
     return {
@@ -290,7 +302,7 @@ export function planRoomLoads(
       loadPercent,
       plannedServiceMinutes: Math.round(accumulator.serviceMinutes),
       remainingWorkMinutes,
-      status: room.isActive === false || room.status === 'paused'
+      status: room.isActive === false || room.status === 'paused' || !roomWorkingNow
         ? 'paused'
         : currentTicket ? 'busy' : 'open',
       workload: loadPercent,

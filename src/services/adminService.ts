@@ -24,6 +24,8 @@ export type AdminRoomPayload = {
   placeType?: string
   serviceTypeIds?: Array<string | number>
   ticketIssueEnabled?: boolean
+  workEndTime?: string
+  workStartTime?: string
 }
 
 export type AdminUserPayload = AdminUserInput & {
@@ -382,6 +384,8 @@ export const adminService = {
           name: typeof room.name === 'string' ? room.name : String(room.id),
           serviceTypeIds: nextServiceTypeIds.map(normalizeId),
           ticketIssueEnabled: typeof room.ticketIssueEnabled === 'boolean' ? room.ticketIssueEnabled : undefined,
+          workEndTime: typeof room.workEndTime === 'string' ? room.workEndTime : undefined,
+          workStartTime: typeof room.workStartTime === 'string' ? room.workStartTime : undefined,
         } as AdminRecordInput)
       }))
 

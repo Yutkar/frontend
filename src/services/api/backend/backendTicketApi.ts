@@ -1,4 +1,5 @@
 import type { ServiceType as SharedServiceType, TicketPriority } from '@shared/types'
+import { isWithinWorkHours } from '@shared/utils'
 import type { TicketStatus } from '../../../types'
 import {
   toArchitectureTicket,
@@ -38,6 +39,10 @@ type BackendRoomOption = {
   status?: string
   ticketIssueEnabled?: boolean
   title?: string
+  workEndTime?: string
+  workStartTime?: string
+  work_end_time?: string
+  work_start_time?: string
 }
 
 type BackendServiceTypeOption = {
@@ -187,9 +192,12 @@ function isBackendRoomAcceptingTickets(room: BackendRoomOption): boolean {
     return false
   }
 
-  return room.isActive
+  return isWithinWorkHours({
+    workEndTime: room.workEndTime ?? room.work_end_time,
+    workStartTime: room.workStartTime ?? room.work_start_time,
+  }) && (room.isActive
     ?? room.active
-    ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted')
+    ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted'))
 }
 
 function getBackendRoomOptionActive(room: BackendRoomOption): boolean {
@@ -212,7 +220,7 @@ async function assertRoomAcceptsTickets(roomId?: string | number) {
   const room = rooms.find((item) => String(item.id ?? item.roomId ?? item._id) === String(roomId))
 
   if (!room || !isBackendRoomAcceptingTickets(room)) {
-    throw new Error('Ticket issuance is closed for this room.')
+    throw new Error('Выдача талонов в это место обслуживания закрыта.')
   }
 }
 
@@ -324,6 +332,8 @@ function toSettingsOptions(
       services: room.services,
       ticketIssueEnabled: room.ticketIssueEnabled,
       title: room.title,
+      workEndTime: room.workEndTime ?? room.work_end_time,
+      workStartTime: room.workStartTime ?? room.work_start_time,
     })),
     serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({
       active: serviceType.active ?? serviceType.isActive ?? serviceType.enabled,

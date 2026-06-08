@@ -1,7 +1,15 @@
 import { createInitialQueueSnapshot, calculateQueueKpi } from '@mock/queue.mock'
-import { createMockTicket, createQueueEvent, getServiceTypeLabel, planRoomLoads } from '@shared/utils'
+import {
+  createMockTicket,
+  createQueueEvent,
+  createRoomWorkTimeRecommendation,
+  getServiceTypeLabel,
+  isWithinWorkHours,
+  planRoomLoads,
+} from '@shared/utils'
 import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
 import type {
+  QueueRecommendation as SharedQueueRecommendation,
   QueueSnapshot,
   Room as SharedRoom,
   ServiceType as SharedServiceType,
@@ -101,7 +109,8 @@ function isRoomAcceptingTickets(room?: SharedRoom): boolean {
     room.ticketIssueEnabled !== false &&
     room.isTicketIssueEnabled !== false &&
     room.kioskEnabled !== false &&
-    room.status !== 'paused',
+    room.status !== 'paused' &&
+    isWithinWorkHours(room),
   )
 }
 
@@ -113,7 +122,7 @@ export function assertMockRoomAcceptsTickets(roomId?: string | number): void {
   const room = findRoom(String(roomId))
 
   if (!isRoomAcceptingTickets(room)) {
-    throw new Error('Ticket issuance is closed for this room.')
+    throw new Error('Выдача талонов в это место обслуживания закрыта.')
   }
 }
 
@@ -141,30 +150,37 @@ function refreshQueueSnapshot(): void {
   queueSnapshot.rooms = plannedQueue.rooms
   queueSnapshot.tickets = plannedQueue.tickets
   queueSnapshot.kpi = calculateQueueKpi(queueSnapshot.tickets, queueSnapshot.rooms)
-  queueSnapshot.recommendations = queueSnapshot.recommendations.map((recommendation) => {
-    const ticket = recommendation.ticket
-      ?? (recommendation.ticketId
-        ? queueSnapshot.tickets.find((item) => item.id === recommendation.ticketId)
-        : undefined)
-      ?? (recommendation.relatedRoomId
-        ? queueSnapshot.tickets.find((item) =>
-          item.roomId === recommendation.relatedRoomId &&
-          ['critical', 'high'].includes(item.priority) &&
-          ['created', 'waiting', 'called', 'redirected'].includes(item.status),
-        )
-        : undefined)
-    const roomId = recommendation.relatedRoomId ?? ticket?.roomId
-    const room = roomId ? queueSnapshot.rooms.find((item) => item.id === roomId) : undefined
+  const preservedRecommendations = queueSnapshot.recommendations
+    .filter((recommendation) => !recommendation.id.startsWith('room-') || !recommendation.id.endsWith('-worktime-risk'))
+    .map((recommendation) => {
+      const ticket = recommendation.ticket
+        ?? (recommendation.ticketId
+          ? queueSnapshot.tickets.find((item) => item.id === recommendation.ticketId)
+          : undefined)
+        ?? (recommendation.relatedRoomId
+          ? queueSnapshot.tickets.find((item) =>
+            item.roomId === recommendation.relatedRoomId &&
+            ['critical', 'high'].includes(item.priority) &&
+            ['created', 'waiting', 'called', 'redirected'].includes(item.status),
+          )
+          : undefined)
+      const roomId = recommendation.relatedRoomId ?? ticket?.roomId
+      const room = roomId ? queueSnapshot.rooms.find((item) => item.id === roomId) : undefined
 
-    return {
-      ...recommendation,
-      isResolved: recommendation.isResolved ?? false,
-      relatedRoomId: roomId,
-      relatedRoomName: recommendation.relatedRoomName ?? room?.name,
-      ticket,
-      ticketId: recommendation.ticketId ?? ticket?.id,
-    }
-  })
+      return {
+        ...recommendation,
+        isResolved: recommendation.isResolved ?? false,
+        relatedRoomId: roomId,
+        relatedRoomName: recommendation.relatedRoomName ?? room?.name,
+        ticket,
+        ticketId: recommendation.ticketId ?? ticket?.id,
+      }
+    })
+  const workTimeRecommendations = queueSnapshot.rooms
+    .map((room) => createRoomWorkTimeRecommendation(room, queueSnapshot.tickets))
+    .filter((recommendation): recommendation is SharedQueueRecommendation => Boolean(recommendation))
+
+  queueSnapshot.recommendations = [...preservedRecommendations, ...workTimeRecommendations]
 }
 
 export function upsertMockQueueRoom(record: { id: string | number } & Record<string, unknown>): void {
@@ -174,6 +190,8 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
   const name = getRecordText(record, ['name', 'title', 'roomName'], currentRoom?.name ?? `Кабинет ${id}`)
   const number = getRecordText(record, ['number'], currentRoom?.number ? String(currentRoom.number) : '')
   const placeType = getRecordText(record, ['placeType', 'place_type'], currentRoom?.placeType ? String(currentRoom.placeType) : '')
+  const workEndTime = getRecordText(record, ['workEndTime', 'work_end_time'], currentRoom?.workEndTime ?? '')
+  const workStartTime = getRecordText(record, ['workStartTime', 'work_start_time'], currentRoom?.workStartTime ?? '')
   const nextRoom: SharedRoom = {
     active: isActive,
     department: getRecordText(record, ['department'], currentRoom?.department ?? name),
@@ -204,6 +222,8 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
       ? record.ticketIssueEnabled
       : currentRoom?.ticketIssueEnabled,
     workload: currentRoom?.workload ?? 0,
+    workEndTime: workEndTime || undefined,
+    workStartTime: workStartTime || undefined,
   }
 
   queueSnapshot.rooms = currentRoom

@@ -160,7 +160,12 @@ export function KioskPage() {
           terminal,
         )
 
-        return Boolean(getAutoRoomForService(serviceRooms, queueRooms, queueTickets))
+        return Boolean(getAutoRoomForService(
+          serviceRooms,
+          queueRooms,
+          queueTickets,
+          serviceType.averageDurationMinutes ?? 10,
+        ))
       })
     },
     [options, queueRooms, queueTickets, terminal, terminalId],
@@ -173,8 +178,13 @@ export function KioskPage() {
     [options, queueRooms, selectedServiceType?.id, terminal, terminalId],
   )
   const selectedRoom = useMemo(
-    () => getAutoRoomForService(rooms, queueRooms, queueTickets),
-    [queueRooms, queueTickets, rooms],
+    () => getAutoRoomForService(
+      rooms,
+      queueRooms,
+      queueTickets,
+      selectedServiceType?.averageDurationMinutes ?? 10,
+    ),
+    [queueRooms, queueTickets, rooms, selectedServiceType?.averageDurationMinutes],
   )
 
   useEffect(() => {
@@ -250,7 +260,12 @@ export function KioskPage() {
         getRoomsForService(latestOptions, latestServiceType?.id, latestRooms),
         latestTerminal,
       )
-      const latestRoom = getAutoRoomForService(latestServiceRooms, latestRooms, latestTickets)
+      const latestRoom = getAutoRoomForService(
+        latestServiceRooms,
+        latestRooms,
+        latestTickets,
+        latestServiceType?.averageDurationMinutes ?? 10,
+      )
 
       if (!latestServiceType || !latestRoom) {
         setError(t.kiosk.noRoomsForService)

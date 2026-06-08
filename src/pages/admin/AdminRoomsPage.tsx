@@ -5,7 +5,7 @@ import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
 import type { ServicePlaceType } from '@shared/types'
 import { Button } from '@shared/ui/components'
-import { formatRoomName, getRoomBoardId, getRoomPlaceType } from '@shared/utils'
+import { formatRoomName, getRoomBoardId, getRoomPlaceType, normalizeWorkTime } from '@shared/utils'
 import {
   getRoomActive,
   getAdminErrorMessage,
@@ -20,6 +20,8 @@ type RoomFormState = {
   number: string
   placeType: ServicePlaceType
   serviceTypeIds: string[]
+  workEndTime: string
+  workStartTime: string
 }
 
 const emptyForm: RoomFormState = {
@@ -27,6 +29,8 @@ const emptyForm: RoomFormState = {
   number: '',
   placeType: 'room',
   serviceTypeIds: [],
+  workEndTime: '',
+  workStartTime: '',
 }
 
 const placeTypeOptions: Array<{ label: string; value: ServicePlaceType }> = [
@@ -51,6 +55,25 @@ function toRoomNumberInput(room: AdminRoomRecord): string {
 
 function normalizeRoomNumberInput(value: string): string {
   return value.replace(/\D/g, '')
+}
+
+function getRoomWorkTimeLabel(room: AdminRoomRecord): string {
+  const workStartTime = normalizeWorkTime(room.workStartTime ?? room.work_start_time)
+  const workEndTime = normalizeWorkTime(room.workEndTime ?? room.work_end_time)
+
+  if (workStartTime && workEndTime) {
+    return `с ${workStartTime} до ${workEndTime}`
+  }
+
+  if (workStartTime) {
+    return `с ${workStartTime}`
+  }
+
+  if (workEndTime) {
+    return `до ${workEndTime}`
+  }
+
+  return 'Весь день'
 }
 
 export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
@@ -104,6 +127,8 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
       number: toRoomNumberInput(room),
       placeType: getRoomPlaceType(room),
       serviceTypeIds: getRoomServiceTypeIds(room),
+      workEndTime: room.workEndTime ?? room.work_end_time ?? '',
+      workStartTime: room.workStartTime ?? room.work_start_time ?? '',
     })
     setSuccessMessage(null)
   }
@@ -141,6 +166,8 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
       number: roomNumber,
       placeType: form.placeType,
       serviceTypeIds: form.serviceTypeIds.map(normalizeId),
+      workEndTime: form.workEndTime || undefined,
+      workStartTime: form.workStartTime || undefined,
     }
 
     try {
@@ -217,6 +244,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
                   <tr>
                     <th>Место обслуживания</th>
                     <th>Типы услуг</th>
+                    <th>Рабочее время</th>
                     <th>Активен</th>
                     <th>Действия</th>
                   </tr>
@@ -226,6 +254,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
                     <tr key={String(room.id)}>
                       <td>{getRoomName(room)}</td>
                       <td>{getServiceTypeNames(room, serviceTypes)}</td>
+                      <td>{getRoomWorkTimeLabel(room)}</td>
                       <td>{getRoomActive(room) ? 'Да' : 'Нет'}</td>
                       <td>
                         <div className="button-row">
@@ -287,6 +316,32 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
                 value={form.number}
               />
             </label>
+
+            <div className="form-grid">
+              <label className="field">
+                <span>Время начала работы</span>
+                <input
+                  onChange={(event) => setForm((current) => ({
+                    ...current,
+                    workStartTime: event.target.value,
+                  }))}
+                  type="time"
+                  value={form.workStartTime}
+                />
+              </label>
+
+              <label className="field">
+                <span>Время окончания работы</span>
+                <input
+                  onChange={(event) => setForm((current) => ({
+                    ...current,
+                    workEndTime: event.target.value,
+                  }))}
+                  type="time"
+                  value={form.workEndTime}
+                />
+              </label>
+            </div>
 
             <fieldset className="admin-checkbox-group">
               <legend>Типы услуг</legend>

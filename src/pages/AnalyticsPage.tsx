@@ -22,6 +22,17 @@ function toDateInputValue(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
+function subtractMonths(date: Date, months: number): Date {
+  const nextDate = new Date(date)
+  const originalDay = nextDate.getDate()
+
+  nextDate.setDate(1)
+  nextDate.setMonth(nextDate.getMonth() - months)
+  nextDate.setDate(Math.min(originalDay, new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate()))
+
+  return nextDate
+}
+
 function getCompletedServiceMinutes(ticket: Ticket): number | null {
   if (ticket.status !== 'completed' || !ticket.startedAt || !ticket.completedAt) {
     return null
@@ -120,9 +131,10 @@ export function AnalyticsPage() {
   const rooms = useQueueStore((state) => state.rooms)
   const tickets = useQueueStore((state) => state.tickets)
   const today = useMemo(() => toDateInputValue(new Date()), [])
+  const minDate = useMemo(() => toDateInputValue(subtractMonths(new Date(), 6)), [])
   const [dateFrom, setDateFrom] = useState(today)
   const [dateTo, setDateTo] = useState(today)
-  const [periodError, setPeriodError] = useState<string | null>(null)
+  const [serviceTypesError, setServiceTypesError] = useState<string | null>(null)
   const [selectedServiceTypeId, setSelectedServiceTypeId] = useState('')
   const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const location = useLocation()
@@ -133,30 +145,39 @@ export function AnalyticsPage() {
     dateTo,
     serviceTypeId: selectedServiceTypeId || undefined,
   }), [dateFrom, dateTo, selectedServiceTypeId])
+  const periodIsValid = useMemo(() => (
+    dateFrom >= minDate &&
+    dateFrom <= today &&
+    dateTo >= minDate &&
+    dateTo <= today &&
+    dateFrom <= dateTo
+  ), [dateFrom, dateTo, minDate, today])
+  const periodError = periodIsValid ? null : 'Выберите корректный период'
   const chartAnalytics = useMemo(
-    () => createFilteredAnalyticsFromTickets(tickets, analyticsFilters, now),
-    [analyticsFilters, now, tickets],
+    () => periodIsValid ? createFilteredAnalyticsFromTickets(tickets, analyticsFilters, now) : [],
+    [analyticsFilters, now, periodIsValid, tickets],
   )
   const periodTickets = useMemo(
-    () => getTicketsForAnalyticsFilters(tickets, analyticsFilters),
-    [analyticsFilters, tickets],
+    () => periodIsValid ? getTicketsForAnalyticsFilters(tickets, analyticsFilters) : [],
+    [analyticsFilters, periodIsValid, tickets],
   )
 
   const loadServiceTypes = useCallback(async () => {
     try {
       setServiceTypes(await adminService.getServiceTypes())
-      setPeriodError(null)
+      setServiceTypesError(null)
     } catch (loadError) {
       console.error('Analytics service types load failed', loadError)
       setServiceTypes([])
-      setPeriodError('Не удалось загрузить типы услуг для фильтра.')
+      setServiceTypesError('Не удалось загрузить типы услуг для фильтра.')
     }
   }, [])
 
   useEffect(() => {
-    setPeriodError(null)
-    void refreshAnalyticsData()
-  }, [analyticsFilters, location.key, refreshAnalyticsData])
+    if (periodIsValid) {
+      void refreshAnalyticsData()
+    }
+  }, [analyticsFilters, location.key, periodIsValid, refreshAnalyticsData])
 
   useEffect(() => {
     void loadServiceTypes()
@@ -214,6 +235,8 @@ export function AnalyticsPage() {
             <label className="field">
               <span>Дата от</span>
               <input
+                max={dateTo < today ? dateTo : today}
+                min={minDate}
                 onChange={(event) => setDateFrom(event.target.value)}
                 type="date"
                 value={dateFrom}
@@ -222,6 +245,8 @@ export function AnalyticsPage() {
             <label className="field">
               <span>Дата до</span>
               <input
+                max={today}
+                min={dateFrom > minDate ? dateFrom : minDate}
                 onChange={(event) => setDateTo(event.target.value)}
                 type="date"
                 value={dateTo}
@@ -241,13 +266,24 @@ export function AnalyticsPage() {
                 ))}
               </select>
             </label>
-            {periodError ? <div className="modal-info">{periodError}</div> : null}
+            {serviceTypesError ? <div className="modal-info">{serviceTypesError}</div> : null}
           </section>
-          {periodTickets.length === 0 ? (
+          {periodError ? <div className="modal-error">{periodError}</div> : null}
+          {!periodError && periodTickets.length === 0 ? (
             <div className="modal-info">По выбранным фильтрам данных нет.</div>
           ) : null}
-          <AnalyticsSummaryKpis now={now} tickets={periodTickets} />
-          <AnalyticsCharts analytics={chartAnalytics} now={now} rooms={rooms} tickets={periodTickets} />
+          {!periodError ? (
+            <>
+              <AnalyticsSummaryKpis now={now} tickets={periodTickets} />
+              <AnalyticsCharts
+                analytics={chartAnalytics}
+                now={now}
+                rooms={rooms}
+                selectedServiceTypeId={selectedServiceTypeId || undefined}
+                tickets={periodTickets}
+              />
+            </>
+          ) : null}
         </>
       ) : !loading && hydrated ? (
         <section className="empty-state compact-empty">

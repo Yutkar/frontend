@@ -6,6 +6,7 @@ type AnalyticsChartsProps = {
   analytics: AnalyticsPoint[]
   now?: number
   rooms: Room[]
+  selectedServiceTypeId?: string | number
   tickets: Ticket[]
 }
 
@@ -72,7 +73,38 @@ function formatOptionalDuration(minutes?: number): string {
   return minutes === undefined ? 'Нет данных' : formatWaitingTime(minutes)
 }
 
-export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsChartsProps) {
+function normalizeServiceId(value?: string | number | null): string {
+  return value == null ? '' : String(value)
+}
+
+function getRoomServiceIds(room: Room): string[] {
+  const nestedServices = [...(room.serviceTypes ?? []), ...(room.services ?? [])]
+    .map((service) => {
+      if (typeof service === 'string' || typeof service === 'number') {
+        return normalizeServiceId(service)
+      }
+
+      return normalizeServiceId(service.serviceTypeId ?? service.id ?? service._id ?? service.name ?? service.title)
+    })
+
+  return Array.from(new Set([
+    normalizeServiceId(room.serviceTypeId),
+    ...(room.serviceTypeIds ?? []).map(normalizeServiceId),
+    ...nestedServices,
+  ].filter(Boolean)))
+}
+
+function roomSupportsSelectedService(room: Room, selectedServiceTypeId?: string | number): boolean {
+  const serviceTypeId = normalizeServiceId(selectedServiceTypeId)
+
+  return !serviceTypeId || getRoomServiceIds(room).some((roomServiceTypeId) => roomServiceTypeId === serviceTypeId)
+}
+
+function isActiveRoom(room: Room): boolean {
+  return room.active !== false && room.isActive !== false && room.status !== 'paused'
+}
+
+export function AnalyticsCharts({ analytics, now, rooms, selectedServiceTypeId, tickets }: AnalyticsChartsProps) {
   const maxTicketCount = Math.max(
     ...analytics.flatMap((point) => [point.waiting, point.completed, point.noShow ?? 0]),
     1,
@@ -94,6 +126,9 @@ export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsCha
     ...point,
     displayLabel: formatPeriodLabel(point.label, index),
   }))
+  const displayedRooms = rooms
+    .filter(isActiveRoom)
+    .filter((room) => roomSupportsSelectedService(room, selectedServiceTypeId))
 
   return (
     <div className="analytics-grid">
@@ -205,8 +240,13 @@ export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsCha
           <span>Среднее время ожидания, мин</span>
         </div>
         <div className="room-load-grid analytics-room-grid">
-          {rooms.map((room) => {
-            const roomTickets = tickets.filter((ticket) => ticket.roomId === room.id)
+          {displayedRooms.length === 0 ? (
+            <div className="empty-state compact-empty analytics-room-empty">
+              <h2>Нет мест обслуживания по выбранной услуге</h2>
+            </div>
+          ) : null}
+          {displayedRooms.map((room) => {
+            const roomTickets = tickets.filter((ticket) => String(ticket.roomId ?? '') === String(room.id))
             const averageWaitingMinutes = getAverageWaitingMinutes(roomTickets, now)
             const averageServiceMinutes = getAverageServiceMinutes(roomTickets)
             const waitingCount = roomTickets.filter((ticket) => ticket.status === 'waiting').length

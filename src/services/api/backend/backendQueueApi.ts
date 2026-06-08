@@ -1,5 +1,5 @@
 import type { QueueSnapshot, RedirectTicketInput } from '@shared/types'
-import { formatRoomName, getRoomBoardId } from '@shared/utils'
+import { formatRoomName, getRoomBoardId, isWithinWorkHours } from '@shared/utils'
 import type { QueueStats, Room, Ticket } from '../../../types'
 import {
   toArchitectureRooms,
@@ -191,6 +191,21 @@ function isBackendRoomAcceptingTickets(room: BackendRoom): boolean {
     return false
   }
 
+  if (!isWithinWorkHours({
+    workEndTime: typeof record.workEndTime === 'string'
+      ? record.workEndTime
+      : typeof record.work_end_time === 'string'
+        ? record.work_end_time
+        : undefined,
+    workStartTime: typeof record.workStartTime === 'string'
+      ? record.workStartTime
+      : typeof record.work_start_time === 'string'
+        ? record.work_start_time
+        : undefined,
+  })) {
+    return false
+  }
+
   if (typeof record.isActive === 'boolean') {
     return record.isActive
   }
@@ -216,7 +231,7 @@ async function assertRoomAcceptsTickets(roomId?: string | number) {
   const room = rooms.find((item) => String(item.id ?? item.roomId ?? item._id) === String(roomId))
 
   if (!room || !isBackendRoomAcceptingTickets(room)) {
-    throw new Error('Ticket issuance is closed for this room.')
+    throw new Error('Выдача талонов в это место обслуживания закрыта.')
   }
 }
 

@@ -2480,14 +2480,15 @@ h3 {
   border-radius: var(--radius);
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
-  justify-content: space-between;
+  gap: 10px 12px;
+  justify-content: flex-start;
   padding: 16px;
 }
 
 .analytics-period-panel .field {
-  max-width: 260px;
-  min-width: min(100%, 220px);
+  flex: 0 1 220px;
+  max-width: 240px;
+  min-width: min(100%, 180px);
 }
 
 .wide-panel {
@@ -2746,6 +2747,10 @@ h3 {
   max-height: 430px;
   overflow: auto;
   padding-right: 4px;
+}
+
+.analytics-room-empty {
+  grid-column: 1 / -1;
 }
 
 .room-status-summary {

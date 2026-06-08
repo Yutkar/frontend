@@ -341,6 +341,8 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
       ? record.active
       : record.status !== 'paused' && record.status !== 'inactive' && record.status !== 'deleted'
   const serviceTypeIds = getServiceTypeIds(record)
+  const workEndTime = getText(record.workEndTime ?? record.work_end_time)
+  const workStartTime = getText(record.workStartTime ?? record.work_start_time)
   const ticketIssueEnabled = typeof record.ticketIssueEnabled === 'boolean'
     ? record.ticketIssueEnabled
     : typeof record.isTicketIssueEnabled === 'boolean'
@@ -359,6 +361,8 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
     ...(getText(record.number) ? { number: getText(record.number) } : {}),
     ...(getText(record.placeType ?? record.place_type) ? { placeType: getText(record.placeType ?? record.place_type) } : {}),
     serviceTypeIds,
+    ...(workEndTime ? { workEndTime } : {}),
+    ...(workStartTime ? { workStartTime } : {}),
   }
 }
 
@@ -516,6 +520,8 @@ function toRoomCreatePayload(input: AdminRecordInput) {
   const name = getText(input.name) ?? getText(input.title) ?? ''
   const number = getText(input.number)
   const placeType = getText(input.placeType) ?? getText(input.place_type)
+  const workEndTime = getText(input.workEndTime ?? input.work_end_time)
+  const workStartTime = getText(input.workStartTime ?? input.work_start_time)
   const serviceTypeIds = normalizeIdList(input.serviceTypeIds as Array<string | number> | undefined)
   const ticketIssueEnabled = typeof input.ticketIssueEnabled === 'boolean'
     ? input.ticketIssueEnabled
@@ -531,6 +537,8 @@ function toRoomCreatePayload(input: AdminRecordInput) {
     ...(placeType ? { placeType } : {}),
     serviceTypeIds,
     ...(ticketIssueEnabled === undefined ? {} : { ticketIssueEnabled, isTicketIssueEnabled: ticketIssueEnabled }),
+    ...(workEndTime ? { workEndTime } : {}),
+    ...(workStartTime ? { workStartTime } : {}),
   }
 }
 
