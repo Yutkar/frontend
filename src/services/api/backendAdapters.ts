@@ -51,6 +51,7 @@ export type BackendRoom = {
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
   name?: string
+  number?: number | string
   room_id?: number | string
   room_name?: string
   roomId?: number | string

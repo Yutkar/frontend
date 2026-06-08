@@ -33,17 +33,13 @@ export function TvBoardPage() {
 
         if (!active || currentRequestId !== requestId) return
 
-        const nextTickets: Ticket[] = roomId
-          ? snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomId)
-          : snapshot.tickets
-        const nextRooms: Room[] = roomId
-          ? snapshot.rooms.filter((room) => String(room.id) === roomId)
-          : snapshot.rooms
+        const nextTickets: Ticket[] = snapshot.tickets
+        const nextRooms: Room[] = snapshot.rooms
 
         setTickets(nextTickets)
         setRooms(nextRooms)
         setRoomName(roomId
-          ? formatRoomName(nextRooms.find((room) => String(room.id) === roomId) ?? { id: roomId })
+          ? formatRoomName(nextRooms[0] ?? { id: roomId })
           : '')
         setError(null)
       } catch (error) {

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Building2, Check, Copy, ExternalLink, PlusCircle } from 'lucide-react'
+import { Building2, PlusCircle } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { Button } from '@shared/ui/components'
@@ -51,7 +51,6 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
   const [saving, setSaving] = useState(false)
   const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [copiedBoardPath, setCopiedBoardPath] = useState<string | null>(null)
 
   async function loadData() {
     setLoading(true)
@@ -162,23 +161,6 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
     }
   }
 
-  function getBoardPath(room: AdminRoomRecord): string {
-    return `/board?roomId=${encodeURIComponent(String(room.id))}`
-  }
-
-  function openBoard(room: AdminRoomRecord) {
-    window.open(getBoardPath(room), '_blank', 'noopener,noreferrer')
-  }
-
-  async function copyBoardLink(room: AdminRoomRecord) {
-    const path = getBoardPath(room)
-    const url = `${window.location.origin}${path}`
-
-    await navigator.clipboard.writeText(url)
-    setCopiedBoardPath(path)
-    window.setTimeout(() => setCopiedBoardPath(null), 2_000)
-  }
-
   return (
     <div className="page-stack">
       <section className="admin-page-grid">
@@ -213,7 +195,6 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
                   <tr>
                     <th>Номер кабинета</th>
                     <th>Типы услуг</th>
-                    <th>Ссылка на табло</th>
                     <th>Активен</th>
                     <th>Действия</th>
                   </tr>
@@ -223,31 +204,9 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
                     <tr key={String(room.id)}>
                       <td>{getRoomName(room)}</td>
                       <td>{getServiceTypeNames(room, serviceTypes)}</td>
-                      <td>
-                        <div className="admin-link-cell">
-                          <span>Ссылка на табло:</span>
-                          <code>{getBoardPath(room)}</code>
-                        </div>
-                      </td>
                       <td>{getRoomActive(room) ? 'Да' : 'Нет'}</td>
                       <td>
                         <div className="button-row">
-                          <Button
-                            icon={<ExternalLink size={14} />}
-                            onClick={() => openBoard(room)}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            Открыть табло
-                          </Button>
-                          <Button
-                            icon={copiedBoardPath === getBoardPath(room) ? <Check size={14} /> : <Copy size={14} />}
-                            onClick={() => void copyBoardLink(room)}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            {copiedBoardPath === getBoardPath(room) ? 'Скопировано' : 'Скопировать ссылку'}
-                          </Button>
                           <Button onClick={() => handleEdit(room)} size="sm" variant="secondary">
                             Редактировать
                           </Button>

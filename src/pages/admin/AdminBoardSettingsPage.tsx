@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Monitor, Copy, Check, ExternalLink, Plus, Trash2 } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { Button } from '@shared/ui/components'
+import { getRoomBoardId } from '@shared/utils'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
 
 type BoardScreen = {
@@ -55,13 +56,22 @@ export function BoardSettingsSection() {
       ? screen.roomIds
       : activeRooms
         .filter((room) => screen.roomNames.includes(getRoomName(room)))
-        .map((room) => String(room.id))
+        .map(getRoomBoardId)
+        .filter(Boolean)
 
     if (roomIds.length === 1) {
       return `${base}/board?roomId=${encodeURIComponent(roomIds[0])}`
     }
 
     return `${base}/board`
+  }
+
+  function getRoomBoardPath(room: AdminRoomRecord): string {
+    return `/board?roomId=${encodeURIComponent(getRoomBoardId(room))}`
+  }
+
+  function getRoomBoardUrl(room: AdminRoomRecord): string {
+    return `${window.location.origin}${getRoomBoardPath(room)}`
   }
 
   async function copyUrl(url: string) {
@@ -78,7 +88,8 @@ export function BoardSettingsSection() {
     if (!newScreenName.trim() || newScreenRooms.length === 0) return
     const roomIds = activeRooms
       .filter((room) => newScreenRooms.includes(getRoomName(room)))
-      .map((room) => String(room.id))
+      .map(getRoomBoardId)
+      .filter(Boolean)
     const newScreens = [
       ...screens,
       { id: String(Date.now()), name: newScreenName.trim(), roomIds, roomNames: newScreenRooms },
@@ -108,9 +119,9 @@ export function BoardSettingsSection() {
                 <Monitor size={14} />
                 Настройка
               </span>
-              <h2>Табло вызовов</h2>
+              <h2>Табло</h2>
               <p className="admin-section-description">
-                Создайте экраны с нужными кабинетами и скопируйте ссылку для телевизора.
+                Ссылки на табло кабинетов и общее табло для всех вызовов.
               </p>
             </div>
           </div>
@@ -124,7 +135,7 @@ export function BoardSettingsSection() {
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Название экрана</th>
+                    <th>Табло</th>
                     <th>Кабинеты</th>
                     <th>Ссылка</th>
                     <th>Действия</th>
@@ -165,13 +176,16 @@ export function BoardSettingsSection() {
                   {/* Отдельные кабинеты */}
                   {activeRooms.map((room) => {
                     const name = getRoomName(room)
-                    const url = `${window.location.origin}/board?roomId=${encodeURIComponent(String(room.id))}`
+                    const url = getRoomBoardUrl(room)
                     return (
                       <tr key={String(room.id)}>
                         <td>{name}</td>
                         <td>{name}</td>
                         <td>
-                          <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{url}</code>
+                          <div className="admin-link-cell">
+                            <span>Ссылка на табло:</span>
+                            <code>{url}</code>
+                          </div>
                         </td>
                         <td>
                           <div className="button-row">

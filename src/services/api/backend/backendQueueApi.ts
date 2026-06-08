@@ -1,4 +1,5 @@
 import type { QueueSnapshot, RedirectTicketInput } from '@shared/types'
+import { getRoomBoardId } from '@shared/utils'
 import type { QueueStats, Room, Ticket } from '../../../types'
 import {
   toArchitectureRooms,
@@ -477,6 +478,81 @@ function toBackendRoomId(roomId: string | number): string | number {
   return Number.isFinite(numericRoomId) ? numericRoomId : roomId
 }
 
+function getRawBackendRoomId(room: BackendRoom): string {
+  const rawId = room.id ?? room.roomId ?? room.room_id ?? room._id
+
+  return rawId == null ? '' : String(rawId)
+}
+
+function getBackendRoomBoardId(room: BackendRoom): string {
+  return getRoomBoardId({
+    id: getRawBackendRoomId(room),
+    name: room.name,
+    number: room.number,
+    roomId: room.roomId ?? room.room_id,
+    roomName: room.roomName ?? room.room_name,
+    title: room.title,
+  })
+}
+
+async function resolveBackendRoomIdForBoard(roomId: string | number): Promise<string> {
+  const boardRoomId = String(roomId)
+
+  try {
+    const response = await publicApiClient.get<unknown>('/rooms')
+    const room = toBackendRooms(response.data).find((item) => (
+      getBackendRoomBoardId(item) === boardRoomId ||
+      getRawBackendRoomId(item) === boardRoomId
+    ))
+    const backendRoomId = room ? getRawBackendRoomId(room) : ''
+
+    return backendRoomId || boardRoomId
+  } catch (error) {
+    console.warn('backendQueueApi: public GET /rooms failed for board room mapping', error)
+
+    return boardRoomId
+  }
+}
+
+function getBoardRoomFilterIds(
+  snapshot: QueueSnapshot,
+  boardRoomId: string,
+  backendRoomId: string,
+): Set<string> {
+  const ids = new Set([boardRoomId, backendRoomId].filter(Boolean))
+
+  snapshot.rooms
+    .filter((room) => (
+      String(room.id) === boardRoomId ||
+      String(room.id) === backendRoomId ||
+      getRoomBoardId(room) === boardRoomId
+    ))
+    .forEach((room) => ids.add(String(room.id)))
+
+  return ids
+}
+
+function filterBoardSnapshotByRoom(
+  snapshot: QueueSnapshot,
+  roomId: string | number,
+  backendRoomId: string,
+): QueueSnapshot {
+  const boardRoomId = String(roomId)
+  const roomIds = getBoardRoomFilterIds(snapshot, boardRoomId, backendRoomId)
+
+  return {
+    ...snapshot,
+    rooms: snapshot.rooms.filter((room) => (
+      roomIds.has(String(room.id)) ||
+      getRoomBoardId(room) === boardRoomId
+    )),
+    tickets: snapshot.tickets.filter((ticket) => (
+      (ticket.roomId !== undefined && roomIds.has(String(ticket.roomId))) ||
+      getRoomBoardId({ id: ticket.roomId, name: ticket.roomName }) === boardRoomId
+    )),
+  }
+}
+
 function toRedirectBody(input: RedirectTicketInput, includeOptional = true): BackendRedirectBody {
   const note = input.note?.trim()
   const comment = input.comment?.trim() ?? input.reason?.trim()
@@ -495,9 +571,10 @@ export const backendQueueApi: QueueApi = {
   },
 
   async getBoardSnapshot(roomId?: string | number) {
+    const backendRoomId = roomId ? await resolveBackendRoomIdForBoard(roomId) : undefined
     const response = roomId
       ? await publicApiClient
-        .get<unknown>(`/queue/board/${encodeURIComponent(String(roomId))}`)
+        .get<unknown>(`/queue/board/${encodeURIComponent(backendRoomId ?? String(roomId))}`)
         .catch((error) => {
           console.warn('backendQueueApi: public room board is not available, loading common board', error)
 
@@ -510,13 +587,7 @@ export const backendQueueApi: QueueApi = {
       return snapshot
     }
 
-    const roomIdValue = String(roomId)
-
-    return {
-      ...snapshot,
-      rooms: snapshot.rooms.filter((room) => String(room.id) === roomIdValue),
-      tickets: snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomIdValue),
-    }
+    return filterBoardSnapshotByRoom(snapshot, roomId, backendRoomId ?? String(roomId))
   },
 
   async getPeriodAnalytics(period) {

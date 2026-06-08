@@ -8,6 +8,7 @@ export type AdminRoomRecord = AdminRecord & {
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
   name?: string
+  number?: string | number
   roomName?: string
   roomId?: string | number
   services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
