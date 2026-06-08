@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 import type { QueueEvent, QueueEventType } from '@shared/types'
+import { formatRoomName } from '@shared/utils/room'
 import { API_BASE_URL, isBackendMode } from './apiProvider'
 
 type QueueEventListener = (event: QueueEvent) => void
@@ -77,22 +78,27 @@ function normalizeStatus(value: unknown): string | undefined {
   return toText(value)?.toLowerCase().replace(/-/g, '_')
 }
 
-function formatRoomName(roomName?: string, roomId?: string | number): string {
-  const rawRoomName = roomName?.trim()
-
-  if (rawRoomName) {
-    return /кабинет/i.test(rawRoomName)
-      ? rawRoomName
-      : /^\d+$/.test(rawRoomName)
-        ? `Кабинет ${rawRoomName}`
-        : rawRoomName
+function getWrappedPayload(payload: unknown): unknown {
+  if (!isRecord(payload)) {
+    return payload
   }
 
-  return roomId !== undefined ? `Кабинет ${roomId}` : 'кабинет не указан'
+  return getRecord(payload, 'payload')
+    ?? getRecord(payload, 'data')
+    ?? getRecord(payload, 'event')
+    ?? payload
 }
 
-function getCreatedAt(payload: unknown): string {
-  const rawDate = toText(getValue(payload, [
+function getEventRoomName(roomName?: string, roomId?: string | number): string {
+  if (!roomName?.trim() && roomId === undefined) {
+    return 'кабинет не указан'
+  }
+
+  return formatRoomName({ id: roomId, name: roomName })
+}
+
+function getEventDateText(payload: unknown): string | undefined {
+  return toText(getValue(payload, [
     'createdAt',
     'created_at',
     'occurredAt',
@@ -101,6 +107,9 @@ function getCreatedAt(payload: unknown): string {
     'updatedAt',
     'updated_at',
   ]))
+}
+
+function getCreatedAt(rawDate?: string): string {
   const date = rawDate ? new Date(rawDate) : new Date()
 
   return Number.isFinite(date.getTime()) ? date.toISOString() : new Date().toISOString()
@@ -116,7 +125,7 @@ function buildMessage(
   const ticketLabel = ticketNumber ? `Талон ${ticketNumber}` : 'Талон'
 
   if (type === 'ticket_called') {
-    return `${ticketLabel} вызван в ${formatRoomName(roomName, roomId).replace(/^Кабинет/i, 'кабинет')}`
+    return `${ticketLabel} вызван в ${getEventRoomName(roomName, roomId).replace(/^Кабинет/i, 'кабинет')}`
   }
 
   const statusLabel = status ? statusLabels[status] ?? status : 'обновлён'
@@ -124,8 +133,17 @@ function buildMessage(
   return `${ticketLabel} переведён в статус «${statusLabel}»`
 }
 
+function getStablePayloadSignature(payload: unknown): string {
+  try {
+    return JSON.stringify(payload) ?? String(payload)
+  } catch {
+    return String(payload)
+  }
+}
+
 function createEventId(
   type: RealtimeEventType,
+  rawPayload: unknown,
   payload: unknown,
   ticketId?: string | number,
   ticketNumber?: string,
@@ -133,45 +151,76 @@ function createEventId(
   status?: string,
   createdAt?: string,
 ): string {
-  const rawId = toId(getValue(payload, ['id', '_id', 'eventId', 'event_id']))
+  const rawEventId = toId(
+    getValue(payload, ['eventId', 'event_id'])
+      ?? getValue(rawPayload, ['eventId', 'event_id']),
+  )
 
-  if (rawId !== undefined) {
-    return String(rawId)
+  if (rawEventId !== undefined) {
+    return String(rawEventId)
   }
 
   return [
     type,
-    ticketId ?? ticketNumber ?? 'ticket',
+    ticketId
+      ?? ticketNumber
+      ?? toId(getValue(payload, ['id', '_id']) ?? getValue(rawPayload, ['id', '_id']))
+      ?? 'ticket',
     roomId ?? 'room',
     status ?? 'status',
-    createdAt ?? JSON.stringify(payload),
+    createdAt ?? getStablePayloadSignature(payload),
   ].join(':')
 }
 
 function normalizeQueueEvent(type: RealtimeEventType, payload: unknown): QueueEvent {
-  const ticket = getRecord(payload, 'ticket')
-  const room = getRecord(payload, 'room')
-  const ticketId = toId(getNestedValue(payload, ['ticketId', 'ticket_id'], 'ticket', ['id', '_id']))
-  const ticketNumber = toText(
-    getNestedValue(payload, ['ticketNumber', 'ticket_number', 'number'], 'ticket', ['number', 'ticketNumber']),
+  const eventPayload = getWrappedPayload(payload)
+  const ticket = getRecord(eventPayload, 'ticket') ?? getRecord(payload, 'ticket')
+  const room = getRecord(eventPayload, 'room') ?? getRecord(payload, 'room')
+  const ticketId = toId(
+    getNestedValue(eventPayload, ['ticketId', 'ticket_id'], 'ticket', ['id', '_id'])
+      ?? getNestedValue(payload, ['ticketId', 'ticket_id'], 'ticket', ['id', '_id']),
   )
-  const roomId = toId(getNestedValue(payload, ['roomId', 'room_id'], 'room', ['id', '_id', 'roomId']))
+  const ticketNumber = toText(
+    getNestedValue(eventPayload, ['ticketNumber', 'ticket_number', 'number'], 'ticket', ['number', 'ticketNumber'])
+      ?? getNestedValue(payload, ['ticketNumber', 'ticket_number', 'number'], 'ticket', ['number', 'ticketNumber']),
+  )
+  const roomId = toId(
+    getNestedValue(eventPayload, ['roomId', 'room_id'], 'room', ['id', '_id', 'roomId'])
+      ?? getNestedValue(payload, ['roomId', 'room_id'], 'room', ['id', '_id', 'roomId']),
+  )
   const roomName = toText(
-    getValue(payload, ['roomName', 'room_name'])
+    getValue(eventPayload, ['roomName', 'room_name'])
+      ?? getValue(payload, ['roomName', 'room_name'])
       ?? getValue(room, ['name', 'roomName', 'room_name', 'title'])
       ?? getValue(ticket, ['roomName', 'room_name']),
   )
   const status = normalizeStatus(
-    getValue(payload, ['status', 'newStatus', 'new_status'])
+    getValue(eventPayload, ['status', 'newStatus', 'new_status'])
+      ?? getValue(payload, ['status', 'newStatus', 'new_status'])
       ?? getValue(ticket, ['status']),
   )
-  const createdAt = getCreatedAt(payload)
-  const message = toText(getValue(payload, ['message', 'text', 'description']))
-    ?? buildMessage(type, ticketNumber, roomName, roomId, status)
+  const eventDateText = getEventDateText(eventPayload) ?? getEventDateText(payload)
+  const createdAt = getCreatedAt(eventDateText)
+  const fallbackMessage = toText(
+    getValue(eventPayload, ['message', 'text', 'description'])
+      ?? getValue(payload, ['message', 'text', 'description']),
+  )
+  const message = ticketNumber || roomName || roomId !== undefined || status
+    ? buildMessage(type, ticketNumber, roomName, roomId, status)
+    : fallbackMessage ?? buildMessage(type, ticketNumber, roomName, roomId, status)
 
   return {
     createdAt,
-    id: createEventId(type, payload, ticketId, ticketNumber, roomId, status, createdAt),
+    id: createEventId(
+      type,
+      payload,
+      eventPayload,
+      ticketId,
+      ticketNumber,
+      roomId,
+      status,
+      eventDateText ? createdAt : undefined,
+    ),
     message,
     occurredAt: createdAt,
     roomId,

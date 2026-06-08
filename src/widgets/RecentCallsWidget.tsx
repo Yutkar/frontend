@@ -18,9 +18,9 @@ export function RecentCallsWidget({ events }: RecentCallsWidgetProps) {
       {events.length > 0 ? (
         <div className="event-list">
           {events.slice(0, 20).map((event) => {
-            const roomLabel = event.roomName || event.roomId
-              ? formatRoomName({ id: event.roomId, name: event.roomName })
-              : ''
+            const eventDate = event.createdAt ?? event.occurredAt
+            const hasRoom = Boolean(event.roomName) || event.roomId !== undefined
+            const roomLabel = hasRoom ? formatRoomName({ id: event.roomId, name: event.roomName }) : ''
             const meta = [
               event.ticketNumber ? `Талон ${event.ticketNumber}` : '',
               roomLabel,
@@ -30,11 +30,12 @@ export function RecentCallsWidget({ events }: RecentCallsWidgetProps) {
               <article className={`event-row event-${event.type}`} key={event.id}>
                 <span />
                 <div>
-                  <strong>{event.message}</strong>
-                  <time>
-                    {formatTime(event.createdAt ?? event.occurredAt)}
-                    {meta ? ` — ${meta}` : ''}
-                  </time>
+                  <strong>
+                    <time dateTime={eventDate}>{formatTime(eventDate)}</time>
+                    {' — '}
+                    {event.message}
+                  </strong>
+                  {meta ? <time>{meta}</time> : null}
                 </div>
               </article>
             )
@@ -43,7 +44,6 @@ export function RecentCallsWidget({ events }: RecentCallsWidgetProps) {
       ) : (
         <div className="empty-inline">
           <strong>Событий пока нет</strong>
-          <span>Новые действия с очередью появятся здесь.</span>
         </div>
       )}
     </section>

@@ -576,7 +576,6 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       return
     }
 
-    socketClient.connect()
     realtimeUnsubscribe = socketClient.subscribe((event) => {
       set((state) => ({
         events: mergeQueueEvents([event], state.events),
@@ -597,6 +596,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
           console.error('Queue realtime refresh failed', error)
         })
     })
+    socketClient.connect()
   },
 
   stopRealtime: () => {
