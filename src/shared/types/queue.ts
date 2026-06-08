@@ -104,6 +104,7 @@ export type AnalyticsPoint = {
   label: string
   waiting: number
   completed: number
+  noShow?: number
   avgWaitMinutes: number
   avgServiceMinutes?: number
 }

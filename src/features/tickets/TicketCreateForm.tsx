@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ClipboardPlus } from 'lucide-react'
 import { ticketService } from '@services/ticketService'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsOptions } from '@services/api'
 import type { TicketCreateInput, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
@@ -48,39 +49,30 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
   )
   const canCreateTicket = Boolean(selectedServiceType && selectedRoomExists && priority)
 
-  useEffect(() => {
-    let active = true
-
-    setOptionsLoading(true)
+  const loadOptions = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setOptionsLoading(true)
+    }
     setError(null)
 
-    ticketService
-      .getTicketSettingsOptions()
-      .then((nextOptions) => {
-        if (!active) {
-          return
-        }
-
-        setOptions(nextOptions)
-      })
-      .catch((loadError) => {
-        console.error('Ticket create options load failed', loadError)
-
-        if (active) {
-          setOptions(emptyOptions)
-          setError('Не удалось загрузить услуги и кабинеты. Проверьте подключение к серверу.')
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setOptionsLoading(false)
-        }
-      })
-
-    return () => {
-      active = false
+    try {
+      setOptions(await ticketService.getTicketSettingsOptions())
+    } catch (loadError) {
+      console.error('Ticket create options load failed', loadError)
+      setOptions(emptyOptions)
+      setError('Не удалось загрузить услуги и кабинеты. Проверьте подключение к серверу.')
+    } finally {
+      setOptionsLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void loadOptions()
+  }, [loadOptions])
+
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    void loadOptions(false)
+  }), [loadOptions])
 
   useEffect(() => {
     if (!serviceTypeId && serviceTypes[0]) {

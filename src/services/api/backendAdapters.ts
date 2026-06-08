@@ -1161,6 +1161,13 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
       'avg_service_minutes',
       'average_service_minutes',
     ])
+    const noShow = getRecordNumberOptional(record, [
+      'noShow',
+      'noShowCount',
+      'no_show',
+      'no_show_count',
+      'noShowTickets',
+    ])
     const nextPoint: AnalyticsPoint = {
       label,
       waiting: getRecordNumber(record, [
@@ -1176,6 +1183,7 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
         'completed_count',
         'completedTickets',
       ], existing?.completed ?? 0),
+      noShow: noShow ?? existing?.noShow,
       avgWaitMinutes: getRecordNumber(record, [
         'avgWaitMinutes',
         'averageWaitMinutes',
@@ -1189,6 +1197,7 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
       label,
       waiting: existing ? Math.max(existing.waiting, nextPoint.waiting) : nextPoint.waiting,
       completed: existing ? Math.max(existing.completed, nextPoint.completed) : nextPoint.completed,
+      noShow: nextPoint.noShow ?? existing?.noShow,
       avgWaitMinutes: nextPoint.avgWaitMinutes || existing?.avgWaitMinutes || 0,
       avgServiceMinutes: nextPoint.avgServiceMinutes ?? existing?.avgServiceMinutes,
     })
@@ -1299,6 +1308,7 @@ function createAnalyticsFromTickets(tickets: Ticket[], now = Date.now()): Analyt
         label,
         waiting: groupTickets.filter((ticket) => queueWaitingStatuses.has(ticket.status)).length,
         completed: groupTickets.filter((ticket) => ticket.status === 'completed').length,
+        noShow: groupTickets.filter((ticket) => ticket.status === 'no_show').length,
         avgWaitMinutes: getAverageMinutes(waitingMinutes),
         avgServiceMinutes: serviceMinutes.length > 0 ? getAverageMinutes(serviceMinutes) : undefined,
       }

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PlusCircle, X } from 'lucide-react'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type {
   TicketCreateSettingsPayload,
@@ -55,6 +56,21 @@ export function TicketManualCreateModal({
   const [saving, setSaving] = useState(false)
   const [serviceTypeId, setServiceTypeId] = useState('')
 
+  const loadOptions = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setLoadingOptions(true)
+    }
+
+    try {
+      setOptions(await ticketService.getTicketSettingsOptions())
+    } catch (loadError) {
+      console.error('Ticket create options load failed', loadError)
+      setOptions(emptyOptions)
+    } finally {
+      setLoadingOptions(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!open) {
       return
@@ -72,32 +88,14 @@ export function TicketManualCreateModal({
       return
     }
 
-    let active = true
+    void loadOptions()
+  }, [loadOptions, open])
 
-    setLoadingOptions(true)
-    ticketService
-      .getTicketSettingsOptions()
-      .then((nextOptions) => {
-        if (active) {
-          setOptions(nextOptions)
-        }
-      })
-      .catch((loadError) => {
-        console.error('Ticket create options load failed', loadError)
-        if (active) {
-          setOptions(emptyOptions)
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoadingOptions(false)
-        }
-      })
-
-    return () => {
-      active = false
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    if (open) {
+      void loadOptions(false)
     }
-  }, [open])
+  }), [loadOptions, open])
 
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
   const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]

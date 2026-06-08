@@ -10,6 +10,7 @@ import {
   getServiceTypes,
 } from '@features/tickets/ticketFormOptions'
 import { kioskService } from '@services/kioskService'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type { TicketSettingsOptions } from '@services/api'
 import type { Ticket } from '@shared/types'
@@ -69,6 +70,11 @@ export function KioskPage() {
       active = false
     }
   }, [loadQueue, loadTicketOptions])
+
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    void loadQueue({ force: true, successMessage: 'Данные киоска обновлены' })
+    void loadTicketOptions()
+  }), [loadQueue, loadTicketOptions])
 
   const serviceTypes = useMemo(
     () => getAvailableServiceTypes(options, queueRooms, queueTickets),

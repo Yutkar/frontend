@@ -2505,6 +2505,10 @@ h3 {
   background: var(--success);
 }
 
+.legend-no-show {
+  background: var(--danger);
+}
+
 .analytics-chart-frame {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2578,7 +2582,7 @@ h3 {
   align-items: end;
   display: grid;
   gap: 5px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
   min-width: 48px;
@@ -2604,6 +2608,10 @@ h3 {
 
 .bar-completed {
   background: var(--success);
+}
+
+.bar-no-show {
+  background: var(--danger);
 }
 
 .wait-row {
