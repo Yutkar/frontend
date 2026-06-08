@@ -4,6 +4,9 @@ import { apiClient, publicApiClient } from '../client'
 import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
 import type {
   AdminApi,
+  AdminTerminalInput,
+  AdminTerminalRecord,
+  BoardSettings,
   AdminRecord,
   AdminRecordInput,
   AdminServiceTypeInput,
@@ -32,6 +35,17 @@ type BackendUserResponse = BackendUser & {
   accessToken?: string
   token?: string
   user?: BackendUser
+}
+
+const defaultBoardSettings: BoardSettings = {
+  boardType: 'general',
+  recentCallsLimit: 10,
+  roomBoardId: '',
+  screens: [],
+  showRecentCalls: true,
+  showTime: true,
+  template: 'classic',
+  voiceEnabled: true,
 }
 
 const serviceCodeByBackendName: Record<string, ServiceType> = {
@@ -345,6 +359,73 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
     ...(getText(record.number) ? { number: getText(record.number) } : {}),
     ...(getText(record.placeType ?? record.place_type) ? { placeType: getText(record.placeType ?? record.place_type) } : {}),
     serviceTypeIds,
+  }
+}
+
+function normalizeRecordIdList(values: unknown): Array<string | number> {
+  if (!Array.isArray(values)) {
+    return []
+  }
+
+  return values
+    .map((value) => {
+      if (typeof value === 'string' && value.trim()) return value.trim()
+      if (typeof value === 'number' && Number.isFinite(value)) return value
+      return undefined
+    })
+    .filter((value): value is string | number => value !== undefined)
+}
+
+function toTerminalRecord(record: UnknownRecord): AdminTerminalRecord {
+  return {
+    active: typeof record.active === 'boolean' ? record.active : record.isActive !== false,
+    id: getId(record),
+    location: getText(record.location ?? record.place ?? record.installationPlace) ?? '',
+    name: getText(record.name ?? record.title) ?? 'Терминал',
+    roomIds: normalizeRecordIdList(record.roomIds ?? record.rooms),
+    serviceTypeIds: normalizeRecordIdList(record.serviceTypeIds ?? record.services ?? record.serviceTypes),
+  }
+}
+
+function toTerminalPayload(input: AdminTerminalInput | Partial<AdminTerminalInput>) {
+  return {
+    active: input.active ?? true,
+    isActive: input.active ?? true,
+    location: input.location ?? '',
+    name: input.name ?? '',
+    roomIds: normalizeIdList(input.roomIds),
+    serviceTypeIds: normalizeIdList(input.serviceTypeIds),
+  }
+}
+
+function normalizeBoardTemplate(value: unknown): BoardSettings['template'] {
+  return value === 'grid' || value === 'list' || value === 'minimal' ? value : 'classic'
+}
+
+function normalizeRecentCallsLimit(value: unknown): BoardSettings['recentCallsLimit'] {
+  return value === 5 || value === 15 ? value : 10
+}
+
+function toBoardSettings(value: unknown): BoardSettings {
+  const record = isRecord(value) ? value : {}
+  const screens = Array.isArray(record.screens)
+    ? record.screens.filter(isRecord).map((screen) => ({
+        id: getText(screen.id) ?? `screen-${Math.random().toString(36).slice(2, 8)}`,
+        name: getText(screen.name) ?? 'Экран',
+        roomIds: normalizeRecordIdList(screen.roomIds).map(String),
+        roomNames: normalizeRecordIdList(screen.roomNames).map(String),
+      }))
+    : []
+
+  return {
+    boardType: record.boardType === 'individual' ? 'individual' : 'general',
+    recentCallsLimit: normalizeRecentCallsLimit(record.recentCallsLimit),
+    roomBoardId: getText(record.roomBoardId),
+    screens,
+    showRecentCalls: typeof record.showRecentCalls === 'boolean' ? record.showRecentCalls : true,
+    showTime: typeof record.showTime === 'boolean' ? record.showTime : true,
+    template: normalizeBoardTemplate(record.template),
+    voiceEnabled: typeof record.voiceEnabled === 'boolean' ? record.voiceEnabled : true,
   }
 }
 
@@ -793,5 +874,51 @@ export const backendAdminApi: AdminApi = {
 
   assignDoctorToRoom(userId, roomId) {
     return assignUserToRoom(userId, roomId)
+  },
+
+  async getTerminals() {
+    const response = await apiClient.get<unknown>('/terminals')
+
+    return toArray(response.data, ['terminals']).map(toTerminalRecord)
+  },
+
+  async createTerminal(input) {
+    const response = await apiClient.post<unknown>('/terminals', toTerminalPayload(input))
+
+    return toTerminalRecord(isRecord(response.data) ? response.data : { ...input, id: Date.now() })
+  },
+
+  async updateTerminal(id, input) {
+    const response = await apiClient.patch<unknown>(`/terminals/${id}`, toTerminalPayload(input))
+
+    return toTerminalRecord(isRecord(response.data) ? response.data : { ...input, id })
+  },
+
+  deleteTerminal(id) {
+    return deleteRecord('/terminals', id)
+  },
+
+  async getBoardSettings() {
+    const response = await requestFirst([
+      () => apiClient.get<unknown>('/board-settings').then((result) => result.data),
+      () => apiClient.get<unknown>('/settings/board').then((result) => result.data),
+    ])
+
+    return toBoardSettings(isRecord(response) && isRecord(response.settings) ? response.settings : response)
+  },
+
+  async updateBoardSettings(input) {
+    const payload = {
+      ...defaultBoardSettings,
+      ...input,
+      screens: input.screens ?? defaultBoardSettings.screens,
+    }
+    const response = await requestFirst([
+      () => apiClient.patch<unknown>('/board-settings', payload).then((result) => result.data),
+      () => apiClient.put<unknown>('/board-settings', payload).then((result) => result.data),
+      () => apiClient.patch<unknown>('/settings/board', payload).then((result) => result.data),
+    ])
+
+    return toBoardSettings(isRecord(response) && isRecord(response.settings) ? response.settings : response)
   },
 }

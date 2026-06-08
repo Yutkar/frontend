@@ -161,6 +161,43 @@ export type AdminRecord = {
 
 export type AdminRecordInput = Record<string, unknown>
 
+export type AdminTerminalRecord = {
+  active: boolean
+  id: string | number
+  location: string
+  name: string
+  roomIds: Array<string | number>
+  serviceTypeIds: Array<string | number>
+}
+
+export type AdminTerminalInput = {
+  active?: boolean
+  location: string
+  name: string
+  roomIds?: Array<string | number>
+  serviceTypeIds?: Array<string | number>
+}
+
+export type BoardTemplate = 'classic' | 'grid' | 'list' | 'minimal'
+
+export type BoardScreen = {
+  id: string
+  name: string
+  roomIds?: string[]
+  roomNames: string[]
+}
+
+export type BoardSettings = {
+  boardType: 'general' | 'individual'
+  recentCallsLimit: 5 | 10 | 15
+  roomBoardId?: string
+  screens: BoardScreen[]
+  showRecentCalls: boolean
+  showTime: boolean
+  template: BoardTemplate
+  voiceEnabled: boolean
+}
+
 export type AdminServiceTypeInput = {
   active?: boolean
   averageDurationMinutes?: number
@@ -194,6 +231,12 @@ export type AdminApi = {
   updateUser: (id: string | number, input: Partial<AdminUserInput>) => Promise<SharedUser>
   deleteUser: (id: string | number) => Promise<void>
   assignDoctorToRoom: (userId: string | number, roomId: string | number) => Promise<SharedUser>
+  getTerminals: () => Promise<AdminTerminalRecord[]>
+  createTerminal: (input: AdminTerminalInput) => Promise<AdminTerminalRecord>
+  updateTerminal: (id: string | number, input: Partial<AdminTerminalInput>) => Promise<AdminTerminalRecord>
+  deleteTerminal: (id: string | number) => Promise<void>
+  getBoardSettings: () => Promise<BoardSettings>
+  updateBoardSettings: (input: Partial<BoardSettings>) => Promise<BoardSettings>
 }
 
 export type KioskApi = {

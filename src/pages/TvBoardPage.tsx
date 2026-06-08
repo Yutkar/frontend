@@ -1,15 +1,28 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CallBoard } from '@features/tv-board/CallBoard'
+import { adminService } from '@services/adminService'
 import { queueService } from '@services/queueService'
-import { t } from '@shared/locales/useLocale'
+import type { BoardSettings } from '@services/api'
 import type { Room, Ticket } from '@shared/types'
 import { formatRoomName } from '@shared/utils'
+
+const defaultBoardSettings: BoardSettings = {
+  boardType: 'general',
+  recentCallsLimit: 10,
+  roomBoardId: '',
+  screens: [],
+  showRecentCalls: true,
+  showTime: true,
+  template: 'classic',
+  voiceEnabled: true,
+}
 
 export function TvBoardPage() {
   const [searchParams] = useSearchParams()
   const roomId = searchParams.get('roomId') ?? undefined
   const [error, setError] = useState<string | null>(null)
+  const [boardSettings, setBoardSettings] = useState<BoardSettings>(defaultBoardSettings)
   const [rooms, setRooms] = useState<Room[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [roomName, setRoomName] = useState<string>('')
@@ -18,6 +31,24 @@ export function TvBoardPage() {
   useEffect(() => {
     const clockInterval = window.setInterval(() => setNow(new Date()), 1000)
     return () => window.clearInterval(clockInterval)
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    adminService.getBoardSettings()
+      .then((nextSettings) => {
+        if (active) {
+          setBoardSettings(nextSettings)
+        }
+      })
+      .catch((settingsError) => {
+        console.error('Board settings load failed', settingsError)
+      })
+
+    return () => {
+      active = false
+    }
   }, [])
 
   useEffect(() => {
@@ -62,25 +93,34 @@ export function TvBoardPage() {
 
   return (
     <main className="tv-board">
-      <header className="tv-header">
-        <div>
-          <span>{t.system.smartq}</span>
-          <strong>{roomName ? `Табло вызовов — ${roomName}` : 'Общее табло вызовов'}</strong>
-        </div>
-        <time>
-          {new Intl.DateTimeFormat('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }).format(now)}
-        </time>
-      </header>
+      {roomName || boardSettings.showTime ? (
+        <header className={roomName ? 'tv-header' : 'tv-header tv-header-general'}>
+          {roomName ? <strong>{roomName}</strong> : <span />}
+          {boardSettings.showTime ? (
+            <time>
+              {new Intl.DateTimeFormat('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              }).format(now)}
+            </time>
+          ) : null}
+        </header>
+      ) : null}
       {error ? (
         <section className="empty-state">
           <h2>{error}</h2>
         </section>
       ) : null}
-      <CallBoard rooms={rooms} tickets={tickets} />
+      <CallBoard
+        recentCallsLimit={boardSettings.recentCallsLimit}
+        rooms={rooms}
+        showRecentCalls={boardSettings.showRecentCalls}
+        showTime={boardSettings.showTime}
+        template={boardSettings.template}
+        tickets={tickets}
+        voiceEnabled={boardSettings.voiceEnabled}
+      />
     </main>
   )
 }

@@ -4,12 +4,18 @@ import {
   getVoiceAudienceLabel,
   voiceSettingsService,
 } from '@services/voiceSettingsService'
+import type { BoardTemplate } from '@services/api'
 import type { Room, Ticket } from '@shared/types'
 import { formatRoomName, formatRoomVoiceTarget, formatTime } from '@shared/utils'
 
 type CallBoardProps = {
+  recentCallsLimit?: number
   rooms: Room[]
+  showRecentCalls?: boolean
+  showTime?: boolean
+  template?: BoardTemplate
   tickets: Ticket[]
+  voiceEnabled?: boolean
 }
 
 function getCallTime(ticket: Ticket): string {
@@ -55,7 +61,15 @@ function isBoardCallTicket(ticket: Ticket): boolean {
     && (ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'no_show')
 }
 
-export function CallBoard({ rooms, tickets }: CallBoardProps) {
+export function CallBoard({
+  recentCallsLimit = 10,
+  rooms,
+  showRecentCalls = true,
+  showTime = true,
+  template = 'classic',
+  tickets,
+  voiceEnabled = true,
+}: CallBoardProps) {
   const [highlightedCallKey, setHighlightedCallKey] = useState('')
   const audioContextRef = useRef<AudioContext | null>(null)
   const hasRenderedRef = useRef(false)
@@ -77,7 +91,8 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
   const recentCalls = tickets
     .filter(isBoardCallTicket)
     .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
-    .slice(0, 10)
+    .slice(0, recentCallsLimit)
+  const visibleCalls = showRecentCalls ? recentCalls : currentCall ? [currentCall] : []
 
   async function playBeep() {
     const AudioContextConstructor = window.AudioContext
@@ -144,13 +159,69 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
     setHighlightedCallKey(currentCallKey)
     const highlightTimeout = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
 
-    void announceCall(currentCallNumber, currentCallVoiceTarget).catch(() => undefined)
+    if (voiceEnabled) {
+      void announceCall(currentCallNumber, currentCallVoiceTarget).catch(() => undefined)
+    }
 
     return () => window.clearTimeout(highlightTimeout)
-  }, [currentCallKey, currentCallNumber, currentCallVoiceTarget])
+  }, [currentCallKey, currentCallNumber, currentCallVoiceTarget, voiceEnabled])
+
+  if (template === 'minimal') {
+    return (
+      <div className="tv-layout tv-layout-minimal">
+        {currentCall ? (
+          <article
+            className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
+          >
+            <strong>{currentCall.number}</strong>
+            <span>{currentCallRoomName}</span>
+            {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
+          </article>
+        ) : (
+          <div className="tv-empty-call">Ожидайте вызова</div>
+        )}
+      </div>
+    )
+  }
+
+  if (template === 'grid') {
+    return (
+      <div className="tv-layout tv-layout-grid">
+        {visibleCalls.length > 0 ? visibleCalls.map((ticket) => (
+          <article
+            className={`tv-call-card ${highlightedCallKey === getCallKey(ticket) ? 'tv-call-animated' : ''}`}
+            key={ticket.id}
+          >
+            <strong>{ticket.number}</strong>
+            <span>{getRoomName(ticket, rooms)}</span>
+            {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
+          </article>
+        )) : (
+          <div className="tv-empty-call">Ожидайте вызова</div>
+        )}
+      </div>
+    )
+  }
+
+  if (template === 'list') {
+    return (
+      <section className="tv-layout tv-layout-list">
+        {visibleCalls.length > 0 ? visibleCalls.map((ticket) => (
+          <div className="tv-list-row" key={ticket.id}>
+            {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
+            <strong>{ticket.number}</strong>
+            <span>{getRoomName(ticket, rooms)}</span>
+            {ticket.status === 'no_show' ? <em>Не явился</em> : null}
+          </div>
+        )) : (
+          <div className="tv-empty-recent">Ожидайте вызова</div>
+        )}
+      </section>
+    )
+  }
 
   return (
-    <div className="tv-grid">
+    <div className={`tv-grid ${showRecentCalls ? '' : 'tv-grid-single'}`}>
       <section className="tv-current">
         <span className="tv-section-label">Сейчас вызывается</span>
         {currentCall ? (
@@ -160,15 +231,15 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
             >
               <strong>{currentCall.number}</strong>
               <span>{currentCallRoomName}</span>
-              <time>{formatTime(getCallTime(currentCall))}</time>
+              {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
             </article>
-            {currentCalls.length > 1 ? (
+            {showRecentCalls && currentCalls.length > 1 ? (
               <div className="tv-current-list">
-                {currentCalls.slice(1, 6).map((ticket) => (
+                {currentCalls.slice(1, Math.min(recentCallsLimit, 6)).map((ticket) => (
                   <div className="tv-recent-row" key={ticket.id}>
                     <strong>{ticket.number}</strong>
                     <span>{getRoomName(ticket, rooms)}</span>
-                    <time>{formatTime(getCallTime(ticket))}</time>
+                    {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
                   </div>
                 ))}
               </div>
@@ -179,21 +250,23 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
         )}
       </section>
 
-      <section className="tv-recent">
-        <span className="tv-section-label">Последние вызовы</span>
-        {recentCalls.length > 0 ? (
-          recentCalls.map((ticket) => (
-            <div className="tv-recent-row" key={ticket.id}>
-              <strong>{ticket.number}</strong>
-              <span>{getRoomName(ticket, rooms)}</span>
-              <time>{formatTime(getCallTime(ticket))}</time>
-              {ticket.status === 'no_show' ? <em>Не явился</em> : null}
-            </div>
-          ))
-        ) : (
-          <div className="tv-empty-recent">Ожидайте вызова</div>
-        )}
-      </section>
+      {showRecentCalls ? (
+        <section className="tv-recent">
+          <span className="tv-section-label">Последние вызовы</span>
+          {recentCalls.length > 0 ? (
+            recentCalls.map((ticket) => (
+              <div className="tv-recent-row" key={ticket.id}>
+                <strong>{ticket.number}</strong>
+                <span>{getRoomName(ticket, rooms)}</span>
+                {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
+                {ticket.status === 'no_show' ? <em>Не явился</em> : null}
+              </div>
+            ))
+          ) : (
+            <div className="tv-empty-recent">Ожидайте вызова</div>
+          )}
+        </section>
+      ) : null}
     </div>
   )
 }

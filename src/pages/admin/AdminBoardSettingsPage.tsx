@@ -9,37 +9,38 @@ import {
   type VoiceAudience,
   type VoiceSettings,
 } from '@services/voiceSettingsService'
+import type { BoardScreen, BoardSettings, BoardTemplate } from '@services/api'
 import { Button } from '@shared/ui/components'
 import { getRoomBoardId } from '@shared/utils'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
 
-type BoardScreen = {
-  id: string
-  name: string
-  roomIds?: string[]
-  roomNames: string[]
+const defaultBoardSettings: BoardSettings = {
+  boardType: 'general',
+  recentCallsLimit: 10,
+  roomBoardId: '',
+  screens: [],
+  showRecentCalls: true,
+  showTime: true,
+  template: 'classic',
+  voiceEnabled: true,
 }
 
-const STORAGE_KEY = 'smartq_board_screens'
-
-function loadScreens(): BoardScreen[] {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    return saved ? JSON.parse(saved) : []
-  } catch {
-    return []
-  }
-}
-
-function saveScreens(screens: BoardScreen[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(screens))
-}
+const boardTemplates: Array<{
+  description: string
+  label: string
+  value: BoardTemplate
+}> = [
+  { description: 'Крупный текущий талон и последние вызовы', label: 'Классический', value: 'classic' },
+  { description: 'Несколько крупных карточек вызовов', label: 'Сетка', value: 'grid' },
+  { description: 'Компактный список время, талон, место', label: 'Список', value: 'list' },
+  { description: 'Только текущий талон и место', label: 'Минималистичный', value: 'minimal' },
+]
 
 export function BoardSettingsSection() {
   const [rooms, setRooms] = useState<AdminRoomRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [screens, setScreens] = useState<BoardScreen[]>(loadScreens)
+  const [boardSettings, setBoardSettings] = useState<BoardSettings>(defaultBoardSettings)
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => voiceSettingsService.getSettings())
   const [copied, setCopied] = useState<string | null>(null)
   const [newScreenName, setNewScreenName] = useState('')
@@ -47,9 +48,15 @@ export function BoardSettingsSection() {
 
   useEffect(() => {
     setLoading(true)
-    adminService.getRooms()
-      .then((nextRooms) => setRooms(nextRooms as AdminRoomRecord[]))
-      .catch((loadError) => setError(getAdminErrorMessage(loadError, 'Не удалось загрузить кабинеты')))
+    Promise.all([
+      adminService.getRooms(),
+      adminService.getBoardSettings(),
+    ])
+      .then(([nextRooms, nextBoardSettings]) => {
+        setRooms(nextRooms as AdminRoomRecord[])
+        setBoardSettings(nextBoardSettings)
+      })
+      .catch((loadError) => setError(getAdminErrorMessage(loadError, 'Не удалось загрузить настройки табло')))
       .finally(() => setLoading(false))
   }, [])
 
@@ -93,26 +100,42 @@ export function BoardSettingsSection() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  function addScreen() {
+  async function updateBoardSettings(nextSettings: Partial<BoardSettings>) {
+    const savedSettings = await adminService.updateBoardSettings({
+      ...boardSettings,
+      ...nextSettings,
+    })
+
+    setBoardSettings(savedSettings)
+  }
+
+  function getSelectedBoardUrl(): string {
+    if (boardSettings.boardType === 'individual' && boardSettings.roomBoardId) {
+      return `${window.location.origin}/board?roomId=${encodeURIComponent(boardSettings.roomBoardId)}`
+    }
+
+    return generalUrl
+  }
+
+  async function addScreen() {
     if (!newScreenName.trim() || newScreenRooms.length === 0) return
     const roomIds = activeRooms
       .filter((room) => newScreenRooms.includes(getRoomName(room)))
       .map(getRoomBoardId)
       .filter(Boolean)
     const newScreens = [
-      ...screens,
+      ...boardSettings.screens,
       { id: String(Date.now()), name: newScreenName.trim(), roomIds, roomNames: newScreenRooms },
     ]
-    setScreens(newScreens)
-    saveScreens(newScreens)
+    await updateBoardSettings({ screens: newScreens })
     setNewScreenName('')
     setNewScreenRooms([])
   }
 
-  function deleteScreen(id: string) {
-    const newScreens = screens.filter((screen) => screen.id !== id)
-    setScreens(newScreens)
-    saveScreens(newScreens)
+  async function deleteScreen(id: string) {
+    await updateBoardSettings({
+      screens: boardSettings.screens.filter((screen) => screen.id !== id),
+    })
   }
 
   function updateVoiceSettings(nextSettings: Partial<VoiceSettings>) {
@@ -121,6 +144,7 @@ export function BoardSettingsSection() {
 
   const activeRooms = rooms.filter(getRoomActive)
   const generalUrl = `${window.location.origin}/board`
+  const selectedBoardUrl = getSelectedBoardUrl()
 
   return (
     <div className="page-stack">
@@ -225,7 +249,7 @@ export function BoardSettingsSection() {
                   })}
 
                   {/* Созданные экраны */}
-                  {screens.map((screen) => {
+                  {boardSettings.screens.map((screen) => {
                     const url = getScreenUrl(screen)
                     return (
                       <tr key={screen.id}>
@@ -254,7 +278,7 @@ export function BoardSettingsSection() {
                             </Button>
                             <Button
                               icon={<Trash2 size={14} />}
-                              onClick={() => deleteScreen(screen.id)}
+                              onClick={() => void deleteScreen(screen.id)}
                               size="sm"
                               variant="danger"
                             >
@@ -273,6 +297,120 @@ export function BoardSettingsSection() {
 
         {/* Форма создания объединённого экрана */}
         <aside className="widget-panel admin-form-panel">
+          <div className="admin-form">
+            <div className="panel-header">
+              <div>
+                <span className="eyebrow">Настройки</span>
+                <h2>Табло вызовов</h2>
+              </div>
+            </div>
+
+            <label className="field">
+              <span>Тип табло</span>
+              <select
+                onChange={(event) => void updateBoardSettings({
+                  boardType: event.target.value as BoardSettings['boardType'],
+                })}
+                value={boardSettings.boardType}
+              >
+                <option value="general">Общее</option>
+                <option value="individual">Индивидуальное</option>
+              </select>
+            </label>
+
+            {boardSettings.boardType === 'individual' ? (
+              <label className="field">
+                <span>Место обслуживания</span>
+                <select
+                  onChange={(event) => void updateBoardSettings({ roomBoardId: event.target.value })}
+                  value={boardSettings.roomBoardId ?? ''}
+                >
+                  <option value="">Выберите место обслуживания</option>
+                  {activeRooms.map((room) => {
+                    const boardId = getRoomBoardId(room)
+
+                    return (
+                      <option key={String(room.id)} value={boardId}>
+                        {getRoomName(room)}
+                      </option>
+                    )
+                  })}
+                </select>
+              </label>
+            ) : null}
+
+            <div className="admin-link-cell">
+              <span>Ссылка выбранного табло:</span>
+              <code>{selectedBoardUrl}</code>
+            </div>
+
+            <fieldset className="admin-checkbox-group">
+              <legend>Вид табло</legend>
+              <div className="board-template-grid">
+                {boardTemplates.map((template) => (
+                  <button
+                    className={boardSettings.template === template.value
+                      ? 'board-template-card active'
+                      : 'board-template-card'}
+                    key={template.value}
+                    onClick={() => void updateBoardSettings({ template: template.value })}
+                    type="button"
+                  >
+                    <span className={`board-template-preview ${template.value}`} aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                    <strong>{template.label}</strong>
+                    <small>{template.description}</small>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="admin-toggle-row">
+              <input
+                checked={boardSettings.showRecentCalls}
+                onChange={(event) => void updateBoardSettings({ showRecentCalls: event.target.checked })}
+                type="checkbox"
+              />
+              <span>Показывать последние вызовы</span>
+            </label>
+
+            <label className="field">
+              <span>Количество последних вызовов</span>
+              <select
+                disabled={!boardSettings.showRecentCalls}
+                onChange={(event) => void updateBoardSettings({
+                  recentCallsLimit: Number(event.target.value) as BoardSettings['recentCallsLimit'],
+                })}
+                value={boardSettings.recentCallsLimit}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+              </select>
+            </label>
+
+            <label className="admin-toggle-row">
+              <input
+                checked={boardSettings.showTime}
+                onChange={(event) => void updateBoardSettings({ showTime: event.target.checked })}
+                type="checkbox"
+              />
+              <span>Показывать время</span>
+            </label>
+
+            <label className="admin-toggle-row">
+              <input
+                checked={boardSettings.voiceEnabled}
+                onChange={(event) => void updateBoardSettings({ voiceEnabled: event.target.checked })}
+                type="checkbox"
+              />
+              <span>Озвучка включена</span>
+            </label>
+          </div>
+
           <div className="admin-form">
             <div className="panel-header">
               <div>
@@ -311,7 +449,7 @@ export function BoardSettingsSection() {
               <Button
                 disabled={!newScreenName.trim() || newScreenRooms.length === 0}
                 icon={<Plus size={16} />}
-                onClick={addScreen}
+                onClick={() => void addScreen()}
                 variant="primary"
               >
                 Добавить экран

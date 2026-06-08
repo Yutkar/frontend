@@ -1,6 +1,13 @@
 import { mockUsers } from '@mock/auth.mock'
 import type { User } from '@shared/types'
-import type { AdminApi, AdminRecord, AdminRecordInput, AdminUserInput } from '../types'
+import type {
+  AdminApi,
+  AdminRecord,
+  AdminRecordInput,
+  AdminTerminalRecord,
+  AdminUserInput,
+  BoardSettings,
+} from '../types'
 import {
   deactivateMockQueueRoom,
   createMockServiceType,
@@ -12,6 +19,17 @@ import {
 } from './mockState'
 
 let rooms = getQueueSnapshot().rooms.map<AdminRecord>((room) => ({ ...room }))
+let terminals: AdminTerminalRecord[] = []
+let boardSettings: BoardSettings = {
+  boardType: 'general',
+  recentCallsLimit: 10,
+  roomBoardId: '',
+  screens: [],
+  showRecentCalls: true,
+  showTime: true,
+  template: 'classic',
+  voiceEnabled: true,
+}
 let staff: AdminRecord[] = [
   {
     department: mockUsers.specialist.department,
@@ -217,5 +235,69 @@ export const mockAdminApi: AdminApi = {
       assignedRoomId: String(roomId),
       roomId: String(roomId),
     }))
+  },
+
+  getTerminals() {
+    return Promise.resolve(clone(terminals))
+  },
+
+  createTerminal(input) {
+    const terminal: AdminTerminalRecord = {
+      active: input.active ?? true,
+      id: nextId('terminal'),
+      location: input.location,
+      name: input.name,
+      roomIds: input.roomIds ?? [],
+      serviceTypeIds: input.serviceTypeIds ?? [],
+    }
+
+    terminals = [...terminals, terminal]
+
+    return Promise.resolve(clone(terminal))
+  },
+
+  updateTerminal(id, input) {
+    const currentTerminal = terminals.find((terminal) => String(terminal.id) === String(id))
+
+    if (!currentTerminal) {
+      throw new Error(`Terminal ${id} was not found.`)
+    }
+
+    const updatedTerminal: AdminTerminalRecord = {
+      ...currentTerminal,
+      ...input,
+      active: input.active ?? currentTerminal.active,
+      id,
+      location: input.location ?? currentTerminal.location,
+      name: input.name ?? currentTerminal.name,
+      roomIds: input.roomIds ?? currentTerminal.roomIds,
+      serviceTypeIds: input.serviceTypeIds ?? currentTerminal.serviceTypeIds,
+    }
+
+    terminals = terminals.map((terminal) => (
+      String(terminal.id) === String(id) ? updatedTerminal : terminal
+    ))
+
+    return Promise.resolve(clone(updatedTerminal))
+  },
+
+  deleteTerminal(id) {
+    terminals = terminals.filter((terminal) => String(terminal.id) !== String(id))
+
+    return Promise.resolve()
+  },
+
+  getBoardSettings() {
+    return Promise.resolve(clone(boardSettings))
+  },
+
+  updateBoardSettings(input) {
+    boardSettings = {
+      ...boardSettings,
+      ...input,
+      screens: input.screens ?? boardSettings.screens,
+    }
+
+    return Promise.resolve(clone(boardSettings))
   },
 }

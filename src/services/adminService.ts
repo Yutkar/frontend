@@ -4,7 +4,10 @@ import {
   type AdminRecord,
   type AdminRecordInput,
   type AdminServiceTypeInput,
+  type AdminTerminalInput,
+  type AdminTerminalRecord,
   type AdminUserInput,
+  type BoardSettings,
   type TicketSettingsServiceTypeOption,
 } from './api'
 import { refreshOperationalData, withOperationalRefresh } from './syncService'
@@ -30,6 +33,23 @@ export type AdminUserPayload = AdminUserInput & {
 }
 
 export type AdminServiceTypePayload = AdminServiceTypeInput
+export type AdminTerminalPayload = AdminTerminalInput
+export type AdminBoardSettings = BoardSettings
+
+const terminalStorageKey = 'smartq_terminals'
+const boardSettingsStorageKey = 'smartq_board_settings'
+const legacyBoardScreensStorageKey = 'smartq_board_screens'
+
+const defaultBoardSettings: AdminBoardSettings = {
+  boardType: 'general',
+  recentCallsLimit: 10,
+  roomBoardId: '',
+  screens: [],
+  showRecentCalls: true,
+  showTime: true,
+  template: 'classic',
+  voiceEnabled: true,
+}
 
 function onlySpecialists(users: User[]): User[] {
   return users.filter((user) => user.role === 'specialist')
@@ -43,6 +63,81 @@ function normalizeId(value: string | number): string | number {
   const numberValue = Number(value)
 
   return Number.isFinite(numberValue) && String(value).trim() !== '' ? numberValue : value
+}
+
+function readJsonStorage<T>(key: string, fallback: T): T {
+  try {
+    const saved = window.localStorage.getItem(key)
+
+    return saved ? JSON.parse(saved) as T : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function writeJsonStorage<T>(key: string, value: T): T {
+  window.localStorage.setItem(key, JSON.stringify(value))
+
+  return value
+}
+
+function normalizeIdList(values?: Array<string | number>): Array<string | number> {
+  return (values ?? []).map(normalizeId)
+}
+
+function normalizeTerminal(record: AdminTerminalRecord | AdminTerminalInput & { id?: string | number }): AdminTerminalRecord {
+  return {
+    active: record.active ?? true,
+    id: record.id ?? `terminal-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    location: record.location.trim(),
+    name: record.name.trim(),
+    roomIds: normalizeIdList(record.roomIds),
+    serviceTypeIds: normalizeIdList(record.serviceTypeIds),
+  }
+}
+
+function readStoredTerminals(): AdminTerminalRecord[] {
+  return readJsonStorage<AdminTerminalRecord[]>(terminalStorageKey, []).map(normalizeTerminal)
+}
+
+function writeStoredTerminals(terminals: AdminTerminalRecord[]): AdminTerminalRecord[] {
+  return writeJsonStorage(terminalStorageKey, terminals.map(normalizeTerminal))
+}
+
+function normalizeBoardSettings(settings: Partial<AdminBoardSettings> = {}): AdminBoardSettings {
+  const recentCallsLimit = settings.recentCallsLimit === 5 || settings.recentCallsLimit === 15
+    ? settings.recentCallsLimit
+    : defaultBoardSettings.recentCallsLimit
+  const template = settings.template === 'grid' || settings.template === 'list' || settings.template === 'minimal'
+    ? settings.template
+    : defaultBoardSettings.template
+
+  return {
+    boardType: settings.boardType === 'individual' ? 'individual' : defaultBoardSettings.boardType,
+    recentCallsLimit,
+    roomBoardId: settings.roomBoardId ?? defaultBoardSettings.roomBoardId,
+    screens: settings.screens ?? defaultBoardSettings.screens,
+    showRecentCalls: settings.showRecentCalls ?? defaultBoardSettings.showRecentCalls,
+    showTime: settings.showTime ?? defaultBoardSettings.showTime,
+    template,
+    voiceEnabled: settings.voiceEnabled ?? defaultBoardSettings.voiceEnabled,
+  }
+}
+
+function readStoredBoardSettings(): AdminBoardSettings {
+  const settings = normalizeBoardSettings(readJsonStorage<Partial<AdminBoardSettings>>(boardSettingsStorageKey, {}))
+
+  if (settings.screens.length > 0) {
+    return settings
+  }
+
+  const legacyScreens = readJsonStorage<AdminBoardSettings['screens']>(legacyBoardScreensStorageKey, [])
+
+  return legacyScreens.length > 0 ? { ...settings, screens: legacyScreens } : settings
+}
+
+function writeStoredBoardSettings(settings: AdminBoardSettings): AdminBoardSettings {
+  return writeJsonStorage(boardSettingsStorageKey, normalizeBoardSettings(settings))
 }
 
 function getRoomServiceTypeIds(room: AdminRecord): string[] {
@@ -172,6 +267,91 @@ export const adminService = {
     } catch (error) {
       console.error('adminService.deleteRoom failed', error)
       throw toServiceError(error, 'Не удалось удалить кабинет')
+    }
+  },
+
+  async getTerminals(): Promise<AdminTerminalRecord[]> {
+    try {
+      const terminals = await adminApi.getTerminals()
+
+      return terminals.map(normalizeTerminal)
+    } catch (error) {
+      console.warn('adminService.getTerminals: backend endpoint недоступен, используем временное хранилище', error)
+
+      return readStoredTerminals()
+    }
+  },
+
+  async createTerminal(input: AdminTerminalPayload): Promise<AdminTerminalRecord> {
+    try {
+      return normalizeTerminal(await adminApi.createTerminal(input))
+    } catch (error) {
+      console.warn('adminService.createTerminal: backend endpoint недоступен, сохраняем локально', error)
+      const nextTerminal = normalizeTerminal(input)
+      const terminals = writeStoredTerminals([...readStoredTerminals(), nextTerminal])
+
+      return terminals.find((terminal) => String(terminal.id) === String(nextTerminal.id)) ?? nextTerminal
+    }
+  },
+
+  async updateTerminal(
+    id: string | number,
+    input: Partial<AdminTerminalPayload>,
+  ): Promise<AdminTerminalRecord> {
+    try {
+      return normalizeTerminal(await adminApi.updateTerminal(id, input))
+    } catch (error) {
+      console.warn('adminService.updateTerminal: backend endpoint недоступен, сохраняем локально', error)
+      const terminals = readStoredTerminals()
+      const currentTerminal = terminals.find((terminal) => String(terminal.id) === String(id))
+
+      if (!currentTerminal) {
+        throw new Error('Терминал не найден')
+      }
+
+      const updatedTerminal = normalizeTerminal({ ...currentTerminal, ...input, id })
+
+      writeStoredTerminals(terminals.map((terminal) => (
+        String(terminal.id) === String(id) ? updatedTerminal : terminal
+      )))
+
+      return updatedTerminal
+    }
+  },
+
+  async deleteTerminal(id: string | number): Promise<void> {
+    try {
+      await adminApi.deleteTerminal(id)
+    } catch (error) {
+      console.warn('adminService.deleteTerminal: backend endpoint недоступен, удаляем локально', error)
+    }
+
+    writeStoredTerminals(readStoredTerminals().filter((terminal) => String(terminal.id) !== String(id)))
+  },
+
+  async getBoardSettings(): Promise<AdminBoardSettings> {
+    try {
+      return normalizeBoardSettings(await adminApi.getBoardSettings())
+    } catch (error) {
+      console.warn('adminService.getBoardSettings: backend endpoint недоступен, используем временное хранилище', error)
+
+      return readStoredBoardSettings()
+    }
+  },
+
+  async updateBoardSettings(input: Partial<AdminBoardSettings>): Promise<AdminBoardSettings> {
+    const localSettings = normalizeBoardSettings({ ...readStoredBoardSettings(), ...input })
+
+    try {
+      const savedSettings = normalizeBoardSettings(await adminApi.updateBoardSettings(localSettings))
+
+      writeStoredBoardSettings(savedSettings)
+
+      return savedSettings
+    } catch (error) {
+      console.warn('adminService.updateBoardSettings: backend endpoint недоступен, сохраняем локально', error)
+
+      return writeStoredBoardSettings(localSettings)
     }
   },
 
