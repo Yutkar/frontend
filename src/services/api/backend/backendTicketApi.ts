@@ -459,8 +459,8 @@ export const backendTicketApi: TicketApi = {
     return backendTicketApi.noShowTicket(id)
   },
 
-  async returnTicket(id: string) {
-    return toArchitectureTicket(await requestTicketReturn(id))
+  async returnTicket(id: string, roomId?: string | number) {
+    return toArchitectureTicket(await requestTicketReturn(id, { roomId }))
   },
 
   async redirectTicket(id: string, newRoomId: string | number) {

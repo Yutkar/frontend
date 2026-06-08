@@ -85,6 +85,11 @@ export type BackendTicket = {
   room_id?: number | string | null
   room_name?: string | null
   roomId?: number | string | null
+  destinationRoomId?: number | string | null
+  newRoomId?: number | string | null
+  redirectedToRoomId?: number | string | null
+  targetRoomId?: number | string | null
+  toRoomId?: number | string | null
   createdAt?: string
   created_at?: string
   updatedAt?: string | null
@@ -307,6 +312,20 @@ function getBackendRoomName(room?: BackendRoom | null): string {
 }
 
 export function getBackendTicketRoomId(ticket: BackendTicket): string {
+  const redirectedRoomId = ticket.status?.trim().toLowerCase().replace(/-/g, '_') === 'redirected'
+    ? toId(
+        ticket.newRoomId
+        ?? ticket.targetRoomId
+        ?? ticket.destinationRoomId
+        ?? ticket.redirectedToRoomId
+        ?? ticket.toRoomId,
+      )
+    : ''
+
+  if (redirectedRoomId) {
+    return redirectedRoomId
+  }
+
   const roomId = toId(ticket.roomId ?? ticket.room_id)
 
   if (roomId) {

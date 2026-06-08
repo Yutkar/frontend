@@ -10,6 +10,7 @@ import {
   toBackendAnalyticsPoints,
   toSharedAnalytics,
   toSharedTicket,
+  toSharedStatus,
   toBackendTicketCreateInput,
   toBackendRecommendations,
   toQueueKpi,
@@ -582,7 +583,9 @@ export const backendQueueApi: QueueApi = {
 
     try {
       const ticketResponse = await apiClient.get<BackendTicket>(`/tickets/${ticketId}`)
-      resolvedTicket = ticketResponse.data
+      if (toSharedStatus(ticketResponse.data.status) !== 'no_show') {
+        resolvedTicket = ticketResponse.data
+      }
     } catch (error) {
       console.warn('backendQueueApi.returnTicket: GET /tickets/:id failed after return', error)
     }
@@ -592,9 +595,10 @@ export const backendQueueApi: QueueApi = {
       || (roomId !== undefined ? String(roomId) : undefined)
 
     if (resolvedRoomId) {
-      const noShowTickets = await getBackendNoShowTicketsForRoom(resolvedRoomId)
+      const noShowTickets = (await getBackendNoShowTicketsForRoom(resolvedRoomId))
+        .filter((ticket) => String(ticket.id) !== String(ticketId))
 
-      return loadRoomQueueSnapshot(resolvedRoomId, noShowTickets)
+      return loadRoomQueueSnapshot(resolvedRoomId, [resolvedTicket, ...noShowTickets])
     }
 
     return loadQueueSnapshot()
@@ -608,7 +612,17 @@ export const backendQueueApi: QueueApi = {
       await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input, false))
     }
 
-    return loadQueueSnapshot()
+    const snapshot = await loadQueueSnapshot()
+    const redirectedRoomId = String(input.roomId)
+
+    return {
+      ...snapshot,
+      tickets: snapshot.tickets.map((ticket) => (
+        ticket.id === input.ticketId
+          ? { ...ticket, roomId: redirectedRoomId }
+          : ticket
+      )),
+    }
   },
 
   async recalculateRoom(roomId: string | number) {

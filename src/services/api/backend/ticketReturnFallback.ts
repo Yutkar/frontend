@@ -1,5 +1,5 @@
 import { apiClient } from '../client'
-import { getBackendTicketRoomId } from '../backendAdapters'
+import { getBackendTicketRoomId, toSharedStatus } from '../backendAdapters'
 import type { BackendTicket } from '../backendAdapters'
 
 type AxiosErrorLike = {
@@ -24,10 +24,10 @@ function getHttpStatus(error: unknown): number | undefined {
 function isUnsupportedEndpoint(error: unknown): boolean {
   const status = getHttpStatus(error)
 
-  return status === 403 || status === 404 || status === 405 || status === 501
+  return status === 404 || status === 405 || status === 501
 }
 
-function shouldRetryPatchWithRoom(error: unknown): boolean {
+function shouldRetryPatchWithoutRoom(error: unknown): boolean {
   const status = getHttpStatus(error)
 
   return status === 400 || status === 422
@@ -83,6 +83,10 @@ function withWaitingStatus(ticket: BackendTicket | undefined, id: string, roomId
   }
 }
 
+function isWaitingTicket(ticket?: BackendTicket): boolean {
+  return ticket ? toSharedStatus(ticket.status) === 'waiting' : false
+}
+
 async function resolveFallbackRoomId(id: string, roomId?: string | number): Promise<string | number | undefined> {
   if (roomId !== undefined) {
     return roomId
@@ -98,13 +102,13 @@ async function patchTicketToWaiting(id: string, roomId?: string | number): Promi
   let response: { data?: BackendTicket | undefined }
 
   try {
-    response = await apiClient.patch<BackendTicket | undefined>(`/tickets/${id}`, toWaitingPayload())
+    response = await apiClient.patch<BackendTicket | undefined>(`/tickets/${id}`, toWaitingPayload(roomId))
   } catch (error) {
-    if (!shouldRetryPatchWithRoom(error) || roomId === undefined) {
+    if (!shouldRetryPatchWithoutRoom(error) || roomId === undefined) {
       throw error
     }
 
-    response = await apiClient.patch<BackendTicket | undefined>(`/tickets/${id}`, toWaitingPayload(roomId))
+    response = await apiClient.patch<BackendTicket | undefined>(`/tickets/${id}`, toWaitingPayload())
   }
 
   if (response.data) {
@@ -117,14 +121,25 @@ async function patchTicketToWaiting(id: string, roomId?: string | number): Promi
 }
 
 export async function requestTicketReturn(id: string, options: TicketReturnOptions = {}): Promise<BackendTicket> {
-  let returnWasForbidden = false
-
   try {
-    const response = await apiClient.post<BackendTicket>(`/tickets/${id}/return`)
+    const response = await apiClient.post<BackendTicket | undefined>(`/tickets/${id}/return`)
+    const returnedTicket = response.data
+    const roomId = returnedTicket ? getBackendTicketRoomId(returnedTicket) || options.roomId : options.roomId
+    const latestTicket = await getTicketById(id)
 
-    return withWaitingStatus(response.data, id, options.roomId)
+    if (isWaitingTicket(latestTicket)) {
+      return withWaitingStatus(latestTicket, id, roomId)
+    }
+
+    if (isWaitingTicket(returnedTicket)) {
+      return withWaitingStatus(returnedTicket, id, roomId)
+    }
+
+    return await patchTicketToWaiting(id, await resolveFallbackRoomId(id, roomId))
   } catch (returnError) {
-    returnWasForbidden = isForbidden(returnError)
+    if (isForbidden(returnError)) {
+      throw createForbiddenReturnError()
+    }
 
     if (!isUnsupportedEndpoint(returnError)) {
       throw returnError
@@ -136,7 +151,7 @@ export async function requestTicketReturn(id: string, options: TicketReturnOptio
 
     return await patchTicketToWaiting(id, roomId)
   } catch (patchError) {
-    if (isForbidden(patchError) || returnWasForbidden) {
+    if (isForbidden(patchError)) {
       throw createForbiddenReturnError()
     }
 

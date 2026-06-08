@@ -5,6 +5,7 @@ import type {
   QueueEvent,
   QueueKpi,
   QueueRecommendation,
+  QueueSnapshot,
   RedirectTicketInput,
   Room,
   Ticket,
@@ -255,6 +256,24 @@ function createRoomNoShowUpdate(noShowSnapshotTickets: Ticket[], state: QueueSta
   }
 }
 
+async function getRoomSnapshotWithNoShow(roomId: string | number): Promise<{
+  roomId: string | number
+  snapshot: QueueSnapshot
+}> {
+  const [snapshot, noShowTickets] = await Promise.all([
+    queueApi.getRoomQueueSnapshot(roomId),
+    queueApi.getRoomNoShowTickets(roomId),
+  ])
+
+  return {
+    roomId,
+    snapshot: {
+      ...snapshot,
+      tickets: mergeTicketsById(snapshot.tickets, noShowTickets),
+    },
+  }
+}
+
 export const useQueueStore = create<QueueState>((set, get) => ({
   activeTickets: [],
   analytics: [],
@@ -407,15 +426,38 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     set({ error: null, loading: true, statusMessage: null })
 
     try {
+      const previousRoomId = get().tickets.find((ticket) => ticket.id === input.ticketId)?.roomId
+        ?? get().activeTickets.find((ticket) => ticket.id === input.ticketId)?.roomId
       const snapshot = await queueApi.redirectTicket(input)
-      set((state) => ({
-        ...createSnapshotUpdate(snapshot, state),
-        error: null,
-        hydrated: true,
-        lastUpdatedAt: new Date().toISOString(),
-        loading: false,
-        statusMessage: defaultSuccessMessage,
-      }))
+      const roomIds = Array.from(new Set(
+        [previousRoomId, input.roomId]
+          .filter((roomId): roomId is string | number => roomId !== undefined)
+          .map(String),
+      ))
+      const roomResults = await Promise.allSettled(roomIds.map(getRoomSnapshotWithNoShow))
+
+      set((state) => {
+        let nextState: QueueState = {
+          ...state,
+          ...createSnapshotUpdate(snapshot, state),
+          error: null,
+          hydrated: true,
+          lastUpdatedAt: new Date().toISOString(),
+          loading: false,
+          statusMessage: defaultSuccessMessage,
+        }
+
+        roomResults.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            nextState = {
+              ...nextState,
+              ...createRoomSnapshotUpdate(result.value.snapshot, nextState, result.value.roomId),
+            }
+          }
+        })
+
+        return nextState
+      })
     } catch (error) {
       console.error('Queue redirect ticket failed', error)
       set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })
@@ -529,18 +571,37 @@ export const useQueueStore = create<QueueState>((set, get) => ({
             [ticketId]: createReturnedTicket(ticketId, returnedTicket, currentRoomId),
           }
         : get().returnedTicketOverrides
+      const fullSnapshot = await queueApi.getQueueSnapshot().catch((refreshError) => {
+        console.warn('Queue return ticket full refresh failed', refreshError)
 
-      set((state) => ({
-        ...(currentRoomId !== undefined
-          ? createRoomSnapshotUpdate(snapshot, { ...state, returnedTicketOverrides }, currentRoomId)
-          : createSnapshotUpdate(snapshot, { ...state, returnedTicketOverrides })),
-        error: null,
-        hydrated: true,
-        lastUpdatedAt: new Date().toISOString(),
-        loading: false,
-        selectedTicketId: ticketId,
-        statusMessage: defaultSuccessMessage,
-      }))
+        return undefined
+      })
+
+      set((state) => {
+        let nextState: QueueState = {
+          ...state,
+          ...(fullSnapshot
+            ? createSnapshotUpdate(fullSnapshot, { ...state, returnedTicketOverrides })
+            : createSnapshotUpdate(snapshot, { ...state, returnedTicketOverrides })),
+        }
+
+        if (currentRoomId !== undefined) {
+          nextState = {
+            ...nextState,
+            ...createRoomSnapshotUpdate(snapshot, nextState, currentRoomId),
+          }
+        }
+
+        return {
+          ...nextState,
+          error: null,
+          hydrated: true,
+          lastUpdatedAt: new Date().toISOString(),
+          loading: false,
+          selectedTicketId: ticketId,
+          statusMessage: defaultSuccessMessage,
+        }
+      })
     } catch (error) {
       console.error('Queue return ticket failed', error)
       set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })
