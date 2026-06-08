@@ -9,6 +9,7 @@ export type {
   RedirectTicketInput,
   Room,
   RoomStatus,
+  ServicePlaceType,
   ServiceType,
   Ticket,
   TicketCreateInput,

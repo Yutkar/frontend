@@ -52,6 +52,8 @@ export type BackendRoom = {
   kioskEnabled?: boolean
   name?: string
   number?: number | string
+  place_type?: string
+  placeType?: string
   room_id?: number | string
   room_name?: string
   roomId?: number | string
@@ -307,6 +309,8 @@ function getBackendRoomName(room?: BackendRoom | null): string {
   return formatRoomName({
     id: room?.id ?? room?.roomId ?? room?.room_id ?? room?._id,
     name: room?.name,
+    number: room?.number,
+    placeType: room?.placeType ?? room?.place_type,
     roomName: room?.roomName ?? room?.room_name,
     title: room?.title,
   })
@@ -355,6 +359,8 @@ function getBackendTicketRoomName(ticket: BackendTicket): string {
     return formatRoomName({
       id: getBackendRoomId(ticket.room),
       name: nestedRoomName,
+      number: ticket.room?.number,
+      placeType: ticket.room?.placeType ?? ticket.room?.place_type,
     })
   }
 
@@ -385,6 +391,8 @@ function getBackendTicketRoomName(ticket: BackendTicket): string {
     return formatRoomName({
       id: getBackendRoomId(ticket.assignedRoom),
       name: assignedRoomName,
+      number: ticket.assignedRoom?.number,
+      placeType: ticket.assignedRoom?.placeType ?? ticket.assignedRoom?.place_type,
     })
   }
 
@@ -761,6 +769,8 @@ export function toSharedRooms(
       isTicketIssueEnabled: room.isTicketIssueEnabled,
       kioskEnabled: room.kioskEnabled,
       name: getBackendRoomName(room),
+      number: room.number,
+      placeType: room.placeType ?? room.place_type,
       department: getBackendRoomName(room),
       serviceTypeId: room.serviceTypeId,
       serviceTypeIds: room.serviceTypeIds,
@@ -797,6 +807,8 @@ export function toSharedRooms(
       isTicketIssueEnabled: existingRoom?.isTicketIssueEnabled,
       kioskEnabled: existingRoom?.kioskEnabled,
       name: existingRoom?.name ?? stat.roomName,
+      number: existingRoom?.number,
+      placeType: existingRoom?.placeType,
       department: existingRoom?.department ?? stat.roomName,
       serviceTypeId: existingRoom?.serviceTypeId,
       serviceTypeIds: existingRoom?.serviceTypeIds,
@@ -831,6 +843,8 @@ export function toSharedRooms(
       isTicketIssueEnabled: ticket.room?.isTicketIssueEnabled,
       kioskEnabled: ticket.room?.kioskEnabled,
       name: roomName,
+      number: ticket.room?.number,
+      placeType: ticket.room?.placeType ?? ticket.room?.place_type,
       department: serviceType,
       serviceTypeId: ticket.room?.serviceTypeId,
       serviceTypeIds: ticket.room?.serviceTypeIds,
@@ -1048,7 +1062,9 @@ function getTicketRoomName(ticket?: Ticket, rooms: Room[] = []): string | undefi
     return undefined
   }
 
-  return rooms.find((room) => room.id === ticket.roomId)?.name ?? `Кабинет ${ticket.roomId}`
+  const room = rooms.find((item) => item.id === ticket.roomId)
+
+  return room ? formatRoomName(room) : formatRoomName({ id: ticket.roomId, name: ticket.roomName })
 }
 
 function findRecommendationTicket(

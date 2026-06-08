@@ -1,5 +1,5 @@
 import type { QueueSnapshot, RedirectTicketInput } from '@shared/types'
-import { getRoomBoardId } from '@shared/utils'
+import { formatRoomName, getRoomBoardId } from '@shared/utils'
 import type { QueueStats, Room, Ticket } from '../../../types'
 import {
   toArchitectureRooms,
@@ -436,7 +436,7 @@ function ensureRoomSnapshotRoom(snapshot: QueueSnapshot, roomId: string | number
     return snapshot
   }
 
-  const roomName = roomTicket.roomName ?? `Кабинет ${roomIdValue}`
+  const roomName = formatRoomName({ id: roomIdValue, name: roomTicket.roomName })
 
   return {
     ...snapshot,
@@ -489,6 +489,7 @@ function getBackendRoomBoardId(room: BackendRoom): string {
     id: getRawBackendRoomId(room),
     name: room.name,
     number: room.number,
+    placeType: room.placeType ?? room.place_type,
     roomId: room.roomId ?? room.room_id,
     roomName: room.roomName ?? room.room_name,
     title: room.title,

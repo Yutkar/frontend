@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  getVoiceActionText,
+  getVoiceAudienceLabel,
+  voiceSettingsService,
+} from '@services/voiceSettingsService'
 import type { Room, Ticket } from '@shared/types'
-import { formatRoomName, formatTime } from '@shared/utils'
+import { formatRoomName, formatRoomVoiceTarget, formatTime } from '@shared/utils'
 
 type CallBoardProps = {
   rooms: Room[]
@@ -16,11 +21,28 @@ function getCallTimestamp(ticket: Ticket): number {
   return Number.isFinite(timestamp) ? timestamp : 0
 }
 
-function getRoomName(ticket: Ticket, rooms: Room[]): string {
-  if (ticket.roomName) {
-    return formatRoomName({ id: ticket.roomId, name: ticket.roomName })
-  }
+function getTicketRoom(ticket: Ticket, rooms: Room[]): Room | {
+  id?: string
+  name?: string
+  number?: string | number
+  placeType?: string
+} {
   const room = rooms.find((item) => String(item.id) === String(ticket.roomId))
+
+  if (ticket.roomName) {
+    return {
+      ...room,
+      id: ticket.roomId ?? room?.id,
+      name: ticket.roomName,
+    }
+  }
+
+  return room ?? { id: ticket.roomId }
+}
+
+function getRoomName(ticket: Ticket, rooms: Room[]): string {
+  const room = getTicketRoom(ticket, rooms)
+
   return formatRoomName(room ?? { id: ticket.roomId })
 }
 
@@ -31,10 +53,6 @@ function getCallKey(ticket?: Ticket): string {
 function isBoardCallTicket(ticket: Ticket): boolean {
   return Boolean(ticket.calledAt)
     && (ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'no_show')
-}
-
-function getSpeechRoomName(roomName: string): string {
-  return roomName.replace(/^Кабинет/i, 'кабинет')
 }
 
 export function CallBoard({ rooms, tickets }: CallBoardProps) {
@@ -52,7 +70,9 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
   const currentCall = currentCalls[0]
   const currentCallKey = getCallKey(currentCall)
   const currentCallNumber = currentCall?.number ?? ''
-  const currentCallRoomName = currentCall ? getRoomName(currentCall, rooms) : ''
+  const currentCallRoom = currentCall ? getTicketRoom(currentCall, rooms) : undefined
+  const currentCallRoomName = currentCall ? formatRoomName(currentCallRoom) : ''
+  const currentCallVoiceTarget = currentCall ? formatRoomVoiceTarget(currentCallRoom) : ''
 
   const recentCalls = tickets
     .filter(isBoardCallTicket)
@@ -88,11 +108,12 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
     oscillator.stop(audioContext.currentTime + 0.34)
   }
 
-  async function announceCall(ticketNumber: string, roomName: string) {
+  async function announceCall(ticketNumber: string, voiceTarget: string) {
     if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
       window.speechSynthesis.cancel()
+      const voiceSettings = voiceSettingsService.getSettings()
       const utterance = new SpeechSynthesisUtterance(
-        `Талон ${ticketNumber}, ${getSpeechRoomName(roomName)}`,
+        `${getVoiceAudienceLabel(voiceSettings.audience)} ${ticketNumber}, ${getVoiceActionText(voiceSettings.action)} ${voiceTarget}`,
       )
       utterance.lang = 'ru-RU'
       utterance.rate = 0.92
@@ -123,10 +144,10 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
     setHighlightedCallKey(currentCallKey)
     const highlightTimeout = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
 
-    void announceCall(currentCallNumber, currentCallRoomName).catch(() => undefined)
+    void announceCall(currentCallNumber, currentCallVoiceTarget).catch(() => undefined)
 
     return () => window.clearTimeout(highlightTimeout)
-  }, [currentCallKey, currentCallNumber, currentCallRoomName])
+  }, [currentCallKey, currentCallNumber, currentCallVoiceTarget])
 
   return (
     <div className="tv-grid">

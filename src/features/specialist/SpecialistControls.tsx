@@ -191,7 +191,7 @@ function RedirectPatientModal({
     }
 
     if (!autoRoom) {
-      setError('Нет доступного кабинета для выбранной услуги')
+      setError('Нет доступного места обслуживания для выбранной услуги')
       return
     }
 
@@ -242,10 +242,10 @@ function RedirectPatientModal({
 
         {error ? <div className="modal-error">{error}</div> : null}
         {!error && noRoomAvailable ? (
-          <div className="modal-error">Нет доступного кабинета для выбранной услуги</div>
+          <div className="modal-error">Нет доступного места обслуживания для выбранной услуги</div>
         ) : null}
         {!error && autoRoom ? (
-          <div className="modal-info">Кабинет выбран автоматически: {formatRoomName(autoRoom)}</div>
+          <div className="modal-info">Место обслуживания выбрано автоматически: {formatRoomName(autoRoom)}</div>
         ) : null}
 
         <div className="settings-form-grid">
@@ -489,7 +489,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         <section className="specialist-side-section queue-calculation">
           <div className="panel-header">
             <div>
-              <span className="eyebrow">Статистика кабинета</span>
+              <span className="eyebrow">Статистика места обслуживания</span>
               <h2>Расчёт очереди</h2>
             </div>
           </div>

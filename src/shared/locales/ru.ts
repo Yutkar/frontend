@@ -111,7 +111,7 @@ export const ru = {
     noShow: 'Не явился',
     returnPatient: 'Вернуть пациента',
     redirectPatient: 'Перенаправить пациента',
-    selectDestinationRoom: 'Выберите кабинет назначения',
+    selectDestinationRoom: 'Выберите место обслуживания назначения',
     redirect: 'Перенаправить',
     waitingList: 'Лист ожидания',
     waitingListEmpty: 'Нет ожидающих пациентов для этого направления',

@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Monitor, Copy, Check, ExternalLink, Plus, Trash2 } from 'lucide-react'
 import { adminService } from '@services/adminService'
+import {
+  getVoiceActionLabel,
+  getVoiceAudienceLabel,
+  voiceSettingsService,
+  type VoiceAction,
+  type VoiceAudience,
+  type VoiceSettings,
+} from '@services/voiceSettingsService'
 import { Button } from '@shared/ui/components'
 import { getRoomBoardId } from '@shared/utils'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
@@ -32,6 +40,7 @@ export function BoardSettingsSection() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [screens, setScreens] = useState<BoardScreen[]>(loadScreens)
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => voiceSettingsService.getSettings())
   const [copied, setCopied] = useState<string | null>(null)
   const [newScreenName, setNewScreenName] = useState('')
   const [newScreenRooms, setNewScreenRooms] = useState<string[]>([])
@@ -106,6 +115,10 @@ export function BoardSettingsSection() {
     saveScreens(newScreens)
   }
 
+  function updateVoiceSettings(nextSettings: Partial<VoiceSettings>) {
+    setVoiceSettings((current) => voiceSettingsService.saveSettings({ ...current, ...nextSettings }))
+  }
+
   const activeRooms = rooms.filter(getRoomActive)
   const generalUrl = `${window.location.origin}/board`
 
@@ -121,7 +134,7 @@ export function BoardSettingsSection() {
               </span>
               <h2>Табло</h2>
               <p className="admin-section-description">
-                Ссылки на табло кабинетов и общее табло для всех вызовов.
+                Ссылки на табло мест обслуживания и общее табло для всех вызовов.
               </p>
             </div>
           </div>
@@ -136,7 +149,7 @@ export function BoardSettingsSection() {
                 <thead>
                   <tr>
                     <th>Табло</th>
-                    <th>Кабинеты</th>
+                    <th>Места обслуживания</th>
                     <th>Ссылка</th>
                     <th>Действия</th>
                   </tr>
@@ -145,7 +158,7 @@ export function BoardSettingsSection() {
                   {/* Общее табло */}
                   <tr>
                     <td><strong>Общее табло</strong></td>
-                    <td>Все кабинеты</td>
+                    <td>Все места обслуживания</td>
                     <td>
                       <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>
                         {generalUrl}
@@ -173,7 +186,7 @@ export function BoardSettingsSection() {
                     </td>
                   </tr>
 
-                  {/* Отдельные кабинеты */}
+                  {/* Отдельные места обслуживания */}
                   {activeRooms.map((room) => {
                     const name = getRoomName(room)
                     const url = getRoomBoardUrl(room)
@@ -278,7 +291,7 @@ export function BoardSettingsSection() {
             </label>
 
             <fieldset className="admin-checkbox-group">
-              <legend>Выберите кабинеты</legend>
+              <legend>Выберите места обслуживания</legend>
               {activeRooms.map((room) => {
                 const name = getRoomName(room)
                 return (
@@ -304,6 +317,37 @@ export function BoardSettingsSection() {
                 Добавить экран
               </Button>
             </div>
+          </div>
+
+          <div className="admin-form">
+            <div className="panel-header">
+              <div>
+                <span className="eyebrow">Табло</span>
+                <h2>Настройки озвучки</h2>
+              </div>
+            </div>
+
+            <label className="field">
+              <span>Обращение</span>
+              <select
+                onChange={(event) => updateVoiceSettings({ audience: event.target.value as VoiceAudience })}
+                value={voiceSettings.audience}
+              >
+                <option value="patient">{getVoiceAudienceLabel('patient')}</option>
+                <option value="client">{getVoiceAudienceLabel('client')}</option>
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Действие</span>
+              <select
+                onChange={(event) => updateVoiceSettings({ action: event.target.value as VoiceAction })}
+                value={voiceSettings.action}
+              >
+                <option value="approach">{getVoiceActionLabel('approach')}</option>
+                <option value="enter">{getVoiceActionLabel('enter')}</option>
+              </select>
+            </label>
           </div>
         </aside>
       </section>

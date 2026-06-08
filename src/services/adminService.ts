@@ -17,6 +17,8 @@ export type AdminRoomPayload = {
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
   name: string
+  number?: string | number
+  placeType?: string
   serviceTypeIds?: Array<string | number>
   ticketIssueEnabled?: boolean
 }

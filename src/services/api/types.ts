@@ -54,6 +54,8 @@ export type TicketSettingsRoomOption = Pick<SharedRoom, 'id' | 'name'> & {
   isActive?: boolean
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
+  number?: string | number
+  placeType?: SharedRoom['placeType']
   roomId?: string | number
   roomName?: string
   serviceTypeId?: string | number

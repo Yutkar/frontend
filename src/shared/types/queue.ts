@@ -22,6 +22,8 @@ export type ServiceType =
 
 export type RoomStatus = 'open' | 'busy' | 'paused'
 
+export type ServicePlaceType = 'room' | 'window' | 'desk'
+
 export type Ticket = {
   id: string
   number: string
@@ -46,6 +48,8 @@ export type Ticket = {
 export type Room = {
   id: string
   name: string
+  number?: string | number
+  placeType?: ServicePlaceType | string
   department: string
   specialistName: string
   status: RoomStatus

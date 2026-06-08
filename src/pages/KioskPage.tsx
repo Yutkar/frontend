@@ -162,7 +162,7 @@ export function KioskPage() {
       const latestRoom = getAutoRoomForService(latestServiceRooms, latestRooms, latestTickets)
 
       if (!latestServiceType || !latestRoom) {
-        setError('Нет доступных кабинетов для выбранной услуги')
+        setError('Нет доступных мест обслуживания для выбранной услуги')
         return
       }
 
@@ -222,7 +222,7 @@ export function KioskPage() {
           <div className="modal-error">Сейчас нет доступных услуг. Обратитесь к администратору.</div>
         ) : null}
         {selectedServiceType && !selectedRoom ? (
-          <div className="modal-error">Нет доступных кабинетов для выбранной услуги</div>
+          <div className="modal-error">Нет доступных мест обслуживания для выбранной услуги</div>
         ) : null}
 
         <div className="kiosk-service-grid">

@@ -281,7 +281,7 @@ export function TicketSettingsModal({
           </label>
 
           <label className="field">
-            <span>Кабинет</span>
+            <span>Место обслуживания</span>
             <select
               disabled={isBusy || rooms.length === 0}
               onChange={(event) => {
@@ -298,7 +298,7 @@ export function TicketSettingsModal({
               ))}
             </select>
             {selectedServiceType && rooms.length === 0 ? (
-              <small className="field-hint">Нет доступных кабинетов для выбранной услуги</small>
+              <small className="field-hint">Нет доступных мест обслуживания для выбранной услуги</small>
             ) : null}
           </label>
 

@@ -56,7 +56,7 @@ export function TicketPrintPreview({ data, onPrint }: TicketPrintPreviewProps) {
             <dd>{data.serviceName}</dd>
           </div>
           <div>
-            <dt>Кабинет</dt>
+            <dt>Место обслуживания</dt>
             <dd>{data.roomName}</dd>
           </div>
           {data.doctorName ? (

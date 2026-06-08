@@ -63,7 +63,7 @@ export function VisitHistoryPage() {
                   <th>Пациент</th>
                   <th>Талон</th>
                   <th>Услуга</th>
-                  <th>Кабинет</th>
+                  <th>Место обслуживания</th>
                   <th>Статус</th>
                   <th>Приоритет</th>
                 </tr>

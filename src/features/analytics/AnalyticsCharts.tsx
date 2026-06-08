@@ -201,7 +201,7 @@ export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsCha
           <span><i className="legend-dot legend-completed" /> Завершены</span>
         </div>
         <div className="analytics-axis-row">
-          <span>Кабинет</span>
+          <span>Место обслуживания</span>
           <span>Среднее время ожидания, мин</span>
         </div>
         <div className="room-load-grid analytics-room-grid">

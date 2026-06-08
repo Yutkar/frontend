@@ -1,6 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 import type { QueueEvent, QueueEventType } from '@shared/types'
-import { formatRoomName } from '@shared/utils/room'
+import { formatRoomVoiceTarget } from '@shared/utils/room'
 import { REALTIME_BASE_URL, isBackendMode } from './apiProvider'
 
 type QueueEventListener = (event: QueueEvent) => void
@@ -111,12 +111,12 @@ function getWrappedPayload(payload: unknown): unknown {
     ?? payload
 }
 
-function getEventRoomName(roomName?: string, roomId?: string | number): string {
+function getEventRoomTarget(roomName?: string, roomId?: string | number): string {
   if (!roomName?.trim() && roomId === undefined) {
-    return 'кабинет не указан'
+    return 'к месту обслуживания'
   }
 
-  return formatRoomName({ id: roomId, name: roomName })
+  return formatRoomVoiceTarget({ id: roomId, name: roomName })
 }
 
 function getEventDateText(payload: unknown): string | undefined {
@@ -147,7 +147,7 @@ function buildMessage(
   const ticketLabel = ticketNumber ? `Талон ${ticketNumber}` : 'Талон'
 
   if (type === 'ticket_called') {
-    return `${ticketLabel} вызван в ${getEventRoomName(roomName, roomId).replace(/^Кабинет/i, 'кабинет')}`
+    return `${ticketLabel} вызван ${getEventRoomTarget(roomName, roomId)}`
   }
 
   const statusLabel = status ? statusLabels[status] ?? status : 'обновлён'

@@ -1,7 +1,14 @@
 export { formatDuration, formatEta, formatTime } from './format'
 export { createMockTicket, createQueueEvent, generateTicketNumber } from './mockGenerators'
 export { planRoomLoads } from './queuePlanning'
-export { formatRoomName, getRoomBoardId } from './room'
+export {
+  formatRoomName,
+  formatRoomVoiceTarget,
+  getRoomBoardId,
+  getRoomPlaceNumber,
+  getRoomPlaceType,
+  getRoomPlaceTypeLabel,
+} from './room'
 export {
   formatWaitingTime,
   getAverageWaitingMinutes,

@@ -26,6 +26,9 @@ type BackendRoomOption = {
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
   name?: string
+  number?: string | number
+  place_type?: string
+  placeType?: string
   roomId?: string | number
   roomName?: string
   serviceTypeId?: string | number
@@ -310,6 +313,8 @@ function toSettingsOptions(
       isTicketIssueEnabled: room.isTicketIssueEnabled,
       kioskEnabled: room.kioskEnabled,
       name: room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия',
+      number: room.number,
+      placeType: room.placeType ?? room.place_type,
       roomId: room.roomId,
       roomName: room.roomName,
       serviceTypeId: room.serviceTypeId,

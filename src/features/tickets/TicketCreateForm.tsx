@@ -98,7 +98,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
     }
 
     if (!roomId || !selectedRoomExists) {
-      setError('Выберите кабинет')
+      setError('Выберите место обслуживания')
       return
     }
 
@@ -149,13 +149,13 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
         </label>
 
         <label className="field">
-          <span>Кабинет</span>
+          <span>Место обслуживания</span>
           <select
             disabled={loading || optionsLoading || rooms.length === 0}
             onChange={(event) => setRoomId(event.target.value)}
             value={roomId}
           >
-            <option value="">Выберите кабинет</option>
+            <option value="">Выберите место обслуживания</option>
             {rooms.length > 0 ? (
               rooms.map((room) => (
                 <option key={room.id} value={room.id}>
@@ -163,11 +163,11 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
                 </option>
               ))
             ) : (
-              <option value="">Нет доступных кабинетов</option>
+              <option value="">Нет доступных мест обслуживания</option>
             )}
           </select>
           {selectedServiceType && rooms.length === 0 ? (
-            <small className="field-hint">Нет доступных кабинетов для выбранной услуги</small>
+            <small className="field-hint">Нет доступных мест обслуживания для выбранной услуги</small>
           ) : null}
         </label>
 

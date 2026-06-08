@@ -172,6 +172,8 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
   const currentRoom = queueSnapshot.rooms.find((room) => room.id === id)
   const isActive = getRecordActive(record)
   const name = getRecordText(record, ['name', 'title', 'roomName'], currentRoom?.name ?? `Кабинет ${id}`)
+  const number = getRecordText(record, ['number'], currentRoom?.number ? String(currentRoom.number) : '')
+  const placeType = getRecordText(record, ['placeType', 'place_type'], currentRoom?.placeType ? String(currentRoom.placeType) : '')
   const nextRoom: SharedRoom = {
     active: isActive,
     department: getRecordText(record, ['department'], currentRoom?.department ?? name),
@@ -185,6 +187,8 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
       : currentRoom?.kioskEnabled,
     loadPercent: currentRoom?.loadPercent ?? 0,
     name,
+    number,
+    placeType: placeType || undefined,
     serviceTypeIds: Array.isArray(record.serviceTypeIds)
       ? record.serviceTypeIds
       : currentRoom?.serviceTypeIds,

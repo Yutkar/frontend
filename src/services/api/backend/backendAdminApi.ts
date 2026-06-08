@@ -342,6 +342,8 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
     isActive,
     ...(ticketIssueEnabled === undefined ? {} : { ticketIssueEnabled, isTicketIssueEnabled: ticketIssueEnabled }),
     name,
+    ...(getText(record.number) ? { number: getText(record.number) } : {}),
+    ...(getText(record.placeType ?? record.place_type) ? { placeType: getText(record.placeType ?? record.place_type) } : {}),
     serviceTypeIds,
   }
 }
@@ -431,6 +433,8 @@ function toUserUpdatePayload(input: Partial<AdminUserInput>) {
 
 function toRoomCreatePayload(input: AdminRecordInput) {
   const name = getText(input.name) ?? getText(input.title) ?? ''
+  const number = getText(input.number)
+  const placeType = getText(input.placeType) ?? getText(input.place_type)
   const serviceTypeIds = normalizeIdList(input.serviceTypeIds as Array<string | number> | undefined)
   const ticketIssueEnabled = typeof input.ticketIssueEnabled === 'boolean'
     ? input.ticketIssueEnabled
@@ -442,6 +446,8 @@ function toRoomCreatePayload(input: AdminRecordInput) {
 
   return {
     name,
+    ...(number ? { number } : {}),
+    ...(placeType ? { placeType } : {}),
     serviceTypeIds,
     ...(ticketIssueEnabled === undefined ? {} : { ticketIssueEnabled, isTicketIssueEnabled: ticketIssueEnabled }),
   }

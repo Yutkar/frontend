@@ -190,7 +190,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                     <th>Имя</th>
                     <th>Логин</th>
                     <th>Роль</th>
-                    <th>Кабинет</th>
+                    <th>Место обслуживания</th>
                     <th>Действия</th>
                   </tr>
                 </thead>
@@ -276,7 +276,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
             </label>
 
             <label className="field">
-              <span>Кабинет</span>
+              <span>Место обслуживания</span>
               <select
                 onChange={(event) => setForm((current) => ({ ...current, roomId: event.target.value }))}
                 value={form.roomId}

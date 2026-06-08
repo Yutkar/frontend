@@ -3,7 +3,9 @@ import { Building2, PlusCircle } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
+import type { ServicePlaceType } from '@shared/types'
 import { Button } from '@shared/ui/components'
+import { formatRoomName, getRoomBoardId, getRoomPlaceType } from '@shared/utils'
 import {
   getRoomActive,
   getAdminErrorMessage,
@@ -15,15 +17,23 @@ import {
 
 type RoomFormState = {
   active: boolean
-  name: string
+  number: string
+  placeType: ServicePlaceType
   serviceTypeIds: string[]
 }
 
 const emptyForm: RoomFormState = {
   active: true,
-  name: '',
+  number: '',
+  placeType: 'room',
   serviceTypeIds: [],
 }
+
+const placeTypeOptions: Array<{ label: string; value: ServicePlaceType }> = [
+  { label: 'Кабинет', value: 'room' },
+  { label: 'Окно', value: 'window' },
+  { label: 'Стол', value: 'desk' },
+]
 
 type RoomsSectionProps = {
   onRoomsChange?: () => void
@@ -36,7 +46,7 @@ function normalizeId(value: string): string | number {
 }
 
 function toRoomNumberInput(room: AdminRoomRecord): string {
-  return getRoomName(room).replace(/^Кабинет\s*/i, '').replace(/\D/g, '')
+  return getRoomBoardId(room).replace(/\D/g, '')
 }
 
 function normalizeRoomNumberInput(value: string): string {
@@ -91,7 +101,8 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
     setEditingRoomId(room.id)
     setForm({
       active: getRoomActive(room),
-      name: toRoomNumberInput(room),
+      number: toRoomNumberInput(room),
+      placeType: getRoomPlaceType(room),
       serviceTypeIds: getRoomServiceTypeIds(room),
     })
     setSuccessMessage(null)
@@ -109,20 +120,26 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const roomNumber = normalizeRoomNumberInput(form.name)
+    const roomNumber = normalizeRoomNumberInput(form.number)
 
     if (!roomNumber) {
-      setError('Введите номер кабинета.')
+      setError('Введите номер места обслуживания.')
       return
     }
 
     setSaving(true)
     setError(null)
 
+    const roomName = formatRoomName({
+      number: roomNumber,
+      placeType: form.placeType,
+    })
     const payload = {
       active: form.active,
       isActive: form.active,
-      name: roomNumber,
+      name: roomName,
+      number: roomNumber,
+      placeType: form.placeType,
       serviceTypeIds: form.serviceTypeIds.map(normalizeId),
     }
 
@@ -133,7 +150,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
         await adminService.createRoom(payload)
       }
 
-      setSuccessMessage('Кабинет успешно сохранён')
+      setSuccessMessage('Место обслуживания успешно сохранено')
       resetForm()
       await loadData()
       onRoomsChange?.()
@@ -141,7 +158,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
       console.error('Admin room save failed', saveError)
       setError(getAdminErrorMessage(
         saveError,
-        editingRoomId ? 'Не удалось сохранить кабинет' : 'Не удалось создать кабинет',
+        editingRoomId ? 'Не удалось сохранить место обслуживания' : 'Не удалось создать место обслуживания',
       ))
     } finally {
       setSaving(false)
@@ -149,7 +166,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
   }
 
   async function handleDelete(room: AdminRoomRecord) {
-    if (!window.confirm(`Удалить кабинет "${getRoomName(room)}"?`)) {
+    if (!window.confirm(`Удалить место обслуживания "${getRoomName(room)}"?`)) {
       return
     }
 
@@ -157,12 +174,12 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
 
     try {
       await adminService.deleteRoom(room.id)
-      setSuccessMessage('Кабинет удалён')
+      setSuccessMessage('Место обслуживания удалено')
       await loadData()
       onRoomsChange?.()
     } catch (deleteError) {
       console.error('Admin room delete failed', deleteError)
-      setError(getAdminErrorMessage(deleteError, 'Не удалось удалить кабинет'))
+      setError(getAdminErrorMessage(deleteError, 'Не удалось удалить место обслуживания'))
     }
   }
 
@@ -178,11 +195,11 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
               </span>
               <h2>Кабинеты</h2>
               <p className="admin-section-description">
-                Создание, редактирование и деактивация кабинетов учреждения.
+                Создание, редактирование и деактивация мест обслуживания учреждения.
               </p>
             </div>
             <Button icon={<PlusCircle size={17} />} onClick={resetForm} variant="secondary">
-              Добавить кабинет
+              Добавить место
             </Button>
           </div>
 
@@ -198,7 +215,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Номер кабинета</th>
+                    <th>Место обслуживания</th>
                     <th>Типы услуг</th>
                     <th>Активен</th>
                     <th>Действия</th>
@@ -228,7 +245,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
           ) : (
             <div className="empty-state compact-empty">
               <h2>Кабинеты не найдены</h2>
-              <p>Добавьте первый кабинет учреждения.</p>
+              <p>Добавьте первое место обслуживания.</p>
             </div>
           )}
         </div>
@@ -237,22 +254,37 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
           <form className="admin-form" onSubmit={handleSubmit}>
             <div className="panel-header">
               <div>
-                <span className="eyebrow">Кабинет</span>
-                <h2>{editingRoomId ? 'Редактировать кабинет' : 'Добавить кабинет'}</h2>
+                <span className="eyebrow">Место обслуживания</span>
+                <h2>{editingRoomId ? 'Редактировать место' : 'Добавить место'}</h2>
               </div>
             </div>
 
             <label className="field">
-              <span>Номер кабинета</span>
+              <span>Тип места</span>
+              <select
+                onChange={(event) => setForm((current) => ({
+                  ...current,
+                  placeType: event.target.value as ServicePlaceType,
+                }))}
+                value={form.placeType}
+              >
+                {placeTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Номер</span>
               <input
                 inputMode="numeric"
                 onChange={(event) => setForm((current) => ({
                   ...current,
-                  name: normalizeRoomNumberInput(event.target.value),
+                  number: normalizeRoomNumberInput(event.target.value),
                 }))}
                 pattern="[0-9]*"
                 placeholder="123"
-                value={form.name}
+                value={form.number}
               />
             </label>
 

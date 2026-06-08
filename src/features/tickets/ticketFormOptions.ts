@@ -121,6 +121,8 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
       isTicketIssueEnabled: room.isTicketIssueEnabled,
       kioskEnabled: room.kioskEnabled,
       name: room.name,
+      number: room.number,
+      placeType: room.placeType,
       roomId: room.roomId,
       roomName: room.roomName,
       serviceTypeId: room.serviceTypeId,
@@ -138,6 +140,8 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
         mergedRooms.push({
           id: room.id,
           name: room.name,
+          number: room.number,
+          placeType: room.placeType,
           serviceTypeId: room.serviceTypeId,
           serviceTypeIds: getFallbackRoomServiceIds(room),
           serviceTypes: room.serviceTypes,

@@ -43,7 +43,7 @@ function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
           <dd>{user.name}</dd>
         </div>
         <div>
-          <dt>Кабинет</dt>
+          <dt>Место обслуживания</dt>
           <dd>{formatRoomName(room)}</dd>
         </div>
         <div>

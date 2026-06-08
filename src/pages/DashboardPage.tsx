@@ -358,14 +358,14 @@ export function DashboardPage() {
             </div>
             <div className="ticket-filters-grid">
               <label className="field">
-                <span>Кабинет</span>
+                <span>Место обслуживания</span>
                 <select
                   onChange={(event) => {
                     setFilters((current) => ({ ...current, roomId: event.target.value }))
                   }}
                   value={filters.roomId}
                 >
-                  <option value="">Все кабинеты</option>
+                  <option value="">Все места обслуживания</option>
                   {roomFilterOptions.map((room) => (
                     <option key={normalizeFilterValue(room.id)} value={normalizeFilterValue(room.id)}>
                       {formatRoomName(room)}

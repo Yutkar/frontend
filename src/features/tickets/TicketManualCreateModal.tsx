@@ -140,7 +140,7 @@ export function TicketManualCreateModal({
     }
 
     if (!autoRoom) {
-      setError('Нет доступного кабинета для выбранной услуги')
+      setError('Нет доступного места обслуживания для выбранной услуги')
       return
     }
 
@@ -195,10 +195,10 @@ export function TicketManualCreateModal({
 
         {error ? <div className="modal-error">{error}</div> : null}
         {!error && noRoomAvailable ? (
-          <div className="modal-error">Нет доступного кабинета для выбранной услуги</div>
+          <div className="modal-error">Нет доступного места обслуживания для выбранной услуги</div>
         ) : null}
         {!error && noDoctorAssigned ? (
-          <div className="modal-info">Кабинет выбран автоматически, врач не назначен</div>
+          <div className="modal-info">Место обслуживания выбрано автоматически, врач не назначен</div>
         ) : null}
 
         <div className="settings-form-grid">
