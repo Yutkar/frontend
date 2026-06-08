@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { CheckCircle2, FastForward, Play, RotateCcw, Shuffle, UserX, X } from 'lucide-react'
 import { ticketService } from '@services/ticketService'
-import type { TicketSettingsOptions } from '@services/api'
-import type { RedirectTicketInput, Room, Ticket, TicketPriority } from '@shared/types'
+import type { TicketSettingsOptions, TicketSettingsServiceTypeOption } from '@services/api'
+import type { RedirectTicketInput, Room, ServiceType, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
-import { formatRoomName, useCurrentTime } from '@shared/utils'
+import { formatDuration, formatRoomName, useCurrentTime } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 import {
   getAutoRoomForService,
@@ -27,6 +27,15 @@ const priorityOrder: Record<TicketPriority, number> = {
 }
 
 const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+const fallbackServiceMinutes = 10
+const fallbackServiceMinutesByType: Record<ServiceType, number> = {
+  billing: 10,
+  consultation: 12,
+  diagnostics: 20,
+  laboratory: 12,
+  pharmacy: 8,
+  registration: 10,
+}
 
 const emptyTicketSettingsOptions: TicketSettingsOptions = {
   rooms: [],
@@ -36,6 +45,51 @@ const emptyTicketSettingsOptions: TicketSettingsOptions = {
 
 function normalizeId(value?: string | number | null): string {
   return value == null ? '' : String(value)
+}
+
+function getServiceTypeDuration(
+  ticket: Ticket,
+  serviceTypes: TicketSettingsServiceTypeOption[],
+  completedAverageMinutes?: number,
+): number {
+  const serviceType = serviceTypes.find((item) => (
+    normalizeId(item.id) === normalizeId(ticket.serviceTypeId) ||
+    item.code === ticket.serviceType
+  ))
+
+  return serviceType?.averageDurationMinutes
+    ?? completedAverageMinutes
+    ?? fallbackServiceMinutesByType[ticket.serviceType]
+    ?? fallbackServiceMinutes
+}
+
+function getCompletedAverageMinutes(tickets: Ticket[], roomId: string | number): number | undefined {
+  const serviceDurations = tickets
+    .filter((ticket) => String(ticket.roomId) === String(roomId))
+    .filter((ticket) => ticket.status === 'completed')
+    .map((ticket) => {
+      if (!ticket.startedAt || !ticket.completedAt) {
+        return undefined
+      }
+
+      const startedAt = Date.parse(ticket.startedAt)
+      const completedAt = Date.parse(ticket.completedAt)
+
+      if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt)) {
+        return undefined
+      }
+
+      return Math.max(1, Math.round((completedAt - startedAt) / 60_000))
+    })
+    .filter((minutes): minutes is number => minutes !== undefined)
+
+  if (serviceDurations.length === 0) {
+    return undefined
+  }
+
+  const total = serviceDurations.reduce((sum, minutes) => sum + minutes, 0)
+
+  return Math.max(1, Math.round(total / serviceDurations.length))
 }
 
 type RedirectPatientModalProps = {
@@ -241,6 +295,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const [returnError, setReturnError] = useState<string | null>(null)
   const [returningTicketId, setReturningTicketId] = useState<string | null>(null)
   const [redirectTicketItem, setRedirectTicketItem] = useState<Ticket | null>(null)
+  const [queueServiceTypes, setQueueServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const completeService = useQueueStore((state) => state.completeService)
   const activeTickets = useQueueStore((state) => state.activeTickets)
@@ -254,6 +309,28 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
   const now = useCurrentTime()
+
+  useEffect(() => {
+    let active = true
+
+    ticketService
+      .getTicketSettingsOptions()
+      .then((options) => {
+        if (active) {
+          setQueueServiceTypes(options.serviceTypes)
+        }
+      })
+      .catch((loadError) => {
+        console.error('Specialist queue calculation options load failed', loadError)
+        if (active) {
+          setQueueServiceTypes([])
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const roomTickets = useMemo(
     () =>
@@ -303,6 +380,25 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         }),
     [noShowTickets, room.id],
   )
+  const completedAverageMinutes = useMemo(
+    () => getCompletedAverageMinutes(tickets, room.id),
+    [room.id, tickets],
+  )
+  const queueCalculation = useMemo(() => {
+    const activeWaitingCount = roomTickets.length
+    const queueDurationMinutes = roomTickets.reduce((total, ticket) => (
+      total + getServiceTypeDuration(ticket, queueServiceTypes, completedAverageMinutes)
+    ), 0)
+    const averageServiceMinutes = activeWaitingCount > 0
+      ? Math.max(1, Math.round(queueDurationMinutes / activeWaitingCount))
+      : completedAverageMinutes ?? fallbackServiceMinutes
+
+    return {
+      activeWaitingCount,
+      averageServiceMinutes,
+      queueDurationMinutes,
+    }
+  }, [completedAverageMinutes, queueServiceTypes, roomTickets])
 
   const handleReturnTicket = async (ticketId: string) => {
     setReturnError(null)
@@ -390,6 +486,33 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
       </section>
 
       <aside className="specialist-panel specialist-waiting-panel">
+        <section className="specialist-side-section queue-calculation">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">Статистика кабинета</span>
+              <h2>Расчёт очереди</h2>
+            </div>
+          </div>
+          <dl className="queue-calculation-list">
+            <div>
+              <dt>Пациентов в очереди</dt>
+              <dd>{queueCalculation.activeWaitingCount}</dd>
+            </div>
+            <div>
+              <dt>Среднее обслуживание</dt>
+              <dd>{queueCalculation.averageServiceMinutes} мин</dd>
+            </div>
+            <div>
+              <dt>Очередь займёт примерно</dt>
+              <dd>
+                {queueCalculation.queueDurationMinutes > 0
+                  ? formatDuration(queueCalculation.queueDurationMinutes)
+                  : '0 мин'}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
         <section className="specialist-side-section">
           <div className="panel-header">
             <div>

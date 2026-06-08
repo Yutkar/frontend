@@ -58,7 +58,9 @@ export function getStatusLabel(status: TicketStatus): string {
 }
 
 export function getServiceTypes(options: TicketSettingsOptions): TicketSettingsServiceTypeOption[] {
-  return options.serviceTypes.length > 0 ? options.serviceTypes : fallbackServiceTypes
+  const serviceTypes = options.serviceTypes.length > 0 ? options.serviceTypes : fallbackServiceTypes
+
+  return serviceTypes.filter((serviceType) => serviceType.active !== false)
 }
 
 function normalizeServiceId(value?: string | number | null): string {

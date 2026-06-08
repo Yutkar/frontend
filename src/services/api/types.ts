@@ -25,9 +25,12 @@ export type QueueOverloadRoom = {
 }
 
 export type TicketSettingsServiceTypeOption = {
+  active?: boolean
+  averageDurationMinutes?: number
   id: string | number
   code: SharedServiceType
   name: string
+  priorityWeight?: number
 }
 
 export type TicketSettingsUserOption = {
@@ -156,6 +159,14 @@ export type AdminRecord = {
 
 export type AdminRecordInput = Record<string, unknown>
 
+export type AdminServiceTypeInput = {
+  active?: boolean
+  averageDurationMinutes?: number
+  code?: SharedServiceType
+  name: string
+  priorityWeight?: number
+}
+
 export type AdminUserInput = Partial<SharedUser> & {
   email?: string
   name: string
@@ -165,6 +176,9 @@ export type AdminUserInput = Partial<SharedUser> & {
 
 export type AdminApi = {
   getServiceTypes: () => Promise<TicketSettingsServiceTypeOption[]>
+  createServiceType: (input: AdminServiceTypeInput) => Promise<TicketSettingsServiceTypeOption>
+  updateServiceType: (id: string | number, input: Partial<AdminServiceTypeInput>) => Promise<TicketSettingsServiceTypeOption>
+  deleteServiceType: (id: string | number) => Promise<void>
   getRooms: () => Promise<AdminRecord[]>
   createRoom: (input: AdminRecordInput) => Promise<AdminRecord>
   updateRoom: (id: string | number, input: AdminRecordInput) => Promise<AdminRecord>

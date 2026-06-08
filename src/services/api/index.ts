@@ -22,6 +22,7 @@ export type {
   AdminApi,
   AdminRecord,
   AdminRecordInput,
+  AdminServiceTypeInput,
   AdminUserInput,
   AuthApi,
   KioskApi,

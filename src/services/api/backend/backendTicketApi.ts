@@ -38,9 +38,19 @@ type BackendRoomOption = {
 }
 
 type BackendServiceTypeOption = {
+  active?: boolean
+  averageDurationMinutes?: number
+  average_duration_minutes?: number
+  avgServiceMinutes?: number
   code?: string
+  durationMinutes?: number
+  enabled?: boolean
   id: string | number
+  isActive?: boolean
   name?: string
+  priorityWeight?: number
+  priority_weight?: number
+  weight?: number
 }
 
 type BackendUserOption = {
@@ -277,6 +287,16 @@ function toServiceCode(option: BackendServiceTypeOption): SharedServiceType {
   return serviceCodeByBackendName[normalized] ?? 'consultation'
 }
 
+function getPositiveNumber(value: unknown): number | undefined {
+  const numberValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value)
+      : Number.NaN
+
+  return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : undefined
+}
+
 function toSettingsOptions(
   rooms: BackendRoomOption[],
   serviceTypes: BackendServiceTypeOption[],
@@ -300,9 +320,21 @@ function toSettingsOptions(
       title: room.title,
     })),
     serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({
+      active: serviceType.active ?? serviceType.isActive ?? serviceType.enabled,
+      averageDurationMinutes: getPositiveNumber(
+        serviceType.averageDurationMinutes
+          ?? serviceType.average_duration_minutes
+          ?? serviceType.avgServiceMinutes
+          ?? serviceType.durationMinutes,
+      ),
       code: toServiceCode(serviceType),
       id: serviceType.id,
       name: serviceType.name ?? serviceType.code ?? `Услуга ${serviceType.id}`,
+      priorityWeight: getPositiveNumber(
+        serviceType.priorityWeight
+          ?? serviceType.priority_weight
+          ?? serviceType.weight,
+      ),
     })),
     specialists: users.map((user) => ({
       assignedRoomId: user.assignedRoomId,

@@ -3,8 +3,11 @@ import type { User } from '@shared/types'
 import type { AdminApi, AdminRecord, AdminRecordInput, AdminUserInput } from '../types'
 import {
   deactivateMockQueueRoom,
+  createMockServiceType,
+  deleteMockServiceType,
   getMockServiceTypeOptions,
   getQueueSnapshot,
+  updateMockServiceType,
   upsertMockQueueRoom,
 } from './mockState'
 
@@ -118,6 +121,20 @@ function updateUserRecord(id: string | number, input: Partial<AdminUserInput>): 
 export const mockAdminApi: AdminApi = {
   getServiceTypes() {
     return Promise.resolve(getMockServiceTypeOptions())
+  },
+
+  createServiceType(input) {
+    return Promise.resolve(createMockServiceType(input))
+  },
+
+  updateServiceType(id, input) {
+    return Promise.resolve(updateMockServiceType(id, input))
+  },
+
+  deleteServiceType(id) {
+    deleteMockServiceType(id)
+
+    return Promise.resolve()
   },
 
   getRooms() {

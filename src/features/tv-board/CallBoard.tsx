@@ -38,12 +38,13 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
   const hasRenderedRef = useRef(false)
   const previousCallKeyRef = useRef('')
 
-  const currentCall = useMemo(
+  const currentCalls = useMemo(
     () => tickets
       .filter((ticket) => ticket.status === 'called')
-      .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))[0],
+      .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left)),
     [tickets],
   )
+  const currentCall = currentCalls[0]
   const currentCallKey = getCallKey(currentCall)
   const currentCallNumber = currentCall?.number ?? ''
   const currentCallRoomName = currentCall ? getRoomName(currentCall, rooms) : ''
@@ -130,13 +131,26 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
       <section className="tv-current">
         <span className="tv-section-label">Сейчас вызывается</span>
         {currentCall ? (
-          <article
-            className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
-          >
-            <strong>{currentCall.number}</strong>
-            <span>{currentCallRoomName}</span>
-            <time>{formatTime(getCallTime(currentCall))}</time>
-          </article>
+          <>
+            <article
+              className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
+            >
+              <strong>{currentCall.number}</strong>
+              <span>{currentCallRoomName}</span>
+              <time>{formatTime(getCallTime(currentCall))}</time>
+            </article>
+            {currentCalls.length > 1 ? (
+              <div className="tv-current-list">
+                {currentCalls.slice(1, 6).map((ticket) => (
+                  <div className="tv-recent-row" key={ticket.id}>
+                    <strong>{ticket.number}</strong>
+                    <span>{getRoomName(ticket, rooms)}</span>
+                    <time>{formatTime(getCallTime(ticket))}</time>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </>
         ) : (
           <div className="tv-empty-call">Ожидайте вызова</div>
         )}

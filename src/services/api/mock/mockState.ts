@@ -20,13 +20,10 @@ import type {
 } from '../../../types'
 import type {
   QueueOverloadRoom,
+  AdminServiceTypeInput,
   TicketSettingsPayload,
   TicketSettingsServiceTypeOption,
 } from '../types'
-
-const sharedServiceTypeByArchitectureId: Record<string, SharedServiceType> = Object.fromEntries(
-  fallbackServiceTypeOptions.map((serviceType) => [String(serviceType.id), serviceType.code]),
-) as Record<string, SharedServiceType>
 
 const architectureCodeByServiceType: Record<SharedServiceType, ArchitectureServiceType['code']> = {
   billing: 'consultation',
@@ -74,7 +71,7 @@ const priorityWeight: Record<SharedTicketPriority, number> = {
   low: 1,
 }
 
-const serviceTypeOptions: TicketSettingsServiceTypeOption[] = fallbackServiceTypeOptions
+let serviceTypeOptions: TicketSettingsServiceTypeOption[] = clone(fallbackServiceTypeOptions)
 
 let queueSnapshot = createInitialQueueSnapshot()
 
@@ -253,9 +250,11 @@ function pushEvent(ticket: SharedTicket, status: SharedTicketStatus): void {
 }
 
 function toArchitectureServiceType(serviceType: SharedServiceType): ArchitectureServiceType {
+  const serviceTypeId = serviceTypeOptions.find((option) => option.code === serviceType)?.id ?? 1
+
   return {
     code: architectureCodeByServiceType[serviceType],
-    id: String(Object.entries(sharedServiceTypeByArchitectureId).find(([, value]) => value === serviceType)?.[0] ?? 1),
+    id: String(serviceTypeId),
     name: getServiceTypeLabel(serviceType),
   }
 }
@@ -340,7 +339,7 @@ export function createSharedTicket(input: SharedTicketCreateInput): SharedTicket
 }
 
 export function createArchitectureTicket(input: ArchitectureCreateTicketInput): ArchitectureTicket {
-  const serviceType = sharedServiceTypeByArchitectureId[String(input.serviceTypeId)] ?? 'consultation'
+  const serviceType = getSharedServiceTypeByOptionId(input.serviceTypeId)
   const ticket = createSharedTicket({
     patientName: `Patient ${Date.now().toString().slice(-4)}`,
     priority: sharedPriorityByArchitecturePriority[input.priority],
@@ -356,7 +355,51 @@ export function getMockServiceTypeOptions(): TicketSettingsServiceTypeOption[] {
 }
 
 export function getSharedServiceTypeByOptionId(id: string | number): SharedServiceType {
-  return sharedServiceTypeByArchitectureId[String(id)] ?? 'consultation'
+  return serviceTypeOptions.find((serviceType) => String(serviceType.id) === String(id))?.code ?? 'consultation'
+}
+
+export function createMockServiceType(input: AdminServiceTypeInput): TicketSettingsServiceTypeOption {
+  const serviceType: TicketSettingsServiceTypeOption = {
+    active: input.active ?? true,
+    averageDurationMinutes: input.averageDurationMinutes,
+    code: input.code ?? 'consultation',
+    id: `service-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    name: input.name,
+    priorityWeight: input.priorityWeight,
+  }
+
+  serviceTypeOptions = [...serviceTypeOptions, serviceType]
+
+  return clone(serviceType)
+}
+
+export function updateMockServiceType(
+  id: string | number,
+  input: Partial<AdminServiceTypeInput>,
+): TicketSettingsServiceTypeOption {
+  const index = serviceTypeOptions.findIndex((serviceType) => String(serviceType.id) === String(id))
+
+  if (index === -1) {
+    throw new Error(`Service type ${id} was not found.`)
+  }
+
+  serviceTypeOptions[index] = {
+    ...serviceTypeOptions[index],
+    ...input,
+    id: serviceTypeOptions[index].id,
+    name: input.name ?? serviceTypeOptions[index].name,
+    code: input.code ?? serviceTypeOptions[index].code,
+  }
+
+  return clone(serviceTypeOptions[index])
+}
+
+export function deleteMockServiceType(id: string | number): void {
+  serviceTypeOptions = serviceTypeOptions.map((serviceType) => (
+    String(serviceType.id) === String(id)
+      ? { ...serviceType, active: false }
+      : serviceType
+  ))
 }
 
 export function updateSharedTicketStatus(
@@ -408,7 +451,7 @@ export function redirectSharedTicket(
   ticket.status = 'redirected'
   ticket.roomId = String(newRoomId)
   if (serviceTypeId !== undefined) {
-    ticket.serviceType = sharedServiceTypeByArchitectureId[String(serviceTypeId)] ?? ticket.serviceType
+    ticket.serviceType = getSharedServiceTypeByOptionId(serviceTypeId)
   }
   pushEvent(ticket, 'redirected')
   refreshQueueSnapshot()
@@ -422,7 +465,7 @@ export function updateSharedTicketSettings(id: string, payload: TicketSettingsPa
   if (payload.serviceType) {
     ticket.serviceType = payload.serviceType
   } else if (payload.serviceTypeId) {
-    ticket.serviceType = sharedServiceTypeByArchitectureId[String(payload.serviceTypeId)] ?? ticket.serviceType
+    ticket.serviceType = getSharedServiceTypeByOptionId(payload.serviceTypeId)
   }
 
   if (payload.roomId !== undefined) {

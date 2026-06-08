@@ -8,7 +8,7 @@ import { formatRoomName } from '@shared/utils'
 
 export function TvBoardPage() {
   const [searchParams] = useSearchParams()
-  const roomId = searchParams.get('roomId')
+  const roomId = searchParams.get('roomId') ?? undefined
   const [error, setError] = useState<string | null>(null)
   const [rooms, setRooms] = useState<Room[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -21,15 +21,6 @@ export function TvBoardPage() {
   }, [])
 
   useEffect(() => {
-    if (!roomId) {
-      setError('Кабинет табло не выбран')
-      setRoomName('')
-      setRooms([])
-      setTickets([])
-
-      return
-    }
-
     let active = true
     let requestId = 0
 
@@ -42,12 +33,18 @@ export function TvBoardPage() {
 
         if (!active || currentRequestId !== requestId) return
 
-        const nextTickets: Ticket[] = snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomId)
-        const nextRooms: Room[] = snapshot.rooms.filter((room) => String(room.id) === roomId)
+        const nextTickets: Ticket[] = roomId
+          ? snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomId)
+          : snapshot.tickets
+        const nextRooms: Room[] = roomId
+          ? snapshot.rooms.filter((room) => String(room.id) === roomId)
+          : snapshot.rooms
 
         setTickets(nextTickets)
         setRooms(nextRooms)
-        setRoomName(formatRoomName(nextRooms.find((room) => String(room.id) === roomId) ?? { id: roomId }))
+        setRoomName(roomId
+          ? formatRoomName(nextRooms.find((room) => String(room.id) === roomId) ?? { id: roomId })
+          : '')
         setError(null)
       } catch (error) {
         console.error('Board load failed', error)
@@ -72,7 +69,7 @@ export function TvBoardPage() {
       <header className="tv-header">
         <div>
           <span>{t.system.smartq}</span>
-          <strong>{roomName ? `Табло вызовов — ${roomName}` : 'Табло вызовов'}</strong>
+          <strong>{roomName ? `Табло вызовов — ${roomName}` : 'Общее табло вызовов'}</strong>
         </div>
         <time>
           {new Intl.DateTimeFormat('ru-RU', {

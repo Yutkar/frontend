@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Monitor, Copy, Check, Plus, Trash2 } from 'lucide-react'
+import { Monitor, Copy, Check, ExternalLink, Plus, Trash2 } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { Button } from '@shared/ui/components'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
@@ -70,6 +70,10 @@ export function BoardSettingsSection() {
     setTimeout(() => setCopied(null), 2000)
   }
 
+  function openUrl(url: string) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
   function addScreen() {
     if (!newScreenName.trim() || newScreenRooms.length === 0) return
     const roomIds = activeRooms
@@ -137,14 +141,24 @@ export function BoardSettingsSection() {
                       </code>
                     </td>
                     <td>
-                      <Button
-                        icon={copied === generalUrl ? <Check size={14} /> : <Copy size={14} />}
-                        onClick={() => void copyUrl(generalUrl)}
-                        size="sm"
-                        variant="secondary"
-                      >
-                        {copied === generalUrl ? 'Скопировано' : 'Копировать'}
-                      </Button>
+                      <div className="button-row">
+                        <Button
+                          icon={<ExternalLink size={14} />}
+                          onClick={() => openUrl(generalUrl)}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          Открыть табло
+                        </Button>
+                        <Button
+                          icon={copied === generalUrl ? <Check size={14} /> : <Copy size={14} />}
+                          onClick={() => void copyUrl(generalUrl)}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          {copied === generalUrl ? 'Скопировано' : 'Копировать'}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
 
@@ -160,14 +174,24 @@ export function BoardSettingsSection() {
                           <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{url}</code>
                         </td>
                         <td>
-                          <Button
-                            icon={copied === url ? <Check size={14} /> : <Copy size={14} />}
-                            onClick={() => void copyUrl(url)}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            {copied === url ? 'Скопировано' : 'Копировать'}
-                          </Button>
+                          <div className="button-row">
+                            <Button
+                              icon={<ExternalLink size={14} />}
+                              onClick={() => openUrl(url)}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Открыть табло
+                            </Button>
+                            <Button
+                              icon={copied === url ? <Check size={14} /> : <Copy size={14} />}
+                              onClick={() => void copyUrl(url)}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              {copied === url ? 'Скопировано' : 'Копировать'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -185,6 +209,14 @@ export function BoardSettingsSection() {
                         </td>
                         <td>
                           <div className="button-row">
+                            <Button
+                              icon={<ExternalLink size={14} />}
+                              onClick={() => openUrl(url)}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Открыть табло
+                            </Button>
                             <Button
                               icon={copied === url ? <Check size={14} /> : <Copy size={14} />}
                               onClick={() => void copyUrl(url)}

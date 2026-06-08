@@ -486,9 +486,15 @@ export const backendQueueApi: QueueApi = {
   },
 
   async getBoardSnapshot(roomId?: string | number) {
-    const response = await publicApiClient.get<unknown>(
-      roomId ? `/queue/board/${roomId}` : '/queue/board',
-    )
+    const response = roomId
+      ? await publicApiClient
+        .get<unknown>(`/queue/board/${encodeURIComponent(String(roomId))}`)
+        .catch((error) => {
+          console.warn('backendQueueApi: public room board is not available, loading common board', error)
+
+          return publicApiClient.get<unknown>('/queue/board')
+        })
+      : await publicApiClient.get<unknown>('/queue/board')
     const snapshot = toBoardQueueSnapshot(response.data)
 
     if (!roomId) {

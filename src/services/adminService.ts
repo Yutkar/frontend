@@ -3,6 +3,7 @@ import {
   toServiceError,
   type AdminRecord,
   type AdminRecordInput,
+  type AdminServiceTypeInput,
   type AdminUserInput,
   type TicketSettingsServiceTypeOption,
 } from './api'
@@ -24,6 +25,8 @@ export type AdminUserPayload = AdminUserInput & {
   email?: string
   roomId?: string | number
 }
+
+export type AdminServiceTypePayload = AdminServiceTypeInput
 
 function onlySpecialists(users: User[]): User[] {
   return users.filter((user) => user.role === 'specialist')
@@ -73,6 +76,45 @@ export const adminService = {
     } catch (error) {
       console.error('adminService.getServiceTypes failed', error)
       throw toServiceError(error, 'Не удалось получить типы услуг')
+    }
+  },
+
+  async createServiceType(input: AdminServiceTypePayload): Promise<TicketSettingsServiceTypeOption> {
+    try {
+      return await withOperationalRefresh(
+        () => adminApi.createServiceType(input),
+        'Типы услуг обновлены',
+      )
+    } catch (error) {
+      console.error('adminService.createServiceType failed', error)
+      throw toServiceError(error, 'Не удалось создать тип услуги')
+    }
+  },
+
+  async updateServiceType(
+    id: string | number,
+    input: Partial<AdminServiceTypePayload>,
+  ): Promise<TicketSettingsServiceTypeOption> {
+    try {
+      return await withOperationalRefresh(
+        () => adminApi.updateServiceType(id, input),
+        'Типы услуг обновлены',
+      )
+    } catch (error) {
+      console.error('adminService.updateServiceType failed', error)
+      throw toServiceError(error, 'Не удалось сохранить тип услуги')
+    }
+  },
+
+  async deleteServiceType(id: string | number): Promise<void> {
+    try {
+      await withOperationalRefresh(
+        () => adminApi.deleteServiceType(id),
+        'Типы услуг обновлены',
+      )
+    } catch (error) {
+      console.error('adminService.deleteServiceType failed', error)
+      throw toServiceError(error, 'Не удалось удалить тип услуги')
     }
   },
 

@@ -10,8 +10,9 @@ import { RoomsSection } from './AdminRoomsPage'
 import { StaffSection } from './AdminStaffPage'
 import { BoardSettingsSection } from './AdminBoardSettingsPage'
 import { QueueRoutingSection } from './AdminQueueRoutingPage'
+import { ServiceTypesSection } from './AdminServiceTypesPage'
 
-type AdminSectionId = 'rooms' | 'routing' | 'staff' | 'managers' | 'board'
+type AdminSectionId = 'rooms' | 'service-types' | 'routing' | 'staff' | 'managers' | 'board'
 
 type AdminSectionConfig = {
   id: AdminSectionId
@@ -28,6 +29,7 @@ type AdminSummary = {
 
 const adminSections: AdminSectionConfig[] = [
   { id: 'rooms', label: 'Кабинеты', roles: ['admin', 'manager'] },
+  { id: 'service-types', label: 'Типы услуг', roles: ['admin', 'manager'] },
   { id: 'routing', label: 'Настройки очередей', roles: ['admin', 'manager'] },
   { id: 'staff', label: 'Персонал', roles: ['admin', 'manager'] },
   { id: 'managers', label: 'Менеджеры', roles: ['admin'] },
@@ -90,6 +92,10 @@ export function AdminPage() {
     void loadSummary()
   }
 
+  function handleServiceTypesChange() {
+    void loadQueue({ force: true, successMessage: 'Типы услуг обновлены' })
+  }
+
   return (
     <div className="page-stack">
       <p className="admin-page-lead">Настройка кабинетов, персонала и доступов</p>
@@ -133,6 +139,9 @@ export function AdminPage() {
       </nav>
 
       {selectedSection?.id === 'rooms' ? <RoomsSection onRoomsChange={handleRoomsChange} /> : null}
+      {selectedSection?.id === 'service-types' ? (
+        <ServiceTypesSection onServiceTypesChange={handleServiceTypesChange} />
+      ) : null}
       {selectedSection?.id === 'routing' ? <QueueRoutingSection onRoutingChange={handleRoomsChange} /> : null}
       {selectedSection?.id === 'staff' ? (
         <StaffSection onStaffChange={handleAdminDataChange} refreshKey={roomsVersion} />

@@ -6,6 +6,7 @@ import type {
   AdminApi,
   AdminRecord,
   AdminRecordInput,
+  AdminServiceTypeInput,
   AdminUserInput,
   TicketSettingsServiceTypeOption,
 } from '../types'
@@ -190,8 +191,30 @@ function toServiceCode(option: UnknownRecord): ServiceType {
 
 function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOption {
   const code = toServiceCode(option)
+  const averageDurationMinutes = getPositiveNumber(
+    option.averageDurationMinutes
+      ?? option.average_duration_minutes
+      ?? option.avgServiceMinutes
+      ?? option.avg_service_minutes
+      ?? option.durationMinutes
+      ?? option.duration_minutes,
+  )
+  const priorityWeight = getPositiveNumber(
+    option.priorityWeight
+      ?? option.priority_weight
+      ?? option.weight,
+  )
+  const active = typeof option.active === 'boolean'
+    ? option.active
+    : typeof option.isActive === 'boolean'
+      ? option.isActive
+      : typeof option.enabled === 'boolean'
+        ? option.enabled
+        : undefined
 
   return {
+    ...(active === undefined ? {} : { active }),
+    ...(averageDurationMinutes === undefined ? {} : { averageDurationMinutes }),
     code,
     id: getId(option),
     name: getText(option.name)
@@ -199,6 +222,57 @@ function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOp
       ?? getText(option.label)
       ?? getText(option.code)
       ?? serviceLabelByCode[code],
+    ...(priorityWeight === undefined ? {} : { priorityWeight }),
+  }
+}
+
+function getServiceTypeRecord(value: unknown): UnknownRecord | undefined {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  for (const key of ['serviceType', 'service_type', 'data', 'item', 'record']) {
+    const nested = value[key]
+
+    if (isRecord(nested)) {
+      return nested
+    }
+  }
+
+  return value
+}
+
+function toServiceTypeResponseOption(
+  value: unknown,
+  fallback: Partial<TicketSettingsServiceTypeOption> & Partial<AdminServiceTypeInput>,
+): TicketSettingsServiceTypeOption {
+  return toServiceTypeOption({
+    ...fallback,
+    ...(getServiceTypeRecord(value) ?? {}),
+  })
+}
+
+function getPositiveNumber(value: unknown): number | undefined {
+  const numberValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value)
+      : Number.NaN
+
+  return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : undefined
+}
+
+function toServiceTypePayload(input: Partial<AdminServiceTypeInput>) {
+  return {
+    ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+    ...(input.code !== undefined ? { code: input.code } : {}),
+    ...(input.averageDurationMinutes !== undefined
+      ? { averageDurationMinutes: Math.max(1, Math.round(input.averageDurationMinutes)) }
+      : {}),
+    ...(input.priorityWeight !== undefined
+      ? { priorityWeight: Math.max(0, Math.round(input.priorityWeight)) }
+      : {}),
+    ...(input.active === undefined ? {} : { active: input.active, isActive: input.active }),
   }
 }
 
@@ -580,6 +654,22 @@ export const backendAdminApi: AdminApi = {
 
       return fallbackServiceTypeOptions
     }
+  },
+
+  async createServiceType(input) {
+    const response = await apiClient.post<unknown>('/service-types', toServiceTypePayload(input))
+
+    return toServiceTypeResponseOption(response.data, input)
+  },
+
+  async updateServiceType(id, input) {
+    const response = await apiClient.patch<unknown>(`/service-types/${id}`, toServiceTypePayload(input))
+
+    return toServiceTypeResponseOption(response.data, { id, ...input })
+  },
+
+  deleteServiceType(id) {
+    return deleteRecord('/service-types', id)
   },
 
   getRooms() {
