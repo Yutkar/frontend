@@ -1,4 +1,5 @@
 import type { ServicePlaceType } from '@shared/types'
+import { getLocale } from '@shared/locales/useLocale'
 
 type RoomNameSource = {
   id?: string | number | null
@@ -12,7 +13,6 @@ type RoomNameSource = {
 }
 
 type PlaceMeta = {
-  label: string
   lowerLabel: string
   preposition: string
   type: ServicePlaceType
@@ -22,19 +22,16 @@ const defaultPlaceType: ServicePlaceType = 'room'
 
 const placeTypeMeta: Record<ServicePlaceType, PlaceMeta> = {
   desk: {
-    label: 'Стол',
     lowerLabel: 'столу',
     preposition: 'к',
     type: 'desk',
   },
   room: {
-    label: 'Кабинет',
     lowerLabel: 'кабинет',
     preposition: 'в',
     type: 'room',
   },
   window: {
-    label: 'Окно',
     lowerLabel: 'окну',
     preposition: 'к',
     type: 'window',
@@ -70,7 +67,7 @@ function inferPlaceTypeFromText(value?: string | number | null): ServicePlaceTyp
 }
 
 function hasPlaceLabel(value: string): boolean {
-  return /^(кабинет|окно|стол)\b/i.test(value)
+  return /^(кабинет|окно|стол|терезе|үстел|room|window|desk)\b/i.test(value)
 }
 
 function extractRoomDigits(value?: string | number | null): string {
@@ -137,7 +134,7 @@ export function formatRoomName(room?: RoomNameSource | null): string {
   }
 
   const placeType = getRoomPlaceType(room)
-  const placeLabel = placeTypeMeta[placeType].label
+  const placeLabel = getRoomPlaceTypeLabel(placeType)
   const placeNumber = getRoomPlaceNumber(room)
   const rawName = normalizeRoomText(room.name)
     || normalizeRoomText(room.roomName)
@@ -174,5 +171,11 @@ export function formatRoomVoiceTarget(room?: RoomNameSource | null): string {
 }
 
 export function getRoomPlaceTypeLabel(placeType: ServicePlaceType | string): string {
-  return placeTypeMeta[normalizePlaceType(placeType) ?? defaultPlaceType].label
+  const normalizedPlaceType = normalizePlaceType(placeType) ?? defaultPlaceType
+  const placeTypes = getLocale().placeTypes
+
+  if (normalizedPlaceType === 'window') return placeTypes.window
+  if (normalizedPlaceType === 'desk') return placeTypes.desk
+
+  return placeTypes.room
 }

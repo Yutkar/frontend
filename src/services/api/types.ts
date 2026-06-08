@@ -10,6 +10,7 @@ import type {
   TicketStatus as SharedTicketStatus,
   User as SharedUser,
 } from '@shared/types'
+import type { SmartQLanguage } from '@shared/locales/types'
 import type {
   CreateTicketInput as ArchitectureCreateTicketInput,
   QueueStats as ArchitectureQueueStats,
@@ -82,6 +83,7 @@ export type TicketSettingsPayload = {
   comment?: string
   note?: string
   etaMinutes?: number
+  language?: SmartQLanguage
 }
 
 export type TicketCreateSettingsPayload = TicketSettingsPayload & {

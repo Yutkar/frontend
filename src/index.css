@@ -173,6 +173,19 @@ h3 {
   width: 42px;
 }
 
+.brand-logo {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: 42px;
+  object-fit: cover;
+  width: 42px;
+}
+
+.brand-logo-lg {
+  height: 54px;
+  width: 54px;
+}
+
 .brand-copy {
   display: flex;
   flex-direction: column;
@@ -273,6 +286,43 @@ h3 {
   align-items: center;
   display: flex;
   gap: 12px;
+}
+
+.language-select {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.language-select span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.language-select select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.language-select-large {
+  justify-content: center;
+}
+
+.language-select-large select {
+  font-size: 18px;
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.login-language-select {
+  margin: 0 auto 18px;
 }
 
 .topbar-shell-label {
@@ -2923,6 +2973,28 @@ h3 {
   justify-content: flex-end;
 }
 
+.tv-brand {
+  align-items: center;
+  display: inline-flex;
+  gap: 10px;
+}
+
+.tv-brand img,
+.tv-brand i {
+  align-items: center;
+  background: #1769aa;
+  border-radius: var(--radius);
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 900;
+  height: 38px;
+  justify-content: center;
+  object-fit: cover;
+  width: 38px;
+}
+
 .tv-header div {
   display: flex;
   flex-direction: column;
@@ -3780,6 +3852,44 @@ h3 {
   white-space: nowrap;
 }
 
+.app-settings-preview {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.app-settings-preview img {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: 72px;
+  object-fit: cover;
+  width: 72px;
+}
+
+.app-settings-preview .brand-mark {
+  height: 72px;
+  width: 72px;
+}
+
+.app-settings-preview span {
+  color: var(--text-muted);
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.app-settings-preview strong {
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 850;
+}
+
 .kiosk-page {
   align-items: center;
   background:
@@ -3811,6 +3921,13 @@ h3 {
   flex-direction: column;
   gap: 10px;
   text-align: center;
+}
+
+.kiosk-brand-row {
+  align-items: center;
+  display: inline-flex;
+  gap: 12px;
+  justify-content: center;
 }
 
 .kiosk-heading strong {

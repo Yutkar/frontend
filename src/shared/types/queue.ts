@@ -1,3 +1,5 @@
+import type { SmartQLanguage } from '@shared/locales/types'
+
 export type TicketStatus =
   | 'created'
   | 'waiting'
@@ -41,6 +43,7 @@ export type Ticket = {
   roomId?: string
   roomName?: string
   assignedTo?: string
+  language?: SmartQLanguage
   etaMinutes: number
   notes?: string
 }
@@ -135,6 +138,7 @@ export type TicketCreateInput = {
   serviceTypeId?: string | number
   priority: TicketPriority
   roomId?: string | number
+  language?: SmartQLanguage
   notes?: string
 }
 

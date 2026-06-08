@@ -105,6 +105,7 @@ const serviceCodeByBackendName: Record<string, SharedServiceType> = {
 
 type TicketCreateBody = {
   doctorId?: number
+  language?: string
   note?: string
   priority: number
   roomId?: number
@@ -133,7 +134,7 @@ function withoutOptionalCreateFields(payload: TicketCreateBody): TicketCreateBod
 }
 
 function hasOptionalCreateFields(payload: TicketCreateBody): boolean {
-  return payload.doctorId !== undefined || payload.note !== undefined
+  return payload.doctorId !== undefined || payload.note !== undefined || payload.language !== undefined
 }
 
 async function createBackendTicket(
@@ -424,6 +425,7 @@ function toBackendCreateSettingsPayload(payload: TicketSettingsPayload & { prior
   return {
     ...(doctorId !== undefined ? { doctorId } : {}),
     ...(note ? { note } : {}),
+    ...(payload.language ? { language: payload.language } : {}),
     priority: toBackendPriority(payload.priority),
     ...(roomId !== undefined ? { roomId } : {}),
     serviceTypeId: serviceTypeId ?? payload.serviceTypeId ?? 1,

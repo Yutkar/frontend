@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bell, Check, ExternalLink, Info, LogOut, Radio, ShieldCheck, Siren, Trash2, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
+import { useLocale } from '@shared/locales/useLocale'
 import type { QueueRecommendation } from '@shared/types'
 import {
   formatTime,
@@ -16,7 +16,7 @@ import {
 } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
-import { ThemeToggle } from '@shared/ui/core-components'
+import { LanguageSelect, ThemeToggle } from '@shared/ui/core-components'
 
 type TopNavbarProps = {
   routes: AppRoute[]
@@ -59,6 +59,7 @@ function waitForNotificationExit() {
 }
 
 export function TopNavbar({ routes }: TopNavbarProps) {
+  const t = useLocale()
   const location = useLocation()
   const navigate = useNavigate()
   const notificationRef = useRef<HTMLDivElement>(null)
@@ -210,6 +211,23 @@ export function TopNavbar({ routes }: TopNavbarProps) {
     }
   }
 
+  function getRouteLabel(route?: AppRoute): string {
+    if (!route) return appFallbackTitle()
+    if (route.path === '/dashboard') return t.nav.dashboard
+    if (route.path === '/analytics') return t.nav.analytics
+    if (route.path === '/admin') return t.nav.admin
+    if (route.path === '/specialist') return t.nav.specialist
+    if (route.path === '/visit-history') return t.nav.visitHistory
+    if (route.path === '/board') return t.nav.tvBoard
+    if (route.path === '/kiosk') return t.nav.kiosk
+
+    return route.label
+  }
+
+  function appFallbackTitle(): string {
+    return t.system.smartq
+  }
+
   return (
     <header className="top-navbar">
       <div>
@@ -217,10 +235,11 @@ export function TopNavbar({ routes }: TopNavbarProps) {
           <Radio size={14} />
           {t.system.realtimeMonitoring}
         </span>
-        <h1>{currentRoute?.label ?? t.system.smartq}</h1>
+        <h1>{getRouteLabel(currentRoute)}</h1>
       </div>
 
       <div className="navbar-actions">
+        <LanguageSelect />
         <ThemeToggle />
 
         <div className="notification-menu" ref={notificationRef}>

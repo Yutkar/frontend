@@ -10,13 +10,16 @@ import {
   getServiceOptionLabel,
   getServiceTypes,
 } from '@features/tickets/ticketFormOptions'
+import { getAppInitials, useAppSettings } from '@services/appSettingsService'
 import { adminService } from '@services/adminService'
 import { kioskService } from '@services/kioskService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type { AdminTerminalRecord, TicketSettingsOptions, TicketSettingsRoomOption } from '@services/api'
 import type { Ticket } from '@shared/types'
+import { useLanguage, useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
+import { LanguageSelect } from '@shared/ui/core-components'
 import { formatRoomName } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
@@ -27,6 +30,9 @@ const emptyOptions: TicketSettingsOptions = {
 }
 
 export function KioskPage() {
+  const appSettings = useAppSettings()
+  const language = useLanguage()
+  const t = useLocale()
   const [searchParams] = useSearchParams()
   const terminalId = searchParams.get('terminalId') ?? ''
   const loadQueue = useQueueStore((state) => state.loadQueue)
@@ -247,11 +253,12 @@ export function KioskPage() {
       const latestRoom = getAutoRoomForService(latestServiceRooms, latestRooms, latestTickets)
 
       if (!latestServiceType || !latestRoom) {
-        setError('Нет доступных мест обслуживания для выбранной услуги')
+        setError(t.kiosk.noRoomsForService)
         return
       }
 
       const ticket = await kioskService.createTicketForKiosk({
+        language,
         priority: 'normal',
         roomId: latestRoom.id,
         serviceType: latestServiceType.code,
@@ -263,7 +270,7 @@ export function KioskPage() {
       void loadQueue({ force: true, successMessage: 'Данные успешно обновлены' })
     } catch (createError) {
       console.error('Kiosk ticket create failed', createError)
-      setError('Не удалось создать талон. Попробуйте ещё раз.')
+      setError(t.kiosk.createError)
     } finally {
       setLoading(false)
     }
@@ -274,9 +281,9 @@ export function KioskPage() {
       <main className="kiosk-page">
         <section className="kiosk-result">
           <CheckCircle2 aria-hidden="true" size={72} />
-          <span className="kiosk-result-label">Ваш талон создан</span>
+          <span className="kiosk-result-label">{t.kiosk.created}</span>
           <div className="kiosk-ticket-number">
-            <span>Номер талона</span>
+            <span>{t.kiosk.ticketNumber}</span>
             <strong>{createdTicket.number}</strong>
           </div>
           <TicketPrintPreview data={printData} onPrint={resetKiosk} />
@@ -287,7 +294,7 @@ export function KioskPage() {
             size="lg"
             variant="secondary"
           >
-            Назад
+            {t.kiosk.back}
           </Button>
         </section>
       </main>
@@ -298,16 +305,24 @@ export function KioskPage() {
     <main className="kiosk-page">
       <section className="kiosk-shell">
         <div className="kiosk-heading">
-          <strong>SmartQ</strong>
-          <h1>Выберите услугу</h1>
+          <div className="kiosk-brand-row">
+            {appSettings.logoDataUrl ? (
+              <img alt={appSettings.appName} className="brand-logo brand-logo-lg" src={appSettings.logoDataUrl} />
+            ) : (
+              <div className="brand-mark">{getAppInitials(appSettings.appName)}</div>
+            )}
+            <strong>{appSettings.appName}</strong>
+          </div>
+          <LanguageSelect variant="large" />
+          <h1>{t.kiosk.chooseService}</h1>
         </div>
 
         {error ? <div className="modal-error">{error}</div> : null}
         {!loadingOptions && !loadingTerminal && serviceTypes.length === 0 ? (
-          <div className="modal-error">Сейчас нет доступных услуг. Обратитесь к администратору.</div>
+          <div className="modal-error">{t.kiosk.noServices}</div>
         ) : null}
         {selectedServiceType && !selectedRoom ? (
-          <div className="modal-error">Нет доступных мест обслуживания для выбранной услуги</div>
+          <div className="modal-error">{t.kiosk.noRoomsForService}</div>
         ) : null}
 
         <div className="kiosk-service-grid">
@@ -336,7 +351,7 @@ export function KioskPage() {
           size="lg"
           variant="primary"
         >
-          {loading ? 'Создаём талон...' : 'Получить талон'}
+          {loading ? t.kiosk.creatingTicket : t.kiosk.createTicket}
         </Button>
       </section>
     </main>

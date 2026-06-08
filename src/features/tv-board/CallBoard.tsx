@@ -1,14 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  getVoiceActionText,
-  getVoiceAudienceLabel,
-  voiceSettingsService,
-} from '@services/voiceSettingsService'
+import { voiceSettingsService } from '@services/voiceSettingsService'
 import type { BoardTemplate } from '@services/api'
+import {
+  getCurrentLanguage,
+  getLocale,
+  type SmartQLanguage,
+} from '@shared/locales/useLocale'
 import type { Room, Ticket } from '@shared/types'
-import { formatRoomName, formatRoomVoiceTarget, formatTime } from '@shared/utils'
+import {
+  formatRoomName,
+  formatTime,
+  getRoomPlaceNumber,
+  getRoomPlaceType,
+} from '@shared/utils'
 
 type CallBoardProps = {
+  labels?: {
+    currentCall: string
+    noShow: string
+    recentCalls: string
+    waiting: string
+  }
   recentCallsLimit?: number
   rooms: Room[]
   showRecentCalls?: boolean
@@ -61,7 +73,96 @@ function isBoardCallTicket(ticket: Ticket): boolean {
     && (ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'no_show')
 }
 
+function getSpeechLanguage(language: SmartQLanguage): string {
+  if (language === 'kk') return 'kk-KZ'
+  if (language === 'en') return 'en-US'
+
+  return 'ru-RU'
+}
+
+function getEnglishPlaceType(room?: Room | {
+  id?: string
+  name?: string
+  number?: string | number
+  placeType?: string
+}): string {
+  const placeType = getRoomPlaceType(room)
+
+  if (placeType === 'window') return 'window'
+  if (placeType === 'desk') return 'desk'
+
+  return 'room'
+}
+
+function getKazakhPlaceTarget(room?: Room | {
+  id?: string
+  name?: string
+  number?: string | number
+  placeType?: string
+}): string {
+  const placeType = getRoomPlaceType(room)
+  const number = getRoomPlaceNumber(room)
+  const fallbackId = room?.id ? String(room.id) : ''
+  const placeNumber = number || fallbackId
+
+  if (placeType === 'window') return `${placeNumber} терезеге`
+  if (placeType === 'desk') return `${placeNumber} үстелге`
+
+  return `${placeNumber} кабинетке`
+}
+
+function getRussianPlaceTarget(room?: Room | {
+  id?: string
+  name?: string
+  number?: string | number
+  placeType?: string
+}): string {
+  const placeType = getRoomPlaceType(room)
+  const number = getRoomPlaceNumber(room)
+  const fallbackId = room?.id ? String(room.id) : ''
+  const placeNumber = number || fallbackId
+
+  if (placeType === 'window') return `к окну ${placeNumber}`
+  if (placeType === 'desk') return `к столу ${placeNumber}`
+
+  return `в кабинет ${placeNumber}`
+}
+
+function buildVoicePhrase(
+  ticketNumber: string,
+  room: Room | {
+    id?: string
+    name?: string
+    number?: string | number
+    placeType?: string
+  } | undefined,
+  language: SmartQLanguage,
+): string {
+  const voiceSettings = voiceSettingsService.getSettings()
+  const audience = voiceSettings.audience
+  const roomNumber = getRoomPlaceNumber(room) || (room?.id ? String(room.id) : '')
+
+  if (language === 'kk') {
+    const audienceText = audience === 'client' ? 'клиенті' : 'пациенті'
+
+    return `${ticketNumber} ${audienceText}, ${getKazakhPlaceTarget(room)} келіңіз`
+  }
+
+  if (language === 'en') {
+    const audienceText = audience === 'client' ? 'Client' : 'Patient'
+
+    return `${audienceText} ${ticketNumber}, please proceed to ${getEnglishPlaceType(room)} ${roomNumber}`
+  }
+
+  const locale = getLocale('ru')
+  const audienceText = audience === 'client' ? locale.voice.client : locale.voice.patient
+  const actionText = voiceSettings.action === 'enter' ? locale.voice.enter : locale.voice.approach
+
+  return `${audienceText} ${ticketNumber}, ${actionText} ${getRussianPlaceTarget(room)}`
+}
+
 export function CallBoard({
+  labels = getLocale().board,
   recentCallsLimit = 10,
   rooms,
   showRecentCalls = true,
@@ -83,10 +184,8 @@ export function CallBoard({
   )
   const currentCall = currentCalls[0]
   const currentCallKey = getCallKey(currentCall)
-  const currentCallNumber = currentCall?.number ?? ''
   const currentCallRoom = currentCall ? getTicketRoom(currentCall, rooms) : undefined
   const currentCallRoomName = currentCall ? formatRoomName(currentCallRoom) : ''
-  const currentCallVoiceTarget = currentCall ? formatRoomVoiceTarget(currentCallRoom) : ''
 
   const recentCalls = tickets
     .filter(isBoardCallTicket)
@@ -123,14 +222,17 @@ export function CallBoard({
     oscillator.stop(audioContext.currentTime + 0.34)
   }
 
-  async function announceCall(ticketNumber: string, voiceTarget: string) {
+  async function announceCall(ticket: Ticket, room?: Room | {
+    id?: string
+    name?: string
+    number?: string | number
+    placeType?: string
+  }) {
     if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
       window.speechSynthesis.cancel()
-      const voiceSettings = voiceSettingsService.getSettings()
-      const utterance = new SpeechSynthesisUtterance(
-        `${getVoiceAudienceLabel(voiceSettings.audience)} ${ticketNumber}, ${getVoiceActionText(voiceSettings.action)} ${voiceTarget}`,
-      )
-      utterance.lang = 'ru-RU'
+      const language = ticket.language ?? getCurrentLanguage() ?? 'ru'
+      const utterance = new SpeechSynthesisUtterance(buildVoicePhrase(ticket.number, room, language))
+      utterance.lang = getSpeechLanguage(language)
       utterance.rate = 0.92
       window.speechSynthesis.speak(utterance)
       return
@@ -159,12 +261,12 @@ export function CallBoard({
     setHighlightedCallKey(currentCallKey)
     const highlightTimeout = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
 
-    if (voiceEnabled) {
-      void announceCall(currentCallNumber, currentCallVoiceTarget).catch(() => undefined)
+    if (voiceEnabled && currentCall) {
+      void announceCall(currentCall, currentCallRoom).catch(() => undefined)
     }
 
     return () => window.clearTimeout(highlightTimeout)
-  }, [currentCallKey, currentCallNumber, currentCallVoiceTarget, voiceEnabled])
+  }, [currentCall, currentCallKey, currentCallRoom, voiceEnabled])
 
   if (template === 'minimal') {
     return (
@@ -178,7 +280,7 @@ export function CallBoard({
             {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
           </article>
         ) : (
-          <div className="tv-empty-call">Ожидайте вызова</div>
+          <div className="tv-empty-call">{labels.waiting}</div>
         )}
       </div>
     )
@@ -197,7 +299,7 @@ export function CallBoard({
             {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
           </article>
         )) : (
-          <div className="tv-empty-call">Ожидайте вызова</div>
+          <div className="tv-empty-call">{labels.waiting}</div>
         )}
       </div>
     )
@@ -211,10 +313,10 @@ export function CallBoard({
             {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
             <strong>{ticket.number}</strong>
             <span>{getRoomName(ticket, rooms)}</span>
-            {ticket.status === 'no_show' ? <em>Не явился</em> : null}
+            {ticket.status === 'no_show' ? <em>{labels.noShow}</em> : null}
           </div>
         )) : (
-          <div className="tv-empty-recent">Ожидайте вызова</div>
+          <div className="tv-empty-recent">{labels.waiting}</div>
         )}
       </section>
     )
@@ -223,7 +325,7 @@ export function CallBoard({
   return (
     <div className={`tv-grid ${showRecentCalls ? '' : 'tv-grid-single'}`}>
       <section className="tv-current">
-        <span className="tv-section-label">Сейчас вызывается</span>
+        <span className="tv-section-label">{labels.currentCall}</span>
         {currentCall ? (
           <>
             <article
@@ -246,24 +348,24 @@ export function CallBoard({
             ) : null}
           </>
         ) : (
-          <div className="tv-empty-call">Ожидайте вызова</div>
+          <div className="tv-empty-call">{labels.waiting}</div>
         )}
       </section>
 
       {showRecentCalls ? (
         <section className="tv-recent">
-          <span className="tv-section-label">Последние вызовы</span>
+          <span className="tv-section-label">{labels.recentCalls}</span>
           {recentCalls.length > 0 ? (
             recentCalls.map((ticket) => (
               <div className="tv-recent-row" key={ticket.id}>
                 <strong>{ticket.number}</strong>
                 <span>{getRoomName(ticket, rooms)}</span>
                 {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
-                {ticket.status === 'no_show' ? <em>Не явился</em> : null}
+                {ticket.status === 'no_show' ? <em>{labels.noShow}</em> : null}
               </div>
             ))
           ) : (
-            <div className="tv-empty-recent">Ожидайте вызова</div>
+            <div className="tv-empty-recent">{labels.waiting}</div>
           )}
         </section>
       ) : null}

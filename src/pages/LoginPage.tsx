@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ShieldCheck } from 'lucide-react'
+import { getAppInitials, useAppSettings } from '@services/appSettingsService'
 import { appModeService } from '@services/appModeService'
 import { useGlobalStore } from '@store/global'
 import { Button } from '@shared/ui/components'
-import { t } from '@shared/locales/useLocale'
+import { useLocale } from '@shared/locales/useLocale'
+import { LanguageSelect } from '@shared/ui/core-components'
 import type { Role } from '@shared/types'
 
 const defaultPathByRole: Record<Role, string> = {
@@ -14,6 +16,8 @@ const defaultPathByRole: Record<Role, string> = {
 }
 
 export function LoginPage() {
+  const appSettings = useAppSettings()
+  const t = useLocale()
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -34,7 +38,7 @@ export function LoginPage() {
 
       navigate(user ? defaultPathByRole[user.role] : '/dashboard', { replace: true })
     } catch (err) {
-      setError('Неверный логин или пароль')
+      setError(t.auth.invalidCredentials)
     } finally {
       setIsLoading(false)
     }
@@ -44,19 +48,24 @@ export function LoginPage() {
     <main className="login-page">
       <section className="login-panel">
         <div className="login-brand">
-          <div className="brand-mark">SQ</div>
+          {appSettings.logoDataUrl ? (
+            <img alt={appSettings.appName} className="brand-logo brand-logo-lg" src={appSettings.logoDataUrl} />
+          ) : (
+            <div className="brand-mark">{getAppInitials(appSettings.appName)}</div>
+          )}
           <div>
             <span className="eyebrow">
               <ShieldCheck size={14} />
-              Авторизация
+              {t.auth.authorization}
             </span>
-            <h1>{t.system.smartq}</h1>
-            <p>Система управления медицинской очередью</p>
+            <h1>{appSettings.appName}</h1>
+            <p>{t.auth.queueSystem}</p>
           </div>
         </div>
 
         <div className="mt-10">
-          <h2 className="text-2xl font-semibold text-center mb-8">Вход в систему</h2>
+          <LanguageSelect className="login-language-select" variant="large" />
+          <h2 className="text-2xl font-semibold text-center mb-8">{t.auth.systemLogin}</h2>
 
           <form onSubmit={handleSubmit} className="space-y-6 max-w-md mx-auto">
             {error && (
@@ -68,13 +77,13 @@ export function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Логин
+                {t.auth.login}
               </label>
               <input
                 type="text"
                 value={loginValue}
                 onChange={(e) => setLoginValue(e.target.value)}
-                placeholder="Введите логин"
+                placeholder={t.auth.loginPlaceholder}
                 className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 required
               />
@@ -82,13 +91,13 @@ export function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Пароль
+                {t.auth.password}
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder={t.auth.passwordPlaceholder}
                 className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 required
               />
@@ -99,7 +108,7 @@ export function LoginPage() {
               className="w-full py-3.5 text-base font-medium"
               disabled={isLoading}
             >
-              {isLoading ? 'Входим...' : 'Войти'}
+              {isLoading ? t.auth.signingIn : t.auth.signIn}
             </Button>
           </form>
 

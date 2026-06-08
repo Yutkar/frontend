@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CallBoard } from '@features/tv-board/CallBoard'
 import { adminService } from '@services/adminService'
+import { getAppInitials, useAppSettings } from '@services/appSettingsService'
 import { queueService } from '@services/queueService'
 import type { BoardSettings } from '@services/api'
+import { useLocale } from '@shared/locales/useLocale'
 import type { Room, Ticket } from '@shared/types'
 import { formatRoomName } from '@shared/utils'
 
@@ -19,6 +21,8 @@ const defaultBoardSettings: BoardSettings = {
 }
 
 export function TvBoardPage() {
+  const appSettings = useAppSettings()
+  const t = useLocale()
   const [searchParams] = useSearchParams()
   const roomId = searchParams.get('roomId') ?? undefined
   const [error, setError] = useState<string | null>(null)
@@ -76,7 +80,7 @@ export function TvBoardPage() {
       } catch (error) {
         console.error('Board load failed', error)
         if (!active || currentRequestId !== requestId) return
-        setError('Не удалось загрузить табло')
+        setError(t.board.waiting)
         setTickets([])
         setRooms([])
       }
@@ -89,13 +93,24 @@ export function TvBoardPage() {
       active = false
       window.clearInterval(interval)
     }
-  }, [roomId])
+  }, [roomId, t.board.waiting])
 
   return (
     <main className="tv-board">
       {roomName || boardSettings.showTime ? (
         <header className={roomName ? 'tv-header' : 'tv-header tv-header-general'}>
-          {roomName ? <strong>{roomName}</strong> : <span />}
+          {roomName ? (
+            <strong>{roomName}</strong>
+          ) : (
+            <span className="tv-brand">
+              {appSettings.logoDataUrl ? (
+                <img alt={appSettings.appName} src={appSettings.logoDataUrl} />
+              ) : (
+                <i>{getAppInitials(appSettings.appName)}</i>
+              )}
+              {appSettings.appName}
+            </span>
+          )}
           {boardSettings.showTime ? (
             <time>
               {new Intl.DateTimeFormat('ru-RU', {
@@ -120,6 +135,7 @@ export function TvBoardPage() {
         template={boardSettings.template}
         tickets={tickets}
         voiceEnabled={boardSettings.voiceEnabled}
+        labels={t.board}
       />
     </main>
   )

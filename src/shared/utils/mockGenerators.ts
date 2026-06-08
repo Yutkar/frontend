@@ -34,6 +34,7 @@ export function createMockTicket(input: TicketCreateInput, queueLength: number):
     status: 'waiting',
     createdAt,
     etaMinutes: Math.max(6, queueLength * 7),
+    language: input.language,
     notes: input.notes,
   }
 }

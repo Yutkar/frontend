@@ -8,6 +8,7 @@ import { publicApiClient } from '../client'
 import type { KioskApi } from '../types'
 
 type TicketCreateBody = {
+  language?: string
   priority: number
   roomId?: number
   serviceTypeId: number | string
@@ -36,12 +37,30 @@ function withoutRoomId(payload: TicketCreateBody) {
   }
 }
 
+function withoutLanguage(payload: TicketCreateBody): TicketCreateBody {
+  return {
+    priority: payload.priority,
+    ...(payload.roomId !== undefined ? { roomId: payload.roomId } : {}),
+    serviceTypeId: payload.serviceTypeId,
+  }
+}
+
 async function createBackendTicket(path: string, payload: TicketCreateBody): Promise<BackendTicket> {
   try {
     const response = await publicApiClient.post<BackendTicket>(path, payload)
 
     return response.data
   } catch (error) {
+    if (payload.language) {
+      try {
+        const response = await publicApiClient.post<BackendTicket>(path, withoutLanguage(payload))
+
+        return response.data
+      } catch (languageFallbackError) {
+        console.warn('backendKioskApi: POST /tickets/kiosk with language failed, retrying fallback', languageFallbackError)
+      }
+    }
+
     if (payload.roomId === undefined) {
       throw error
     }
@@ -71,7 +90,10 @@ export const backendKioskApi: KioskApi = {
     )
     const ticket = await arriveCreatedTicket(createdTicket)
 
-    return toSharedTicket(ticket)
+    return {
+      ...toSharedTicket(ticket),
+      language: input.language ?? toSharedTicket(ticket).language,
+    }
   },
 
   async createTicketForKiosk(input) {
@@ -79,11 +101,15 @@ export const backendKioskApi: KioskApi = {
     const serviceTypeId = Number(input.serviceTypeId)
     const createdTicket = await createBackendTicket('/tickets/kiosk', {
       priority: toBackendPriority(input.priority),
+      ...(input.language ? { language: input.language } : {}),
       ...(Number.isFinite(roomId) ? { roomId } : {}),
       serviceTypeId: Number.isFinite(serviceTypeId) ? serviceTypeId : input.serviceTypeId,
     })
     const ticket = await arriveCreatedTicket(createdTicket)
 
-    return toSharedTicket(ticket)
+    return {
+      ...toSharedTicket(ticket),
+      language: input.language ?? toSharedTicket(ticket).language,
+    }
   },
 }

@@ -10,12 +10,14 @@ import type {
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
+import { isSmartQLanguage } from '@shared/locales/types'
 import {
   formatWaitingTime,
   getAverageWaitingMinutes,
   getWaitingMinutes,
 } from '@shared/utils/time'
 import { formatRoomName } from '@shared/utils/room'
+import { ticketLanguageService } from '@services/ticketLanguageService'
 import { planRoomLoads } from '@shared/utils/queuePlanning'
 import type {
   Room as ArchitectureRoom,
@@ -82,6 +84,7 @@ export type BackendTicket = {
   status?: BackendTicketStatus | string
   etaMinutes?: number | null
   waitMinutes?: number | null
+  language?: unknown
   serviceTypeId?: number | string
   serviceTypeName?: string | null
   serviceName?: string | null
@@ -508,6 +511,10 @@ function getBackendTicketAssigneeId(ticket: BackendTicket): string {
   )
 }
 
+function toSharedLanguage(value: unknown): Ticket['language'] {
+  return isSmartQLanguage(value) ? value : undefined
+}
+
 export function toBackendServiceTypeId(serviceType: ServiceType): number {
   return backendIdByServiceType[serviceType]
 }
@@ -639,6 +646,7 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     roomId: roomId || undefined,
     roomName: getBackendTicketRoomName(ticket),
     assignedTo: assignedTo || undefined,
+    language: toSharedLanguage(ticket.language) ?? ticketLanguageService.getTicketLanguage(ticket.id),
     etaMinutes: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
   }
 }
@@ -704,6 +712,7 @@ export function toArchitectureRooms(rooms: BackendRoom[]): ArchitectureRoom[] {
 }
 
 export function toBackendTicketCreateInput(input: TicketCreateInput): {
+  language?: TicketCreateInput['language']
   priority: number
   roomId?: number
   serviceTypeId: number | string
@@ -713,6 +722,7 @@ export function toBackendTicketCreateInput(input: TicketCreateInput): {
 
   return {
     priority: toBackendPriority(input.priority),
+    ...(input.language ? { language: input.language } : {}),
     ...(Number.isFinite(roomId) ? { roomId } : {}),
     serviceTypeId: Number.isFinite(serviceTypeId)
       ? serviceTypeId
