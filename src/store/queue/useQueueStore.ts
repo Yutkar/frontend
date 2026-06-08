@@ -217,6 +217,7 @@ function createRoomSnapshotUpdate(
   const roomTickets = resolved.tickets.filter((ticket) => String(ticket.roomId) === roomIdValue)
   const activeTickets = replaceRoomTickets(state.activeTickets, roomTickets.filter(isActiveTicket), roomId)
   const noShowTickets = replaceRoomTickets(state.noShowTickets, roomTickets.filter(isNoShowTicket), roomId)
+  const newClosedTickets = roomTickets.filter((ticket) => !isActiveTicket(ticket) && !isNoShowTicket(ticket))
 
   return {
     ...snapshot,
@@ -224,7 +225,7 @@ function createRoomSnapshotUpdate(
     events: mergeQueueEvents(snapshot.events, state.events),
     noShowTickets,
     returnedTicketOverrides: resolved.returnedTicketOverrides,
-    tickets: mergeTicketsById(getClosedTickets(state.tickets), activeTickets, noShowTickets),
+    tickets: mergeTicketsById(getClosedTickets(state.tickets), newClosedTickets, activeTickets, noShowTickets),
   }
 }
 
