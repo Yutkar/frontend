@@ -1,7 +1,7 @@
 import { io, type Socket } from 'socket.io-client'
 import type { QueueEvent, QueueEventType } from '@shared/types'
 import { formatRoomName } from '@shared/utils/room'
-import { API_BASE_URL, isBackendMode } from './apiProvider'
+import { REALTIME_BASE_URL, isBackendMode } from './apiProvider'
 
 type QueueEventListener = (event: QueueEvent) => void
 type RealtimeEventType = Extract<QueueEventType, 'status_update' | 'ticket_called'>
@@ -19,7 +19,7 @@ const statusLabels: Record<string, string> = {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function getRecord(value: unknown, key: string): Record<string, unknown> | undefined {
@@ -242,7 +242,7 @@ class SmartQSocketClient {
     }
 
     if (!this.socket) {
-      this.socket = io(API_BASE_URL, {
+      this.socket = io(REALTIME_BASE_URL, {
         auth: () => ({
           token: window.localStorage.getItem('access_token') ?? undefined,
         }),

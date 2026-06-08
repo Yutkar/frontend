@@ -27,6 +27,7 @@ import type { QueueApi, QueueOverloadRoom } from '../types'
 import { requestTicketReturn } from './ticketReturnFallback'
 
 const activeRoomStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+const serverDidNotReturnMessage = 'Сервер не вернул пациента в очередь'
 const analyticsPaths = [
   '/analytics/dashboard',
   '/analytics/rooms',
@@ -305,6 +306,14 @@ function isNoShowTicket(ticket: BackendTicket): boolean {
   const status = ticket.status?.trim().toLowerCase().replace(/-/g, '_')
 
   return status === 'no_show' || status === 'noshow'
+}
+
+function isReturnedToQueue(ticket: BackendTicket): boolean {
+  return toSharedStatus(ticket.status) === 'waiting'
+}
+
+function createServerDidNotReturnError(): Error {
+  return new Error(serverDidNotReturnMessage)
 }
 
 async function getBackendNoShowTicketsForRoom(roomId: string | number): Promise<BackendTicket[]> {
@@ -589,11 +598,23 @@ export const backendQueueApi: QueueApi = {
 
     try {
       const ticketResponse = await apiClient.get<BackendTicket>(`/tickets/${ticketId}`)
-      if (toSharedStatus(ticketResponse.data.status) !== 'no_show') {
+      if (isNoShowTicket(ticketResponse.data)) {
+        throw createServerDidNotReturnError()
+      }
+
+      if (isReturnedToQueue(ticketResponse.data)) {
         resolvedTicket = ticketResponse.data
       }
     } catch (error) {
+      if (error instanceof Error && error.message === serverDidNotReturnMessage) {
+        throw error
+      }
+
       console.warn('backendQueueApi.returnTicket: GET /tickets/:id failed after return', error)
+    }
+
+    if (!isReturnedToQueue(resolvedTicket)) {
+      throw createServerDidNotReturnError()
     }
 
     const resolvedRoomId = getBackendTicketRoomId(resolvedTicket)
@@ -611,23 +632,49 @@ export const backendQueueApi: QueueApi = {
   },
 
   async redirectTicket(input) {
+    let redirectedTickets: BackendTicket[] = []
+
     try {
-      await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input))
+      const response = await apiClient.post<unknown>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input))
+      redirectedTickets = toBackendTickets(response.data)
     } catch (error) {
       console.warn('backendQueueApi.redirectTicket: extended payload failed, retrying with newRoomId only', error)
-      await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input, false))
+      const response = await apiClient.post<unknown>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input, false))
+      redirectedTickets = toBackendTickets(response.data)
     }
 
     const snapshot = await loadQueueSnapshot()
     const redirectedRoomId = String(input.roomId)
+    const redirectedTicket = redirectedTickets.find((ticket) => String(ticket.id) === String(input.ticketId))
+    const redirectedSnapshotTicket = redirectedTicket
+      ? {
+          ...toSharedTicket(redirectedTicket),
+          roomId: getBackendTicketRoomId(redirectedTicket) || redirectedRoomId,
+          status: toSharedStatus(redirectedTicket.status) === 'no_show'
+            ? 'redirected'
+            : toSharedStatus(redirectedTicket.status),
+        }
+      : undefined
+    const snapshotHasTicket = snapshot.tickets.some((ticket) => ticket.id === input.ticketId)
+    const tickets = snapshotHasTicket
+      ? snapshot.tickets.map((ticket) => {
+          if (ticket.id !== input.ticketId) {
+            return ticket
+          }
+
+          return redirectedSnapshotTicket ?? {
+            ...ticket,
+            roomId: redirectedRoomId,
+            status: ticket.status === 'no_show' ? 'redirected' : ticket.status,
+          }
+        })
+      : redirectedSnapshotTicket
+        ? [...snapshot.tickets, redirectedSnapshotTicket]
+        : snapshot.tickets
 
     return {
       ...snapshot,
-      tickets: snapshot.tickets.map((ticket) => (
-        ticket.id === input.ticketId
-          ? { ...ticket, roomId: redirectedRoomId }
-          : ticket
-      )),
+      tickets,
     }
   },
 

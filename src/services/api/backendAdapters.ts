@@ -1416,15 +1416,17 @@ function getBoardTicketSortTime(ticket: Ticket): number {
   return Number.isFinite(timestamp) ? timestamp : 0
 }
 
+function isBoardCallTicket(ticket: Ticket): boolean {
+  return Boolean(ticket.calledAt)
+    && (ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'no_show')
+}
+
 export function toBoardQueueSnapshot(value: unknown): QueueSnapshot {
   const tickets = toBackendTickets(value)
   const rooms = toBackendRooms(value)
   const boardTickets = tickets
     .map(normalizeBoardTicket)
-    .filter((ticket) =>
-      ticket.calledAt &&
-      (ticket.status === 'called' || ticket.status === 'no_show'),
-    )
+    .filter(isBoardCallTicket)
     .sort((left, right) => getBoardTicketSortTime(right) - getBoardTicketSortTime(left))
 
   return {

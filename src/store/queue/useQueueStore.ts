@@ -169,19 +169,6 @@ function getClosedTickets(tickets: Ticket[]): Ticket[] {
   return tickets.filter((ticket) => !isActiveTicket(ticket) && !isNoShowTicket(ticket))
 }
 
-function createReturnedTicket(ticketId: string, ticket: Ticket, roomId?: string | number): Ticket {
-  return {
-    ...ticket,
-    calledAt: undefined,
-    completedAt: undefined,
-    roomId: roomId !== undefined ? String(roomId) : ticket.roomId,
-    startedAt: undefined,
-    status: 'waiting',
-    updatedAt: new Date().toISOString(),
-    id: ticket.id || ticketId,
-  }
-}
-
 function createSnapshotUpdate(
   snapshot: Pick<QueueState, 'analytics' | 'events' | 'kpi' | 'recommendations' | 'rooms'> & { tickets: Ticket[] },
   state: QueueState,
@@ -429,6 +416,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       const previousRoomId = get().tickets.find((ticket) => ticket.id === input.ticketId)?.roomId
         ?? get().activeTickets.find((ticket) => ticket.id === input.ticketId)?.roomId
       const snapshot = await queueApi.redirectTicket(input)
+      const redirectedTicket = snapshot.tickets.find((ticket) => ticket.id === input.ticketId)
       const roomIds = Array.from(new Set(
         [previousRoomId, input.roomId]
           .filter((roomId): roomId is string | number => roomId !== undefined)
@@ -455,6 +443,21 @@ export const useQueueStore = create<QueueState>((set, get) => ({
             }
           }
         })
+
+        if (redirectedTicket && isActiveTicket(redirectedTicket)) {
+          const activeTickets = mergeTicketsById(
+            nextState.activeTickets.filter((ticket) => ticket.id !== redirectedTicket.id),
+            [redirectedTicket],
+          )
+          const noShowTickets = nextState.noShowTickets.filter((ticket) => ticket.id !== redirectedTicket.id)
+
+          nextState = {
+            ...nextState,
+            activeTickets,
+            noShowTickets,
+            tickets: mergeTicketsById(getClosedTickets(nextState.tickets), activeTickets, noShowTickets),
+          }
+        }
 
         return nextState
       })
@@ -565,32 +568,21 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       const currentRoomId = roomId ?? currentTicket?.roomId
       const snapshot = await queueApi.returnTicket(ticketId, currentRoomId)
       const returnedTicket = snapshot.tickets.find((ticket) => ticket.id === ticketId) ?? currentTicket
-      const returnedTicketOverrides = returnedTicket
-        ? {
-            ...get().returnedTicketOverrides,
-            [ticketId]: createReturnedTicket(ticketId, returnedTicket, currentRoomId),
-          }
-        : get().returnedTicketOverrides
-      const fullSnapshot = await queueApi.getQueueSnapshot().catch((refreshError) => {
-        console.warn('Queue return ticket full refresh failed', refreshError)
 
-        return undefined
-      })
+      if (!returnedTicket || returnedTicket.status !== 'waiting') {
+        throw new Error('Сервер не вернул пациента в очередь')
+      }
 
       set((state) => {
-        let nextState: QueueState = {
-          ...state,
-          ...(fullSnapshot
-            ? createSnapshotUpdate(fullSnapshot, { ...state, returnedTicketOverrides })
-            : createSnapshotUpdate(snapshot, { ...state, returnedTicketOverrides })),
-        }
-
-        if (currentRoomId !== undefined) {
-          nextState = {
-            ...nextState,
-            ...createRoomSnapshotUpdate(snapshot, nextState, currentRoomId),
-          }
-        }
+        const nextState: QueueState = currentRoomId !== undefined
+          ? {
+              ...state,
+              ...createRoomSnapshotUpdate(snapshot, state, currentRoomId),
+            }
+          : {
+              ...state,
+              ...createSnapshotUpdate(snapshot, state),
+            }
 
         return {
           ...nextState,

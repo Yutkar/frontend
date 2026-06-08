@@ -13,6 +13,8 @@ type TicketReturnOptions = {
   roomId?: string | number
 }
 
+const serverDidNotReturnMessage = 'Сервер не вернул пациента в очередь'
+
 function getHttpStatus(error: unknown): number | undefined {
   if (typeof error !== 'object' || error === null) {
     return undefined
@@ -45,6 +47,10 @@ function isForbidden(error: unknown): boolean {
 
 function createForbiddenReturnError(): Error {
   return new Error('Недостаточно прав для возврата пациента')
+}
+
+function createServerDidNotReturnError(): Error {
+  return new Error(serverDidNotReturnMessage)
 }
 
 function toBackendRoomId(roomId: string | number): string | number {
@@ -87,6 +93,18 @@ function isWaitingTicket(ticket?: BackendTicket): boolean {
   return ticket ? toSharedStatus(ticket.status) === 'waiting' : false
 }
 
+function ensureWaitingTicket(ticket: BackendTicket | undefined, id: string, roomId?: string | number): BackendTicket {
+  if (!ticket) {
+    return withWaitingStatus(undefined, id, roomId)
+  }
+
+  if (!isWaitingTicket(ticket)) {
+    throw createServerDidNotReturnError()
+  }
+
+  return withWaitingStatus(ticket, id, roomId)
+}
+
 async function resolveFallbackRoomId(id: string, roomId?: string | number): Promise<string | number | undefined> {
   if (roomId !== undefined) {
     return roomId
@@ -112,12 +130,12 @@ async function patchTicketToWaiting(id: string, roomId?: string | number): Promi
   }
 
   if (response.data) {
-    return withWaitingStatus(response.data, id, roomId)
+    return ensureWaitingTicket(response.data, id, roomId)
   }
 
   const ticket = await getTicketById(id)
 
-  return withWaitingStatus(ticket, id, roomId)
+  return ensureWaitingTicket(ticket, id, roomId)
 }
 
 export async function requestTicketReturn(id: string, options: TicketReturnOptions = {}): Promise<BackendTicket> {
@@ -135,8 +153,16 @@ export async function requestTicketReturn(id: string, options: TicketReturnOptio
       return withWaitingStatus(returnedTicket, id, roomId)
     }
 
+    if (returnedTicket && toSharedStatus(returnedTicket.status) === 'no_show') {
+      throw createServerDidNotReturnError()
+    }
+
     return await patchTicketToWaiting(id, await resolveFallbackRoomId(id, roomId))
   } catch (returnError) {
+    if (returnError instanceof Error && returnError.message === serverDidNotReturnMessage) {
+      throw returnError
+    }
+
     if (isForbidden(returnError)) {
       throw createForbiddenReturnError()
     }

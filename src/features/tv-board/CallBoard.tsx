@@ -28,6 +28,11 @@ function getCallKey(ticket?: Ticket): string {
   return ticket ? `${ticket.id}:${ticket.calledAt ?? ticket.createdAt}` : ''
 }
 
+function isBoardCallTicket(ticket: Ticket): boolean {
+  return Boolean(ticket.calledAt)
+    && (ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'no_show')
+}
+
 function getSpeechRoomName(roomName: string): string {
   return roomName.replace(/^Кабинет/i, 'кабинет')
 }
@@ -40,7 +45,7 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
 
   const currentCalls = useMemo(
     () => tickets
-      .filter((ticket) => ticket.status === 'called')
+      .filter(isBoardCallTicket)
       .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left)),
     [tickets],
   )
@@ -50,10 +55,7 @@ export function CallBoard({ rooms, tickets }: CallBoardProps) {
   const currentCallRoomName = currentCall ? getRoomName(currentCall, rooms) : ''
 
   const recentCalls = tickets
-    .filter((ticket) =>
-      ticket.calledAt &&
-      (ticket.status === 'called' || ticket.status === 'no_show'),
-    )
+    .filter(isBoardCallTicket)
     .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
     .slice(0, 10)
 
