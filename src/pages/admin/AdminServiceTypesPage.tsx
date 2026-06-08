@@ -3,7 +3,6 @@ import { ClipboardList, PlusCircle } from 'lucide-react'
 import { adminService, type AdminServiceTypePayload } from '@services/adminService'
 import type { ServiceType } from '@shared/types'
 import { Button, StatusBadge } from '@shared/ui/components'
-import { getServiceTypeLabel } from '@shared/utils'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { getAdminErrorMessage } from './adminPageHelpers'
 
@@ -12,28 +11,17 @@ type ServiceTypeFormState = {
   averageDurationMinutes: string
   code: ServiceType
   name: string
-  priorityWeight: string
 }
 
 type ServiceTypesSectionProps = {
   onServiceTypesChange?: () => void
 }
 
-const serviceCodes: ServiceType[] = [
-  'registration',
-  'consultation',
-  'diagnostics',
-  'laboratory',
-  'pharmacy',
-  'billing',
-]
-
 const emptyForm: ServiceTypeFormState = {
   active: true,
   averageDurationMinutes: '10',
   code: 'consultation',
   name: '',
-  priorityWeight: '1',
 }
 
 function toPositiveNumber(value: string, fallback: number): number {
@@ -48,7 +36,6 @@ function toForm(serviceType: TicketSettingsServiceTypeOption): ServiceTypeFormSt
     averageDurationMinutes: String(serviceType.averageDurationMinutes ?? 10),
     code: serviceType.code,
     name: serviceType.name,
-    priorityWeight: String(serviceType.priorityWeight ?? 1),
   }
 }
 
@@ -58,7 +45,7 @@ function toPayload(form: ServiceTypeFormState): AdminServiceTypePayload {
     averageDurationMinutes: toPositiveNumber(form.averageDurationMinutes, 10),
     code: form.code,
     name: form.name.trim(),
-    priorityWeight: toPositiveNumber(form.priorityWeight, 1),
+    priorityWeight: 1,
   }
 }
 
@@ -166,7 +153,7 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
               </span>
               <h2>Типы услуг</h2>
               <p className="admin-section-description">
-                Управляйте услугами, временем обслуживания и весом приоритета.
+                Управляйте услугами, временем обслуживания и доступностью.
               </p>
             </div>
             <Button icon={<PlusCircle size={17} />} onClick={resetForm} variant="secondary">
@@ -187,9 +174,7 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
                 <thead>
                   <tr>
                     <th>Название услуги</th>
-                    <th>Категория</th>
                     <th>Среднее время</th>
-                    <th>Вес приоритета</th>
                     <th>Активна</th>
                     <th>Действия</th>
                   </tr>
@@ -198,9 +183,7 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
                   {serviceTypes.map((serviceType) => (
                     <tr key={String(serviceType.id)}>
                       <td>{serviceType.name}</td>
-                      <td>{getServiceTypeLabel(serviceType.code)}</td>
                       <td>{serviceType.averageDurationMinutes ?? 10} мин</td>
-                      <td>{serviceType.priorityWeight ?? 1}</td>
                       <td>
                         <StatusBadge
                           label={serviceType.active === false ? 'Неактивна' : 'Активна'}
@@ -249,20 +232,6 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
             </label>
 
             <label className="field">
-              <span>Категория услуги</span>
-              <select
-                onChange={(event) => setForm((current) => ({ ...current, code: event.target.value as ServiceType }))}
-                value={form.code}
-              >
-                {serviceCodes.map((code) => (
-                  <option key={code} value={code}>
-                    {getServiceTypeLabel(code)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
               <span>Среднее время обслуживания, мин</span>
               <input
                 min={1}
@@ -272,19 +241,6 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
                 }))}
                 type="number"
                 value={form.averageDurationMinutes}
-              />
-            </label>
-
-            <label className="field">
-              <span>Вес приоритета</span>
-              <input
-                min={1}
-                onChange={(event) => setForm((current) => ({
-                  ...current,
-                  priorityWeight: event.target.value,
-                }))}
-                type="number"
-                value={form.priorityWeight}
               />
             </label>
 

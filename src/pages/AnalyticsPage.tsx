@@ -1,71 +1,180 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { CheckCircle2, ClipboardList, Clock, Stethoscope, UserX } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { AnalyticsCharts } from '@features/analytics/AnalyticsCharts'
 import {
-  analyticsPeriodLabels,
-  createPeriodAnalyticsFromTickets,
-  getTicketsForAnalyticsPeriod,
+  createFilteredAnalyticsFromTickets,
+  getTicketsForAnalyticsFilters,
 } from '@features/analytics/periodAnalytics'
-import { queueService } from '@services/queueService'
-import { DashboardKpis } from '@widgets'
-import { useCurrentTime } from '@shared/utils'
-import type { AnalyticsPeriod, AnalyticsPoint } from '@shared/types'
+import { adminService } from '@services/adminService'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
+import type { TicketSettingsServiceTypeOption } from '@services/api'
+import { formatWaitingTime, getWaitingMinutes, useCurrentTime } from '@shared/utils'
+import type { Ticket } from '@shared/types'
+import { KPIWidget } from '@shared/ui/components'
 import { useQueueStore } from '@store/queue'
 
-const analyticsPeriods: AnalyticsPeriod[] = ['day', 'week', 'month']
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function getCompletedServiceMinutes(ticket: Ticket): number | null {
+  if (ticket.status !== 'completed' || !ticket.startedAt || !ticket.completedAt) {
+    return null
+  }
+
+  const startedAt = Date.parse(ticket.startedAt)
+  const completedAt = Date.parse(ticket.completedAt)
+
+  if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt) || completedAt < startedAt) {
+    return null
+  }
+
+  return Math.round((completedAt - startedAt) / 60_000)
+}
+
+function getAverage(values: number[]): number | null {
+  if (values.length === 0) {
+    return null
+  }
+
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+function getAverageWaitMinutes(tickets: Ticket[], now: number): number | null {
+  return getAverage(
+    tickets
+      .map((ticket) => getWaitingMinutes(ticket, now))
+      .filter((minutes): minutes is number => minutes !== null),
+  )
+}
+
+function getAverageServiceMinutes(tickets: Ticket[]): number | null {
+  return getAverage(
+    tickets
+      .map(getCompletedServiceMinutes)
+      .filter((minutes): minutes is number => minutes !== null),
+  )
+}
+
+function formatAnalyticsDuration(minutes: number | null): string {
+  return minutes === null ? 'Нет данных' : formatWaitingTime(minutes)
+}
+
+function AnalyticsSummaryKpis({ now, tickets }: { now: number; tickets: Ticket[] }) {
+  const completedTickets = tickets.filter((ticket) => ticket.status === 'completed').length
+  const noShowTickets = tickets.filter((ticket) => ticket.status === 'no_show').length
+  const averageWaitMinutes = getAverageWaitMinutes(tickets, now)
+  const averageServiceMinutes = getAverageServiceMinutes(tickets)
+
+  return (
+    <section className="kpi-grid">
+      <KPIWidget
+        helper="С учётом выбранных фильтров"
+        icon={<ClipboardList size={20} />}
+        title="Всего талонов"
+        tone="info"
+        value={tickets.length}
+      />
+      <KPIWidget
+        helper="Обслуживание завершено"
+        icon={<CheckCircle2 size={20} />}
+        title="Завершены"
+        tone={completedTickets > 0 ? 'success' : 'neutral'}
+        value={completedTickets}
+      />
+      <KPIWidget
+        helper="Пациенты не подошли к вызову"
+        icon={<UserX size={20} />}
+        title="Не явились"
+        tone={noShowTickets > 0 ? 'danger' : 'neutral'}
+        value={noShowTickets}
+      />
+      <KPIWidget
+        helper="От создания талона до вызова"
+        icon={<Clock size={20} />}
+        title="Среднее ожидание"
+        tone="warning"
+        value={formatAnalyticsDuration(averageWaitMinutes)}
+      />
+      <KPIWidget
+        helper="От начала до завершения приёма"
+        icon={<Stethoscope size={20} />}
+        title="Среднее обслуживание"
+        tone="success"
+        value={formatAnalyticsDuration(averageServiceMinutes)}
+      />
+    </section>
+  )
+}
 
 export function AnalyticsPage() {
-  const analytics = useQueueStore((state) => state.analytics)
   const error = useQueueStore((state) => state.error)
   const hydrated = useQueueStore((state) => state.hydrated)
   const loading = useQueueStore((state) => state.loading)
   const refreshAnalyticsData = useQueueStore((state) => state.refreshAnalyticsData)
   const rooms = useQueueStore((state) => state.rooms)
   const tickets = useQueueStore((state) => state.tickets)
-  const [period, setPeriod] = useState<AnalyticsPeriod>('day')
-  const [periodAnalytics, setPeriodAnalytics] = useState<AnalyticsPoint[]>([])
+  const today = useMemo(() => toDateInputValue(new Date()), [])
+  const [dateFrom, setDateFrom] = useState(today)
+  const [dateTo, setDateTo] = useState(today)
   const [periodError, setPeriodError] = useState<string | null>(null)
+  const [selectedServiceTypeId, setSelectedServiceTypeId] = useState('')
+  const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const location = useLocation()
   const now = useCurrentTime()
-  const hasAnalyticsData = analytics.length > 0 || tickets.length > 0 || rooms.length > 0
-  const fallbackPeriodAnalytics = useMemo(
-    () => createPeriodAnalyticsFromTickets(tickets, period, now),
-    [now, period, tickets],
+  const hasAnalyticsData = tickets.length > 0 || rooms.length > 0
+  const analyticsFilters = useMemo(() => ({
+    dateFrom,
+    dateTo,
+    serviceTypeId: selectedServiceTypeId || undefined,
+  }), [dateFrom, dateTo, selectedServiceTypeId])
+  const chartAnalytics = useMemo(
+    () => createFilteredAnalyticsFromTickets(tickets, analyticsFilters, now),
+    [analyticsFilters, now, tickets],
   )
-  const chartAnalytics = fallbackPeriodAnalytics.length > 0
-    ? fallbackPeriodAnalytics
-    : periodAnalytics.length > 0
-      ? periodAnalytics
-      : analytics
   const periodTickets = useMemo(
-    () => getTicketsForAnalyticsPeriod(tickets, period, now),
-    [now, period, tickets],
+    () => getTicketsForAnalyticsFilters(tickets, analyticsFilters),
+    [analyticsFilters, tickets],
   )
+
+  const loadServiceTypes = useCallback(async () => {
+    try {
+      setServiceTypes(await adminService.getServiceTypes())
+      setPeriodError(null)
+    } catch (loadError) {
+      console.error('Analytics service types load failed', loadError)
+      setServiceTypes([])
+      setPeriodError('Не удалось загрузить типы услуг для фильтра.')
+    }
+  }, [])
 
   useEffect(() => {
-    let active = true
-
     setPeriodError(null)
     void refreshAnalyticsData()
-    queueService
-      .getPeriodAnalytics(period)
-      .then((nextAnalytics) => {
-        if (active) {
-          setPeriodAnalytics(nextAnalytics)
-        }
-      })
-      .catch((loadError) => {
-        console.error('Analytics period load failed', loadError)
-        if (active) {
-          setPeriodAnalytics([])
-          setPeriodError('Не удалось загрузить аналитику за выбранный период. Используем данные талонов.')
-        }
-      })
+  }, [analyticsFilters, location.key, refreshAnalyticsData])
 
-    return () => {
-      active = false
+  useEffect(() => {
+    void loadServiceTypes()
+  }, [loadServiceTypes])
+
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    void loadServiceTypes()
+    void refreshAnalyticsData()
+  }), [loadServiceTypes, refreshAnalyticsData])
+
+  useEffect(() => {
+    if (
+      selectedServiceTypeId &&
+      !serviceTypes.some((serviceType) => String(serviceType.id) === selectedServiceTypeId)
+    ) {
+      setSelectedServiceTypeId('')
     }
-  }, [period, location.key, refreshAnalyticsData])
+  }, [selectedServiceTypeId, serviceTypes])
 
   useEffect(() => {
     const handleFocus = () => {
@@ -103,21 +212,41 @@ export function AnalyticsPage() {
         <>
           <section className="analytics-period-panel">
             <label className="field">
-              <span>Период аналитики</span>
+              <span>Дата от</span>
+              <input
+                onChange={(event) => setDateFrom(event.target.value)}
+                type="date"
+                value={dateFrom}
+              />
+            </label>
+            <label className="field">
+              <span>Дата до</span>
+              <input
+                onChange={(event) => setDateTo(event.target.value)}
+                type="date"
+                value={dateTo}
+              />
+            </label>
+            <label className="field">
+              <span>Тип услуги</span>
               <select
-                onChange={(event) => setPeriod(event.target.value as AnalyticsPeriod)}
-                value={period}
+                onChange={(event) => setSelectedServiceTypeId(event.target.value)}
+                value={selectedServiceTypeId}
               >
-                {analyticsPeriods.map((item) => (
-                  <option key={item} value={item}>
-                    {analyticsPeriodLabels[item]}
+                <option value="">Все услуги</option>
+                {serviceTypes.map((serviceType) => (
+                  <option key={String(serviceType.id)} value={String(serviceType.id)}>
+                    {serviceType.name}
                   </option>
                 ))}
               </select>
             </label>
             {periodError ? <div className="modal-info">{periodError}</div> : null}
           </section>
-          <DashboardKpis rooms={rooms} tickets={periodTickets} />
+          {periodTickets.length === 0 ? (
+            <div className="modal-info">По выбранным фильтрам данных нет.</div>
+          ) : null}
+          <AnalyticsSummaryKpis now={now} tickets={periodTickets} />
           <AnalyticsCharts analytics={chartAnalytics} now={now} rooms={rooms} tickets={periodTickets} />
         </>
       ) : !loading && hydrated ? (

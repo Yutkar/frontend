@@ -8,6 +8,7 @@ import {
   type TicketSettingsServiceTypeOption,
 } from './api'
 import { refreshOperationalData, withOperationalRefresh } from './syncService'
+import { notifyServiceTypesChanged } from './serviceTypeSync'
 import type { User } from '@shared/types'
 
 export type AdminRoomPayload = {
@@ -81,10 +82,14 @@ export const adminService = {
 
   async createServiceType(input: AdminServiceTypePayload): Promise<TicketSettingsServiceTypeOption> {
     try {
-      return await withOperationalRefresh(
+      const serviceType = await withOperationalRefresh(
         () => adminApi.createServiceType(input),
         'Типы услуг обновлены',
       )
+
+      notifyServiceTypesChanged()
+
+      return serviceType
     } catch (error) {
       console.error('adminService.createServiceType failed', error)
       throw toServiceError(error, 'Не удалось создать тип услуги')
@@ -96,10 +101,14 @@ export const adminService = {
     input: Partial<AdminServiceTypePayload>,
   ): Promise<TicketSettingsServiceTypeOption> {
     try {
-      return await withOperationalRefresh(
+      const serviceType = await withOperationalRefresh(
         () => adminApi.updateServiceType(id, input),
         'Типы услуг обновлены',
       )
+
+      notifyServiceTypesChanged()
+
+      return serviceType
     } catch (error) {
       console.error('adminService.updateServiceType failed', error)
       throw toServiceError(error, 'Не удалось сохранить тип услуги')
@@ -112,6 +121,7 @@ export const adminService = {
         () => adminApi.deleteServiceType(id),
         'Типы услуг обновлены',
       )
+      notifyServiceTypesChanged()
     } catch (error) {
       console.error('adminService.deleteServiceType failed', error)
       throw toServiceError(error, 'Не удалось удалить тип услуги')

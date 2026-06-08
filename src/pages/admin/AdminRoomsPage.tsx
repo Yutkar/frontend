@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Building2, PlusCircle } from 'lucide-react'
 import { adminService } from '@services/adminService'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { Button } from '@shared/ui/components'
 import {
@@ -75,6 +76,10 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
   useEffect(() => {
     void loadData()
   }, [])
+
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    void loadData()
+  }), [])
 
   function resetForm() {
     setEditingRoomId(null)

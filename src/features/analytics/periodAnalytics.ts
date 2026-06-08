@@ -1,6 +1,12 @@
 import type { AnalyticsPeriod, AnalyticsPoint, Ticket } from '@shared/types'
 import { getWaitingMinutes } from '@shared/utils'
 
+export type AnalyticsTicketFilters = {
+  dateFrom?: string
+  dateTo?: string
+  serviceTypeId?: string
+}
+
 export const analyticsPeriodLabels: Record<AnalyticsPeriod, string> = {
   day: 'День',
   week: 'Неделя',
@@ -76,6 +82,62 @@ function getAverage(values: number[]): number {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
 }
 
+function getLocalDateStart(value?: string): number | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const timestamp = new Date(`${value}T00:00:00`).getTime()
+
+  return Number.isFinite(timestamp) ? timestamp : undefined
+}
+
+function getLocalDateEnd(value?: string): number | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const timestamp = new Date(`${value}T23:59:59.999`).getTime()
+
+  return Number.isFinite(timestamp) ? timestamp : undefined
+}
+
+function isTicketInDateRange(ticket: Ticket, filters: AnalyticsTicketFilters): boolean {
+  const from = getLocalDateStart(filters.dateFrom)
+  const to = getLocalDateEnd(filters.dateTo)
+  const timestamps = getTicketTimestamps(ticket)
+
+  if (timestamps.length === 0) {
+    return false
+  }
+
+  return timestamps.some((timestamp) => (
+    (from === undefined || timestamp >= from) &&
+    (to === undefined || timestamp <= to)
+  ))
+}
+
+function isTicketForService(ticket: Ticket, serviceTypeId?: string): boolean {
+  if (!serviceTypeId) {
+    return true
+  }
+
+  return String(ticket.serviceTypeId ?? '') === serviceTypeId || ticket.serviceType === serviceTypeId
+}
+
+function getRangePointLabel(timestamp: number, filters: AnalyticsTicketFilters): string {
+  const date = new Date(timestamp)
+
+  if (filters.dateFrom === filters.dateTo) {
+    return `${String(date.getHours()).padStart(2, '0')}:00`
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(date)
+}
+
 function getServiceMinutes(ticket: Ticket): number | null {
   const startedAt = parseTimestamp(ticket.startedAt)
   const completedAt = parseTimestamp(ticket.completedAt)
@@ -93,6 +155,16 @@ export function getTicketsForAnalyticsPeriod(
   now: number,
 ): Ticket[] {
   return tickets.filter((ticket) => isTicketInPeriod(ticket, period, now))
+}
+
+export function getTicketsForAnalyticsFilters(
+  tickets: Ticket[],
+  filters: AnalyticsTicketFilters,
+): Ticket[] {
+  return tickets.filter((ticket) => (
+    isTicketInDateRange(ticket, filters) &&
+    isTicketForService(ticket, filters.serviceTypeId)
+  ))
 }
 
 export function createPeriodAnalyticsFromTickets(
@@ -130,6 +202,48 @@ export function createPeriodAnalyticsFromTickets(
         avgWaitMinutes: getAverage(waitingMinutes),
         completed: groupTickets.filter((ticket) => ticket.status === 'completed').length,
         label,
+        noShow: groupTickets.filter((ticket) => ticket.status === 'no_show').length,
+        waiting: groupTickets.filter((ticket) => activeQueueStatuses.has(ticket.status)).length,
+      }
+    })
+}
+
+export function createFilteredAnalyticsFromTickets(
+  tickets: Ticket[],
+  filters: AnalyticsTicketFilters,
+  now: number,
+): AnalyticsPoint[] {
+  const filteredTickets = getTicketsForAnalyticsFilters(tickets, filters)
+  const groupedTickets = new Map<string, Ticket[]>()
+
+  filteredTickets.forEach((ticket) => {
+    const timestamp = getTicketPeriodTimestamp(ticket)
+
+    if (timestamp === undefined) {
+      return
+    }
+
+    const label = getRangePointLabel(timestamp, filters)
+
+    groupedTickets.set(label, [...(groupedTickets.get(label) ?? []), ticket])
+  })
+
+  return Array.from(groupedTickets.entries())
+    .sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel, 'ru'))
+    .map(([label, groupTickets]) => {
+      const waitingMinutes = groupTickets
+        .map((ticket) => getWaitingMinutes(ticket, now))
+        .filter((minutes): minutes is number => minutes !== null)
+      const serviceMinutes = groupTickets
+        .map(getServiceMinutes)
+        .filter((minutes): minutes is number => minutes !== null)
+
+      return {
+        avgServiceMinutes: serviceMinutes.length > 0 ? getAverage(serviceMinutes) : undefined,
+        avgWaitMinutes: getAverage(waitingMinutes),
+        completed: groupTickets.filter((ticket) => ticket.status === 'completed').length,
+        label,
+        noShow: groupTickets.filter((ticket) => ticket.status === 'no_show').length,
         waiting: groupTickets.filter((ticket) => activeQueueStatuses.has(ticket.status)).length,
       }
     })

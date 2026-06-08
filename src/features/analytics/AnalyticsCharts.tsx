@@ -74,7 +74,7 @@ function formatOptionalDuration(minutes?: number): string {
 
 export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsChartsProps) {
   const maxTicketCount = Math.max(
-    ...analytics.flatMap((point) => [point.waiting, point.completed]),
+    ...analytics.flatMap((point) => [point.waiting, point.completed, point.noShow ?? 0]),
     1,
   )
   const maxDurationMinutes = Math.max(
@@ -107,6 +107,7 @@ export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsCha
         <div className="chart-legend">
           <span><i className="legend-dot legend-waiting" /> Ожидают</span>
           <span><i className="legend-dot legend-completed" /> Завершены</span>
+          <span><i className="legend-dot legend-no-show" /> Не явились</span>
         </div>
         <div className="analytics-chart-frame">
           <span className="analytics-axis-label analytics-axis-y">Количество талонов</span>
@@ -122,6 +123,11 @@ export function AnalyticsCharts({ analytics, now, rooms, tickets }: AnalyticsCha
                   className="bar bar-completed"
                   title={`Завершены: ${point.completed}`}
                   style={{ height: getBarHeight(point.completed, maxTicketCount) }}
+                />
+                <span
+                  className="bar bar-no-show"
+                  title={`Не явились: ${point.noShow ?? 0}`}
+                  style={{ height: getBarHeight(point.noShow ?? 0, maxTicketCount) }}
                 />
                 <small>{point.displayLabel}</small>
               </div>
