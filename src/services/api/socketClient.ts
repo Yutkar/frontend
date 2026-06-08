@@ -5,6 +5,9 @@ import { REALTIME_BASE_URL, isBackendMode } from './apiProvider'
 
 type QueueEventListener = (event: QueueEvent) => void
 type RealtimeEventType = Extract<QueueEventType, 'status_update' | 'ticket_called'>
+type SocketAuth = {
+  token?: string
+}
 
 const realtimeEventTypes: RealtimeEventType[] = ['status_update', 'ticket_called']
 const statusLabels: Record<string, string> = {
@@ -20,6 +23,25 @@ const statusLabels: Record<string, string> = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function logDev(message: string, payload?: unknown): void {
+  if (!import.meta.env.DEV) {
+    return
+  }
+
+  if (payload !== undefined) {
+    console.log(message, payload)
+    return
+  }
+
+  console.log(message)
+}
+
+function getSocketAuth(): SocketAuth {
+  const token = window.localStorage.getItem('access_token') ?? undefined
+
+  return token ? { token } : {}
 }
 
 function getRecord(value: unknown, key: string): Record<string, unknown> | undefined {
@@ -243,19 +265,20 @@ class SmartQSocketClient {
 
     if (!this.socket) {
       this.socket = io(REALTIME_BASE_URL, {
-        auth: () => ({
-          token: window.localStorage.getItem('access_token') ?? undefined,
-        }),
+        auth: getSocketAuth(),
         autoConnect: false,
         transports: ['websocket', 'polling'],
       })
 
       realtimeEventTypes.forEach((eventType) => {
         this.socket?.on(eventType, (payload: unknown) => {
+          logDev(`Received ${eventType}`, payload)
           this.emitEvent(normalizeQueueEvent(eventType, payload))
         })
       })
 
+      this.socket.on('connect', () => logDev('Socket connected'))
+      this.socket.on('disconnect', () => logDev('Socket disconnected'))
       this.socket.on('connect_error', (error) => {
         if (import.meta.env.DEV) {
           console.warn('Socket подключение не удалось', error)
@@ -264,6 +287,7 @@ class SmartQSocketClient {
     }
 
     if (!this.socket.connected) {
+      this.socket.auth = getSocketAuth()
       this.socket.connect()
     }
   }
