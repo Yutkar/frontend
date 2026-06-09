@@ -46,6 +46,8 @@ export type Ticket = {
   language?: SmartQLanguage
   etaMinutes: number
   notes?: string
+  peopleAhead?: number
+  queuePosition?: number
 }
 
 export type Room = {

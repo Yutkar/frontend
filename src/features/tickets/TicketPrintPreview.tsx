@@ -1,9 +1,11 @@
 import { Printer } from 'lucide-react'
 import { Button } from '@shared/ui/components'
+import { formatPeopleAhead } from '@shared/utils'
 
 export type TicketPrintData = {
   date: Date
   doctorName?: string
+  peopleAhead?: number
   priorityLabel: string
   roomName: string
   serviceName: string
@@ -59,6 +61,12 @@ export function TicketPrintPreview({ data, onPrint }: TicketPrintPreviewProps) {
             <dt>Место обслуживания</dt>
             <dd>{data.roomName}</dd>
           </div>
+          {data.peopleAhead !== undefined ? (
+            <div>
+              <dt>Очередь</dt>
+              <dd>{formatPeopleAhead(data.peopleAhead)}</dd>
+            </div>
+          ) : null}
           {data.doctorName ? (
             <div>
               <dt>Врач</dt>

@@ -3,6 +3,7 @@ import {
   createMockTicket,
   createQueueEvent,
   createRoomWorkTimeRecommendation,
+  getRoomQueuePeopleAhead,
   getServiceTypeLabel,
   isWithinWorkHours,
   planRoomLoads,
@@ -354,6 +355,10 @@ export function createSharedTicket(input: SharedTicketCreateInput): SharedTicket
   assertMockRoomAcceptsTickets(input.roomId)
 
   const ticket = createMockTicket(input, queueSnapshot.tickets.length)
+  const peopleAhead = getRoomQueuePeopleAhead(input.roomId, queueSnapshot.tickets)
+
+  ticket.peopleAhead = peopleAhead
+  ticket.queuePosition = peopleAhead + 1
 
   queueSnapshot.tickets = [ticket, ...queueSnapshot.tickets]
   pushEvent(ticket, 'created')

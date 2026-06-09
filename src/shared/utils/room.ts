@@ -82,10 +82,10 @@ export function getRoomPlaceType(room?: RoomNameSource | null): ServicePlaceType
     return defaultPlaceType
   }
 
-  return normalizePlaceType(room.placeType ?? room.place_type)
-    ?? inferPlaceTypeFromText(room.name)
+  return inferPlaceTypeFromText(room.name)
     ?? inferPlaceTypeFromText(room.roomName)
     ?? inferPlaceTypeFromText(room.title)
+    ?? normalizePlaceType(room.placeType ?? room.place_type)
     ?? defaultPlaceType
 }
 

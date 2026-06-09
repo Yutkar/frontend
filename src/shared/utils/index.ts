@@ -1,5 +1,10 @@
 export { formatDuration, formatEta, formatTime } from './format'
 export { createMockTicket, createQueueEvent, generateTicketNumber } from './mockGenerators'
+export {
+  formatPeopleAhead,
+  getRoomQueuePeopleAhead,
+  getTicketPeopleAhead,
+} from './queuePosition'
 export { planRoomLoads } from './queuePlanning'
 export {
   formatRoomName,

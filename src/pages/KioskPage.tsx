@@ -20,7 +20,7 @@ import type { Ticket } from '@shared/types'
 import { useLanguage, useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { LanguageSelect } from '@shared/ui/core-components'
-import { formatRoomName } from '@shared/utils'
+import { formatPeopleAhead, formatRoomName, getRoomQueuePeopleAhead, getTicketPeopleAhead } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
 const emptyOptions: TicketSettingsOptions = {
@@ -223,6 +223,7 @@ export function KioskPage() {
     return {
       date: new Date(createdTicket.createdAt),
       priorityLabel: getPriorityLabel(createdTicket.priority),
+      peopleAhead: getTicketPeopleAhead(createdTicket),
       roomName: formatRoomName(room ?? { id: createdTicket.roomId, name: createdTicket.roomName }),
       serviceName: selectedServiceType
         ? getServiceOptionLabel(selectedServiceType)
@@ -266,6 +267,7 @@ export function KioskPage() {
         latestTickets,
         latestServiceType?.averageDurationMinutes ?? 10,
       )
+      const peopleAhead = getRoomQueuePeopleAhead(latestRoom?.id, latestTickets)
 
       if (!latestServiceType || !latestRoom) {
         setError(t.kiosk.noRoomsForService)
@@ -280,8 +282,13 @@ export function KioskPage() {
         serviceTypeId: latestServiceType.id,
         status: 'waiting',
       })
+      const resolvedPeopleAhead = getTicketPeopleAhead(ticket, peopleAhead)
 
-      setCreatedTicket(ticket)
+      setCreatedTicket({
+        ...ticket,
+        peopleAhead: resolvedPeopleAhead,
+        queuePosition: ticket.queuePosition ?? resolvedPeopleAhead + 1,
+      })
       void loadQueue({ force: true, successMessage: 'Данные успешно обновлены' })
     } catch (createError) {
       console.error('Kiosk ticket create failed', createError)
@@ -300,6 +307,9 @@ export function KioskPage() {
           <div className="kiosk-ticket-number">
             <span>{t.kiosk.ticketNumber}</span>
             <strong>{createdTicket.number}</strong>
+          </div>
+          <div className="kiosk-queue-position">
+            {formatPeopleAhead(getTicketPeopleAhead(createdTicket))}
           </div>
           <TicketPrintPreview data={printData} onPrint={resetKiosk} />
           <Button

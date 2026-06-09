@@ -89,6 +89,11 @@ export type BackendTicket = {
   status?: BackendTicketStatus | string
   etaMinutes?: number | null
   waitMinutes?: number | null
+  peopleAhead?: number | string | null
+  people_ahead?: number | string | null
+  position?: number | string | null
+  queuePosition?: number | string | null
+  queue_position?: number | string | null
   language?: unknown
   serviceTypeId?: number | string
   serviceTypeName?: string | null
@@ -633,6 +638,9 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
   const roomId = getBackendTicketRoomId(ticket)
   const serviceTypeId = toId(ticket.serviceTypeId ?? ticket.serviceType?.id ?? ticket.service?.id)
   const assignedTo = getBackendTicketAssigneeId(ticket)
+  const ticketRecord = ticket as Record<string, unknown>
+  const peopleAhead = getRecordNumberOptional(ticketRecord, ['peopleAhead', 'people_ahead'])
+  const queuePosition = getRecordNumberOptional(ticketRecord, ['queuePosition', 'queue_position', 'position'])
 
   return {
     id: toId(ticket.id),
@@ -653,6 +661,8 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     assignedTo: assignedTo || undefined,
     language: toSharedLanguage(ticket.language) ?? ticketLanguageService.getTicketLanguage(ticket.id),
     etaMinutes: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
+    peopleAhead,
+    queuePosition,
   }
 }
 

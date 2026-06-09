@@ -6,12 +6,12 @@ import type { TicketSettingsOptions } from '@services/api'
 import type { Room, Ticket, TicketCreateInput, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
-import { formatRoomName, getPriorityMeta } from '@shared/utils'
+import { formatPeopleAhead, formatRoomName, getPriorityMeta, getRoomQueuePeopleAhead } from '@shared/utils'
 import {
+  getAutoRoomForService,
   getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
-  isRoomAvailableForTicket,
 } from './ticketFormOptions'
 
 const priorities: TicketPriority[] = ['low', 'normal', 'high', 'critical']
@@ -38,7 +38,6 @@ export function TicketCreateForm({
   const [error, setError] = useState<string | null>(null)
   const [patientName, setPatientName] = useState('')
   const [priority, setPriority] = useState<TicketPriority>('normal')
-  const [roomId, setRoomId] = useState('')
   const [options, setOptions] = useState<TicketSettingsOptions>(emptyOptions)
   const [optionsLoading, setOptionsLoading] = useState(true)
   const [serviceTypeId, setServiceTypeId] = useState('')
@@ -46,20 +45,23 @@ export function TicketCreateForm({
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
   const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
   const rooms = useMemo(
-    () => getRoomsForService(options, selectedServiceType?.id, fallbackRooms)
-      .filter((room) => isRoomAvailableForTicket(
-        room,
-        fallbackRooms,
-        tickets,
-        selectedServiceType?.averageDurationMinutes ?? 10,
-      )),
-    [fallbackRooms, options, selectedServiceType?.averageDurationMinutes, selectedServiceType?.id, tickets],
+    () => getRoomsForService(options, selectedServiceType?.id, fallbackRooms),
+    [fallbackRooms, options, selectedServiceType?.id],
   )
-  const selectedRoomExists = useMemo(
-    () => rooms.some((room) => String(room.id) === roomId),
-    [roomId, rooms],
+  const autoRoom = useMemo(
+    () => getAutoRoomForService(
+      rooms,
+      fallbackRooms,
+      tickets,
+      selectedServiceType?.averageDurationMinutes ?? 10,
+    ),
+    [fallbackRooms, rooms, selectedServiceType?.averageDurationMinutes, tickets],
   )
-  const canCreateTicket = Boolean(selectedServiceType && selectedRoomExists && priority)
+  const peopleAhead = useMemo(
+    () => getRoomQueuePeopleAhead(autoRoom?.id, tickets),
+    [autoRoom?.id, tickets],
+  )
+  const canCreateTicket = Boolean(selectedServiceType && autoRoom && priority)
 
   const loadOptions = useCallback(async (showLoading = true) => {
     if (showLoading) {
@@ -92,14 +94,6 @@ export function TicketCreateForm({
     }
   }, [serviceTypeId, serviceTypes])
 
-  useEffect(() => {
-    setRoomId((currentRoomId) => (
-      currentRoomId && rooms.some((room) => String(room.id) === currentRoomId)
-        ? currentRoomId
-        : ''
-    ))
-  }, [rooms])
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
@@ -109,15 +103,15 @@ export function TicketCreateForm({
       return
     }
 
-    if (!roomId || !selectedRoomExists) {
-      setError('Выберите место обслуживания')
+    if (!autoRoom) {
+      setError('Нет доступного места обслуживания для выбранной услуги')
       return
     }
 
     await onSubmit({
       patientName: patientName.trim() || 'Пациент',
       priority,
-      roomId,
+      roomId: autoRoom.id,
       serviceType: selectedServiceType.code,
       serviceTypeId: selectedServiceType.id,
       notes: notes.trim() || undefined,
@@ -127,7 +121,6 @@ export function TicketCreateForm({
     setNotes('')
     setPriority('normal')
     setServiceTypeId(String(serviceTypes[0]?.id ?? ''))
-    setRoomId('')
   }
 
   return (
@@ -148,7 +141,7 @@ export function TicketCreateForm({
             disabled={loading || optionsLoading || serviceTypes.length === 0}
             onChange={(event) => {
               setServiceTypeId(event.target.value)
-              setRoomId('')
+              setError(null)
             }}
             value={serviceTypeId}
           >
@@ -158,29 +151,6 @@ export function TicketCreateForm({
               </option>
             ))}
           </select>
-        </label>
-
-        <label className="field">
-          <span>Место обслуживания</span>
-          <select
-            disabled={loading || optionsLoading || rooms.length === 0}
-            onChange={(event) => setRoomId(event.target.value)}
-            value={roomId}
-          >
-            <option value="">Выберите место обслуживания</option>
-            {rooms.length > 0 ? (
-              rooms.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {formatRoomName(room)}
-                </option>
-              ))
-            ) : (
-              <option value="">Нет доступных мест обслуживания</option>
-            )}
-          </select>
-          {selectedServiceType && rooms.length === 0 ? (
-            <small className="field-hint">Нет доступных мест обслуживания для выбранной услуги</small>
-          ) : null}
         </label>
 
         <label className="field">
@@ -197,6 +167,15 @@ export function TicketCreateForm({
           </select>
         </label>
       </div>
+
+      {selectedServiceType && autoRoom ? (
+        <div className="modal-info">
+          Место обслуживания выбрано автоматически: {formatRoomName(autoRoom)}. {formatPeopleAhead(peopleAhead)}.
+        </div>
+      ) : null}
+      {selectedServiceType && !autoRoom && !optionsLoading ? (
+        <div className="modal-error">Нет доступного места обслуживания для выбранной услуги</div>
+      ) : null}
 
       <label className="field">
         <span>{t.tickets.notes}</span>

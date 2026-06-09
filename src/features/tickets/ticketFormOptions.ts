@@ -276,23 +276,12 @@ export function getAutoRoomForService(
 ): TicketSettingsRoomOption | undefined {
   return [...rooms]
     .filter((room) => isRoomAvailableForTicket(room, fallbackRooms, tickets, averageServiceMinutes, now))
+    .map((room, index) => ({ index, room }))
     .sort((left, right) => {
-      const leftId = normalizeServiceId(left.id)
-      const rightId = normalizeServiceId(right.id)
-      const queueDelta = getRoomQueueCount(leftId, tickets) - getRoomQueueCount(rightId, tickets)
+      const queueDelta = getRoomQueueCount(left.room.id, tickets) - getRoomQueueCount(right.room.id, tickets)
 
-      if (queueDelta !== 0) {
-        return queueDelta
-      }
-
-      const loadDelta = getRoomLoadPercent(left, fallbackRooms) - getRoomLoadPercent(right, fallbackRooms)
-
-      if (loadDelta !== 0) {
-        return loadDelta
-      }
-
-      return left.name.localeCompare(right.name, 'ru')
-    })[0]
+      return queueDelta || left.index - right.index
+    })[0]?.room
 }
 
 export function getAutoSpecialistForRoom(
