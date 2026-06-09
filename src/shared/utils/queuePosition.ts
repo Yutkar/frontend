@@ -1,4 +1,5 @@
 import type { Ticket, TicketStatus } from '@shared/types'
+import { getLocale, type SmartQLanguage } from '@shared/locales/useLocale'
 
 const queueAheadStatuses = new Set<TicketStatus>(['waiting', 'called', 'in_service', 'redirected'])
 
@@ -43,6 +44,8 @@ export function getTicketPeopleAhead(ticket?: Pick<Ticket, 'peopleAhead' | 'queu
   return Math.max(0, Math.floor(fallback))
 }
 
-export function formatPeopleAhead(value: number): string {
-  return `Перед вами ${Math.max(0, Math.floor(value))} человек`
+export function formatPeopleAhead(value: number, language?: SmartQLanguage): string {
+  const count = Math.max(0, Math.floor(value))
+
+  return getLocale(language).ticketPrint.peopleAhead.replace('{{count}}', String(count))
 }

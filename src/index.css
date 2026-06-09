@@ -3163,6 +3163,34 @@ h3 {
   text-transform: uppercase;
 }
 
+.tv-section-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+
+.tv-section-heading time {
+  color: #23435f;
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tv-multilingual-label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  line-height: 1.15;
+}
+
+.tv-empty-call .tv-multilingual-label,
+.tv-empty-recent .tv-multilingual-label {
+  justify-content: center;
+}
+
 .tv-call-card {
   align-items: center;
   background: #ffffff;
@@ -3399,6 +3427,7 @@ h3 {
   .panel-header,
   .dashboard-hero,
   .live-queue-header,
+  .tv-section-heading,
   .tv-header {
     align-items: flex-start;
     flex-direction: column;

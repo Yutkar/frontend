@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { Fragment, useEffect, type ReactNode } from 'react'
 import { appSettingsService, useAppSettings } from '@services/appSettingsService'
 import { useLanguage } from '@shared/locales/useLocale'
 import { useGlobalStore } from '@store/global'
@@ -46,5 +46,5 @@ export function AppProviders({ children }: AppProvidersProps) {
     }
   }, [startRealtime, stopRealtime, user])
 
-  return <>{children}</>
+  return <Fragment key={language}>{children}</Fragment>
 }

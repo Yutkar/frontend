@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { voiceSettingsService } from '@services/voiceSettingsService'
 import type { BoardTemplate } from '@services/api'
 import {
-  getCurrentLanguage,
   getLocale,
   type SmartQLanguage,
 } from '@shared/locales/useLocale'
@@ -21,6 +20,7 @@ type CallBoardProps = {
     recentCalls: string
     waiting: string
   }
+  currentTime?: string
   recentCallsLimit?: number
   rooms: Room[]
   showRecentCalls?: boolean
@@ -28,6 +28,18 @@ type CallBoardProps = {
   template?: BoardTemplate
   tickets: Ticket[]
   voiceEnabled?: boolean
+}
+
+type BoardMultilingualLabelKey = 'currentCall' | 'recentCalls' | 'waiting'
+
+function BoardMultilingualLabel({ labelKey }: { labelKey: BoardMultilingualLabelKey }) {
+  return (
+    <span className="tv-multilingual-label">
+      <span>{getLocale('ru').board[labelKey]}</span>
+      <span>{getLocale('kk').board[labelKey]}</span>
+      <span>{getLocale('en').board[labelKey]}</span>
+    </span>
+  )
 }
 
 function getCallTime(ticket: Ticket): string {
@@ -162,6 +174,7 @@ function buildVoicePhrase(
 }
 
 export function CallBoard({
+  currentTime,
   labels = getLocale().board,
   recentCallsLimit = 10,
   rooms,
@@ -230,7 +243,7 @@ export function CallBoard({
   }) {
     if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
       window.speechSynthesis.cancel()
-      const language = ticket.language ?? getCurrentLanguage() ?? 'ru'
+      const language = ticket.language ?? 'ru'
       const utterance = new SpeechSynthesisUtterance(buildVoicePhrase(ticket.number, room, language))
       utterance.lang = getSpeechLanguage(language)
       utterance.rate = 0.92
@@ -280,7 +293,9 @@ export function CallBoard({
             {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
           </article>
         ) : (
-          <div className="tv-empty-call">{labels.waiting}</div>
+          <div className="tv-empty-call">
+            <BoardMultilingualLabel labelKey="waiting" />
+          </div>
         )}
       </div>
     )
@@ -299,7 +314,9 @@ export function CallBoard({
             {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
           </article>
         )) : (
-          <div className="tv-empty-call">{labels.waiting}</div>
+          <div className="tv-empty-call">
+            <BoardMultilingualLabel labelKey="waiting" />
+          </div>
         )}
       </div>
     )
@@ -316,7 +333,9 @@ export function CallBoard({
             {ticket.status === 'no_show' ? <em>{labels.noShow}</em> : null}
           </div>
         )) : (
-          <div className="tv-empty-recent">{labels.waiting}</div>
+          <div className="tv-empty-recent">
+            <BoardMultilingualLabel labelKey="waiting" />
+          </div>
         )}
       </section>
     )
@@ -325,7 +344,12 @@ export function CallBoard({
   return (
     <div className={`tv-grid ${showRecentCalls ? '' : 'tv-grid-single'}`}>
       <section className="tv-current">
-        <span className="tv-section-label">{labels.currentCall}</span>
+        <div className="tv-section-heading">
+          <span className="tv-section-label">
+            <BoardMultilingualLabel labelKey="currentCall" />
+          </span>
+          {showTime && currentTime ? <time>{currentTime}</time> : null}
+        </div>
         {currentCall ? (
           <>
             <article
@@ -348,13 +372,17 @@ export function CallBoard({
             ) : null}
           </>
         ) : (
-          <div className="tv-empty-call">{labels.waiting}</div>
+          <div className="tv-empty-call">
+            <BoardMultilingualLabel labelKey="waiting" />
+          </div>
         )}
       </section>
 
       {showRecentCalls ? (
         <section className="tv-recent">
-          <span className="tv-section-label">{labels.recentCalls}</span>
+          <span className="tv-section-label">
+            <BoardMultilingualLabel labelKey="recentCalls" />
+          </span>
           {recentCalls.length > 0 ? (
             recentCalls.map((ticket) => (
               <div className="tv-recent-row" key={ticket.id}>
@@ -365,7 +393,9 @@ export function CallBoard({
               </div>
             ))
           ) : (
-            <div className="tv-empty-recent">{labels.waiting}</div>
+            <div className="tv-empty-recent">
+              <BoardMultilingualLabel labelKey="waiting" />
+            </div>
           )}
         </section>
       ) : null}

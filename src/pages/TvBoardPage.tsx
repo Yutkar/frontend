@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CallBoard } from '@features/tv-board/CallBoard'
 import { adminService } from '@services/adminService'
-import { getAppInitials, useAppSettings } from '@services/appSettingsService'
 import { queueService } from '@services/queueService'
 import type { BoardSettings } from '@services/api'
 import { useLocale } from '@shared/locales/useLocale'
@@ -21,7 +20,6 @@ const defaultBoardSettings: BoardSettings = {
 }
 
 export function TvBoardPage() {
-  const appSettings = useAppSettings()
   const t = useLocale()
   const [searchParams] = useSearchParams()
   const roomId = searchParams.get('roomId') ?? undefined
@@ -95,31 +93,17 @@ export function TvBoardPage() {
     }
   }, [roomId, t.board.waiting])
 
+  const currentTime = new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(now)
+
   return (
     <main className="tv-board">
-      {roomName || boardSettings.showTime ? (
-        <header className={roomName ? 'tv-header' : 'tv-header tv-header-general'}>
-          {roomName ? (
-            <strong>{roomName}</strong>
-          ) : (
-            <span className="tv-brand">
-              {appSettings.logoDataUrl ? (
-                <img alt={appSettings.appName} src={appSettings.logoDataUrl} />
-              ) : (
-                <i>{getAppInitials(appSettings.appName)}</i>
-              )}
-              {appSettings.appName}
-            </span>
-          )}
-          {boardSettings.showTime ? (
-            <time>
-              {new Intl.DateTimeFormat('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              }).format(now)}
-            </time>
-          ) : null}
+      {roomName ? (
+        <header className="tv-header">
+          <strong>{roomName}</strong>
         </header>
       ) : null}
       {error ? (
@@ -128,6 +112,7 @@ export function TvBoardPage() {
         </section>
       ) : null}
       <CallBoard
+        currentTime={currentTime}
         recentCallsLimit={boardSettings.recentCallsLimit}
         rooms={rooms}
         showRecentCalls={boardSettings.showRecentCalls}

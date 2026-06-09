@@ -5,6 +5,7 @@ import type {
   TicketSettingsUserOption,
 } from '@services/api'
 import { fallbackServiceTypeOptions } from '@services/api/serviceTypeCatalog'
+import { getLocale, type SmartQLanguage } from '@shared/locales/useLocale'
 import type {
   Room,
   Ticket,
@@ -39,13 +40,36 @@ export const ticketStatuses: TicketStatus[] = [
 export const fallbackServiceTypes = fallbackServiceTypeOptions
 export const activeQueueStatuses = new Set<TicketStatus>(['created', 'waiting', 'called', 'in_service', 'redirected'])
 const overloadLoadPercent = 75
+const fallbackServiceOptionKeys = new Map<string, keyof ReturnType<typeof getLocale>['serviceOptions']>([
+  ['Регистрация', 'registration'],
+  ['Консультация терапевта', 'therapistConsultation'],
+  ['Консультация педиатра', 'pediatricianConsultation'],
+  ['Консультация кардиолога', 'cardiologistConsultation'],
+  ['Консультация невролога', 'neurologistConsultation'],
+  ['Консультация хирурга', 'surgeonConsultation'],
+  ['Лабораторные анализы', 'labTests'],
+  ['Забор крови', 'bloodSampling'],
+  ['Рентген', 'xray'],
+  ['УЗИ', 'ultrasound'],
+  ['ЭКГ', 'ecg'],
+  ['МРТ', 'mri'],
+  ['КТ', 'ct'],
+  ['Оплата услуг', 'billingServices'],
+  ['Получение справки', 'certificate'],
+  ['Вакцинация', 'vaccination'],
+  ['Процедурный кабинет', 'procedureRoom'],
+  ['Приём документов', 'documentIntake'],
+  ['Другое', 'other'],
+])
 
-export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption): string {
+export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption, language?: SmartQLanguage): string {
   if (!option) {
-    return 'Услуга не выбрана'
+    return getLocale(language).tickets.unassigned
   }
 
-  return option.name
+  const fallbackKey = fallbackServiceOptionKeys.get(option.name)
+
+  return fallbackKey ? getLocale(language).serviceOptions[fallbackKey] : option.name
 }
 
 export function getPriorityLabel(priority: TicketPriority): string {

@@ -5,7 +5,6 @@ import { TicketPrintPreview, type TicketPrintData } from '@features/tickets/Tick
 import {
   getAutoRoomForService,
   getAvailableServiceTypes,
-  getPriorityLabel,
   getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
@@ -17,7 +16,7 @@ import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type { AdminTerminalRecord, TicketSettingsOptions, TicketSettingsRoomOption } from '@services/api'
 import type { Ticket } from '@shared/types'
-import { useLanguage, useLocale } from '@shared/locales/useLocale'
+import { getLocale, useLanguage, useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { LanguageSelect } from '@shared/ui/core-components'
 import { formatPeopleAhead, formatRoomName, getRoomQueuePeopleAhead, getTicketPeopleAhead } from '@shared/utils'
@@ -222,12 +221,13 @@ export function KioskPage() {
 
     return {
       date: new Date(createdTicket.createdAt),
-      priorityLabel: getPriorityLabel(createdTicket.priority),
+      language: createdTicket.language ?? language,
       peopleAhead: getTicketPeopleAhead(createdTicket),
+      priorityLabel: getLocale(createdTicket.language ?? language).priority[createdTicket.priority],
       roomName: formatRoomName(room ?? { id: createdTicket.roomId, name: createdTicket.roomName }),
       serviceName: selectedServiceType
-        ? getServiceOptionLabel(selectedServiceType)
-        : 'Консультация',
+        ? getServiceOptionLabel(selectedServiceType, createdTicket.language ?? language)
+        : getLocale(createdTicket.language ?? language).serviceType.consultation,
       ticketNumber: createdTicket.number,
     }
   }, [createdTicket, rooms, selectedServiceType])
@@ -309,7 +309,7 @@ export function KioskPage() {
             <strong>{createdTicket.number}</strong>
           </div>
           <div className="kiosk-queue-position">
-            {formatPeopleAhead(getTicketPeopleAhead(createdTicket))}
+            {formatPeopleAhead(getTicketPeopleAhead(createdTicket), createdTicket.language ?? language)}
           </div>
           <TicketPrintPreview data={printData} onPrint={resetKiosk} />
           <Button
@@ -363,7 +363,7 @@ export function KioskPage() {
                 onClick={() => setSelectedServiceTypeId(id)}
                 type="button"
               >
-                {getServiceOptionLabel(serviceType)}
+                {getServiceOptionLabel(serviceType, language)}
               </button>
             )
           })}
