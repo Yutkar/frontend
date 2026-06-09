@@ -4,7 +4,7 @@ import { ticketService } from '@services/ticketService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsOptions } from '@services/api'
 import type { Room, Ticket, TicketCreateInput, TicketPriority } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
+import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { formatPeopleAhead, formatRoomName, getPriorityMeta, getRoomQueuePeopleAhead } from '@shared/utils'
 import {
@@ -35,6 +35,7 @@ export function TicketCreateForm({
   onSubmit,
   tickets = [],
 }: TicketCreateFormProps) {
+  const t = useLocale()
   const [error, setError] = useState<string | null>(null)
   const [patientName, setPatientName] = useState('')
   const [priority, setPriority] = useState<TicketPriority>('normal')
@@ -74,7 +75,7 @@ export function TicketCreateForm({
     } catch (loadError) {
       console.error('Ticket create options load failed', loadError)
       setOptions(emptyOptions)
-      setError('Не удалось загрузить услуги и кабинеты. Проверьте подключение к серверу.')
+      setError(t.tickets.loadOptionsError)
     } finally {
       setOptionsLoading(false)
     }
@@ -99,12 +100,12 @@ export function TicketCreateForm({
     setError(null)
 
     if (!selectedServiceType) {
-      setError('Выберите тип услуги.')
+      setError(t.tickets.selectService)
       return
     }
 
     if (!autoRoom) {
-      setError('Нет доступного места обслуживания для выбранной услуги')
+      setError(t.tickets.noServicePlace)
       return
     }
 
@@ -170,11 +171,11 @@ export function TicketCreateForm({
 
       {selectedServiceType && autoRoom ? (
         <div className="modal-info">
-          Место обслуживания выбрано автоматически: {formatRoomName(autoRoom)}. {formatPeopleAhead(peopleAhead)}.
+          {t.tickets.autoPlaceSelected}: {formatRoomName(autoRoom)}. {formatPeopleAhead(peopleAhead)}.
         </div>
       ) : null}
       {selectedServiceType && !autoRoom && !optionsLoading ? (
-        <div className="modal-error">Нет доступного места обслуживания для выбранной услуги</div>
+        <div className="modal-error">{t.tickets.noServicePlace}</div>
       ) : null}
 
       <label className="field">

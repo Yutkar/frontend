@@ -3223,14 +3223,14 @@ h3 {
 
 .tv-multilingual-label {
   display: inline-flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
+  flex-direction: column;
+  gap: 6px;
   line-height: 1.15;
 }
 
 .tv-empty-call .tv-multilingual-label,
 .tv-empty-recent .tv-multilingual-label {
-  justify-content: center;
+  align-items: center;
 }
 
 .tv-call-card {

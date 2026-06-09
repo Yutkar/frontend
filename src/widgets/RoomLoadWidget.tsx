@@ -1,6 +1,6 @@
 import type { Room, Ticket } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
-import { formatRoomName, formatWaitingTime, getAverageWaitingMinutes } from '@shared/utils'
+import { useLocale } from '@shared/locales/useLocale'
+import { formatRoomName, formatWaitingTime, getAverageWaitingMinutes, getRoomClosedLabel } from '@shared/utils'
 
 type RoomLoadWidgetProps = {
   now?: number
@@ -10,15 +10,16 @@ type RoomLoadWidgetProps = {
 
 const activeTicketStatuses = ['created', 'waiting', 'called', 'in_service', 'redirected']
 
-function getRoomStatusLabel(room: Room) {
+function getRoomStatusLabel(room: Room, t: ReturnType<typeof useLocale>) {
   if (room.isActive === false || room.status === 'paused') {
-    return 'Закрыт'
+    return getRoomClosedLabel(room)
   }
 
-  return room.status === 'busy' ? 'Занят' : 'Активен'
+  return room.status === 'busy' ? t.status.busy : t.common.active
 }
 
 export function RoomLoadWidget({ now, rooms, tickets = [] }: RoomLoadWidgetProps) {
+  const t = useLocale()
   const activeRooms = rooms.filter((room) => room.status !== 'paused' && room.isActive !== false)
 
   return (
@@ -52,13 +53,13 @@ export function RoomLoadWidget({ now, rooms, tickets = [] }: RoomLoadWidgetProps
                 </div>
                 <div className="room-row-meta">
                   <b>{workload}%</b>
-                  <span>{ticketsCount} тал.</span>
+                  <span>{t.analytics.activeTickets}: {ticketsCount}</span>
                   <span>
                     {averageWaitingMinutes === null
-                      ? 'Нет очереди'
-                      : `ср. ${formatWaitingTime(averageWaitingMinutes)}`}
+                      ? t.analytics.noQueue
+                      : `${t.analytics.averageWaiting}: ${formatWaitingTime(averageWaitingMinutes)}`}
                   </span>
-                  <em>{getRoomStatusLabel(room)}</em>
+                  <em>{getRoomStatusLabel(room, t)}</em>
                 </div>
               </article>
             )
@@ -66,8 +67,8 @@ export function RoomLoadWidget({ now, rooms, tickets = [] }: RoomLoadWidgetProps
         </div>
       ) : (
         <div className="empty-inline">
-          <strong>Активные кабинеты не найдены</strong>
-          <span>Создайте или активируйте кабинет в разделе администрирования.</span>
+          <strong>{t.common.noData}</strong>
+          <span>{t.analytics.noQueue}</span>
         </div>
       )}
     </section>

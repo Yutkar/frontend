@@ -6,7 +6,7 @@ import { queueService } from '@services/queueService'
 import type { BoardSettings } from '@services/api'
 import { useLocale } from '@shared/locales/useLocale'
 import type { Room, Ticket } from '@shared/types'
-import { formatRoomName, getRoomBoardId, getRoomPlaceType } from '@shared/utils'
+import { formatRoomName, getRoomBoardId, getRoomClosedLabel } from '@shared/utils'
 
 const defaultBoardSettings: BoardSettings = {
   boardType: 'general',
@@ -56,15 +56,6 @@ function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string): Boa
 
 function isRoomClosed(room?: Room): boolean {
   return Boolean(room && (room.active === false || room.isActive === false))
-}
-
-function getClosedRoomMessage(room?: Room): string {
-  const placeType = getRoomPlaceType(room)
-
-  if (placeType === 'window') return 'Окно закрыто'
-  if (placeType === 'desk') return 'Стол закрыт'
-
-  return 'Кабинет закрыт'
 }
 
 export function TvBoardPage() {
@@ -167,7 +158,7 @@ export function TvBoardPage() {
       ) : null}
       {roomClosed && tickets.length === 0 ? (
         <section className="tv-closed-state">
-          <h1>{getClosedRoomMessage(boardRoom)}</h1>
+          <h1>{getRoomClosedLabel(boardRoom)}</h1>
         </section>
       ) : (
         <CallBoard

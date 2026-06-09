@@ -229,12 +229,12 @@ function RedirectPatientModal({
     }
 
     if (!selectedServiceType) {
-      setError('Выберите новую услугу.')
+      setError(t.tickets.selectService)
       return
     }
 
     if (!autoRoom) {
-      setError('Нет доступного места обслуживания для выбранной услуги')
+      setError(t.tickets.noServicePlace)
       return
     }
 
@@ -285,10 +285,10 @@ function RedirectPatientModal({
 
         {error ? <div className="modal-error">{error}</div> : null}
         {!error && noRoomAvailable ? (
-          <div className="modal-error">Нет доступного места обслуживания для выбранной услуги</div>
+          <div className="modal-error">{t.tickets.noServicePlace}</div>
         ) : null}
         {!error && autoRoom ? (
-          <div className="modal-info">Место обслуживания выбрано автоматически: {formatRoomName(autoRoom)}</div>
+          <div className="modal-info">{t.tickets.autoPlaceSelected}: {formatRoomName(autoRoom)}</div>
         ) : null}
 
         <div className="settings-form-grid">
@@ -302,7 +302,7 @@ function RedirectPatientModal({
               }}
               value={serviceTypeId}
             >
-              <option value="">Выберите услугу</option>
+              <option value="">{t.tickets.selectService}</option>
               {serviceTypes.map((serviceType) => (
                 <option key={String(serviceType.id)} value={String(serviceType.id)}>
                   {getServiceOptionLabel(serviceType)}
@@ -312,7 +312,7 @@ function RedirectPatientModal({
           </label>
 
           <label className="field settings-comment-field">
-            <span>Примечание</span>
+            <span>{t.tickets.note}</span>
             <input
               disabled={isBusy}
               onChange={(event) => setNote(event.target.value)}

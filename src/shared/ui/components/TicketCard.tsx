@@ -7,6 +7,7 @@ import {
   formatTime,
   formatWaitingTime,
   getServiceTypeLabel,
+  getRoomClosedLabel,
   getTicketPeopleAhead,
   getWaitingMinutes,
 } from '@shared/utils'
@@ -50,14 +51,14 @@ export function TicketCard({ actionSlot, compact = false, now, room, ticket }: T
         </span>
         {(ticket.peopleAhead !== undefined || ticket.queuePosition !== undefined) ? (
           <span>
-            <small>Очередь</small>
+            <small>{t.tickets.queue}</small>
             {formatPeopleAhead(getTicketPeopleAhead(ticket))}
           </span>
         ) : null}
         <span>
           <small>{t.tickets.room}</small>
           {formatRoomName(room ?? { id: ticket.roomId, name: ticket.roomName })}
-          {room?.isActive === false || room?.status === 'paused' ? ' · Кабинет закрыт' : ''}
+          {room?.isActive === false || room?.status === 'paused' ? ` · ${getRoomClosedLabel(room)}` : ''}
         </span>
       </div>
 

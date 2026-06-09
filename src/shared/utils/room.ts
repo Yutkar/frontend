@@ -82,10 +82,10 @@ export function getRoomPlaceType(room?: RoomNameSource | null): ServicePlaceType
     return defaultPlaceType
   }
 
-  return inferPlaceTypeFromText(room.name)
+  return normalizePlaceType(room.placeType ?? room.place_type)
+    ?? inferPlaceTypeFromText(room.name)
     ?? inferPlaceTypeFromText(room.roomName)
     ?? inferPlaceTypeFromText(room.title)
-    ?? normalizePlaceType(room.placeType ?? room.place_type)
     ?? defaultPlaceType
 }
 
@@ -168,6 +168,16 @@ export function formatRoomVoiceTarget(room?: RoomNameSource | null): string {
   return targetNumber
     ? `${meta.preposition} ${meta.lowerLabel} ${targetNumber}`
     : `${meta.preposition} ${meta.lowerLabel}`
+}
+
+export function getRoomClosedLabel(room?: RoomNameSource | null): string {
+  const placeTypes = getLocale().placeTypes
+  const placeType = getRoomPlaceType(room)
+
+  if (placeType === 'window') return placeTypes.windowClosed
+  if (placeType === 'desk') return placeTypes.deskClosed
+
+  return placeTypes.roomClosed
 }
 
 export function getRoomPlaceTypeLabel(placeType: ServicePlaceType | string): string {

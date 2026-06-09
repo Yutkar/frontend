@@ -10,6 +10,7 @@ export {
   formatRoomName,
   formatRoomVoiceTarget,
   getRoomBoardId,
+  getRoomClosedLabel,
   getRoomPlaceNumber,
   getRoomPlaceType,
   getRoomPlaceTypeLabel,

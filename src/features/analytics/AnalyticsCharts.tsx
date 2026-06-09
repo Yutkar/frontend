@@ -1,5 +1,5 @@
 import type { AnalyticsPoint, Room, Ticket } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
+import { useLocale } from '@shared/locales/useLocale'
 import { formatRoomName, formatWaitingTime, getAverageWaitingMinutes } from '@shared/utils'
 
 type AnalyticsChartsProps = {
@@ -105,6 +105,7 @@ function isActiveRoom(room: Room): boolean {
 }
 
 export function AnalyticsCharts({ analytics, now, rooms, selectedServiceTypeId, tickets }: AnalyticsChartsProps) {
+  const t = useLocale()
   const maxTicketCount = Math.max(
     ...analytics.flatMap((point) => [point.waiting, point.completed, point.noShow ?? 0]),
     1,
@@ -242,7 +243,7 @@ export function AnalyticsCharts({ analytics, now, rooms, selectedServiceTypeId, 
         <div className="room-load-grid analytics-room-grid">
           {displayedRooms.length === 0 ? (
             <div className="empty-state compact-empty analytics-room-empty">
-              <h2>Нет мест обслуживания по выбранной услуге</h2>
+              <h2>{t.analytics.noRoomsForService}</h2>
             </div>
           ) : null}
           {displayedRooms.map((room) => {
@@ -258,32 +259,32 @@ export function AnalyticsCharts({ analytics, now, rooms, selectedServiceTypeId, 
               <article className="room-load-card" key={room.id}>
                 <span>{formatRoomName(room)}</span>
                 <strong>{room.loadPercent}%</strong>
-                <small>Статус кабинета: {t.status[room.status]}</small>
+                <small>{t.queue.status}: {t.status[room.status]}</small>
                 <small>
                   {averageWaitingMinutes === null
-                    ? 'Нет очереди'
-                    : `Среднее ожидание: ${formatWaitingTime(averageWaitingMinutes)}`}
+                    ? t.analytics.noQueue
+                    : `${t.analytics.averageWaiting}: ${formatWaitingTime(averageWaitingMinutes)}`}
                 </small>
                 <small>
                   {averageServiceMinutes === null
-                    ? 'Нет завершённых приёмов'
-                    : `Среднее обслуживание: ${formatWaitingTime(averageServiceMinutes)}`}
+                    ? t.analytics.noCompletedAppointments
+                    : `${t.analytics.averageService}: ${formatWaitingTime(averageServiceMinutes)}`}
                 </small>
                 <dl className="room-status-summary">
                   <div className="room-status-item room-status-waiting">
-                    <dt>Ожидают</dt>
+                    <dt>{t.status.waiting}</dt>
                     <dd>{waitingCount}</dd>
                   </div>
                   <div className="room-status-item room-status-called">
-                    <dt>Вызваны</dt>
+                    <dt>{t.status.called}</dt>
                     <dd>{calledCount}</dd>
                   </div>
                   <div className="room-status-item room-status-service">
-                    <dt>На обслуживании</dt>
+                    <dt>{t.status.in_service}</dt>
                     <dd>{inServiceCount}</dd>
                   </div>
                   <div className="room-status-item room-status-completed">
-                    <dt>Завершены</dt>
+                    <dt>{t.status.completed}</dt>
                     <dd>{completedCount}</dd>
                   </div>
                 </dl>
@@ -295,7 +296,7 @@ export function AnalyticsCharts({ analytics, now, rooms, selectedServiceTypeId, 
           })}
         </div>
         <p className="chart-note">
-          Процент отражает текущую нагрузку кабинета, а карточки помогают сравнить статусы талонов.
+          {t.analytics.loadPerRoom}
         </p>
       </section>
     </div>

@@ -10,6 +10,7 @@ import {
   type VoiceSettings,
 } from '@services/voiceSettingsService'
 import type { BoardScreen, BoardSettings, BoardSettingsProfile, BoardTemplate } from '@services/api'
+import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { getRoomBoardId } from '@shared/utils'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
@@ -37,6 +38,7 @@ const boardTemplates: Array<{
 ]
 
 export function BoardSettingsSection() {
+  const t = useLocale()
   const [rooms, setRooms] = useState<AdminRoomRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -255,7 +257,7 @@ export function BoardSettingsSection() {
                   {/* Общее табло */}
                   <tr>
                     <td><strong>Общее табло</strong></td>
-                    <td>Все места обслуживания</td>
+                    <td>{t.queue.allRooms}</td>
                     <td>
                       <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>
                         {generalUrl}

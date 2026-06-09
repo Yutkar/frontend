@@ -233,8 +233,8 @@ export function DashboardPage() {
   }
 
   async function handleTicketCreated() {
-    await loadQueue({ force: true, successMessage: 'Талон создан' })
-    setSuccessMessage('Талон создан')
+    await loadQueue({ force: true, successMessage: t.tickets.createdTicket })
+    setSuccessMessage(t.tickets.createdTicket)
   }
 
   async function handleTicketAction(
@@ -305,7 +305,7 @@ export function DashboardPage() {
                   }}
                   variant="secondary"
                 >
-                  Создать талон
+                  {t.tickets.createTicket}
                 </Button>
               ) : null}
               <div className="sort-control">
@@ -340,11 +340,11 @@ export function DashboardPage() {
               ) : null}
             </div>
           </div>
-          <div className="ticket-filters" aria-label="Фильтры талонов">
+          <div className="ticket-filters" aria-label={t.queue.filters}>
             <div className="ticket-filters-header">
               <div>
                 <SlidersHorizontal size={16} />
-                <span>Фильтры</span>
+                <span>{t.queue.filters}</span>
               </div>
               <Button
                 disabled={!hasActiveFilters}
@@ -353,19 +353,19 @@ export function DashboardPage() {
                 size="sm"
                 variant="secondary"
               >
-                Сбросить фильтры
+                {t.queue.resetFilters}
               </Button>
             </div>
             <div className="ticket-filters-grid">
               <label className="field">
-                <span>Место обслуживания</span>
+                <span>{t.queue.servicePlace}</span>
                 <select
                   onChange={(event) => {
                     setFilters((current) => ({ ...current, roomId: event.target.value }))
                   }}
                   value={filters.roomId}
                 >
-                  <option value="">Все места обслуживания</option>
+                  <option value="">{t.queue.allRooms}</option>
                   {roomFilterOptions.map((room) => (
                     <option key={normalizeFilterValue(room.id)} value={normalizeFilterValue(room.id)}>
                       {formatRoomName(room)}
@@ -375,14 +375,14 @@ export function DashboardPage() {
               </label>
 
               <label className="field">
-                <span>Тип услуги</span>
+                <span>{t.tickets.serviceType}</span>
                 <select
                   onChange={(event) => {
                     setFilters((current) => ({ ...current, serviceTypeId: event.target.value }))
                   }}
                   value={filters.serviceTypeId}
                 >
-                  <option value="">Все услуги</option>
+                  <option value="">{t.queue.allServices}</option>
                   {serviceFilterOptions.map((serviceType) => (
                     <option
                       key={normalizeFilterValue(serviceType.id)}
@@ -395,14 +395,14 @@ export function DashboardPage() {
               </label>
 
               <label className="field">
-                <span>Статус</span>
+                <span>{t.queue.status}</span>
                 <select
                   onChange={(event) => {
                     setFilters((current) => ({ ...current, status: event.target.value }))
                   }}
                   value={filters.status}
                 >
-                  <option value="">Все статусы</option>
+                  <option value="">{t.queue.allStatuses}</option>
                   {ticketStatuses.map((status) => (
                     <option key={status} value={status}>
                       {getStatusLabel(status)}
@@ -412,14 +412,14 @@ export function DashboardPage() {
               </label>
 
               <label className="field">
-                <span>Приоритет</span>
+                <span>{t.queue.priority}</span>
                 <select
                   onChange={(event) => {
                     setFilters((current) => ({ ...current, priority: event.target.value }))
                   }}
                   value={filters.priority}
                 >
-                  <option value="">Все приоритеты</option>
+                  <option value="">{t.queue.allPriorities}</option>
                   {ticketPriorities.map((priority) => (
                     <option key={priority} value={priority}>
                       {getPriorityLabel(priority)}
@@ -430,14 +430,14 @@ export function DashboardPage() {
 
               {showDoctorFilter ? (
                 <label className="field">
-                  <span>Врач</span>
+                  <span>{t.tickets.specialist}</span>
                   <select
                     onChange={(event) => {
                       setFilters((current) => ({ ...current, doctorId: event.target.value }))
                     }}
                     value={filters.doctorId}
                   >
-                    <option value="">Все врачи</option>
+                    <option value="">{t.queue.allSpecialists}</option>
                     {specialistFilterOptions.map((specialist) => (
                       <option
                         key={normalizeFilterValue(specialist.id)}
@@ -451,7 +451,7 @@ export function DashboardPage() {
               ) : null}
 
               <label className="field">
-                <span>Номер талона</span>
+                <span>{t.queue.ticketNumber}</span>
                 <input
                   onChange={(event) => {
                     setFilters((current) => ({ ...current, ticketNumber: event.target.value }))

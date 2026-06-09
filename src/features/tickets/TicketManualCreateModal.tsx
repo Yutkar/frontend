@@ -12,6 +12,7 @@ import type {
   Ticket,
   TicketPriority,
 } from '@shared/types'
+import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import {
   formatRoomName,
@@ -53,6 +54,7 @@ export function TicketManualCreateModal({
   open,
   tickets,
 }: TicketManualCreateModalProps) {
+  const t = useLocale()
   const [error, setError] = useState<string | null>(null)
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [note, setNote] = useState('')
@@ -149,12 +151,12 @@ export function TicketManualCreateModal({
     event.preventDefault()
 
     if (!selectedServiceType) {
-      setError('Выберите тип услуги.')
+      setError(t.tickets.selectService)
       return
     }
 
     if (!autoRoom) {
-      setError('Нет доступного места обслуживания для выбранной услуги')
+      setError(t.tickets.noServicePlace)
       return
     }
 
@@ -179,7 +181,7 @@ export function TicketManualCreateModal({
       await onSaved()
     } catch (saveError) {
       console.error('Manual ticket create failed', saveError)
-      setError('Не удалось создать талон.')
+      setError(t.tickets.createError)
     } finally {
       setSaving(false)
     }
@@ -192,12 +194,12 @@ export function TicketManualCreateModal({
           <div>
             <span className="eyebrow">
               <PlusCircle size={14} />
-              Управление
+              {t.nav.dashboard}
             </span>
-            <h2>Создать талон</h2>
+            <h2>{t.tickets.createTicket}</h2>
           </div>
           <button
-            aria-label="Отмена"
+            aria-label={t.common.cancel}
             className="modal-close"
             disabled={saving}
             onClick={onClose}
@@ -209,20 +211,20 @@ export function TicketManualCreateModal({
 
         {error ? <div className="modal-error">{error}</div> : null}
         {!error && noRoomAvailable ? (
-          <div className="modal-error">Нет доступного места обслуживания для выбранной услуги</div>
+          <div className="modal-error">{t.tickets.noServicePlace}</div>
         ) : null}
         {!error && noDoctorAssigned ? (
-          <div className="modal-info">Место обслуживания выбрано автоматически, врач не назначен</div>
+          <div className="modal-info">{t.tickets.autoPlaceNoSpecialist}</div>
         ) : null}
         {!error && autoRoom ? (
           <div className="modal-info">
-            Место обслуживания выбрано автоматически: {formatRoomName(autoRoom)}. {formatPeopleAhead(peopleAhead)}.
+            {t.tickets.autoPlaceSelected}: {formatRoomName(autoRoom)}. {formatPeopleAhead(peopleAhead)}.
           </div>
         ) : null}
 
         <div className="settings-form-grid">
           <label className="field service-type-field">
-            <span>Тип услуги</span>
+            <span>{t.tickets.serviceType}</span>
             <select
               disabled={isBusy}
               onChange={(event) => {
@@ -240,7 +242,7 @@ export function TicketManualCreateModal({
           </label>
 
           <label className="field">
-            <span>Приоритет</span>
+            <span>{t.tickets.priority}</span>
             <select
               disabled={isBusy}
               onChange={(event) => setPriority(event.target.value as TicketPriority)}
@@ -255,7 +257,7 @@ export function TicketManualCreateModal({
           </label>
 
           <label className="field settings-comment-field">
-            <span>Примечание</span>
+            <span>{t.tickets.note}</span>
             <input
               disabled={isBusy}
               onChange={(event) => setNote(event.target.value)}
@@ -266,10 +268,10 @@ export function TicketManualCreateModal({
 
         <footer className="modal-actions">
           <Button disabled={saving} onClick={onClose} variant="ghost">
-            Отмена
+            {t.common.cancel}
           </Button>
           <Button disabled={isBusy || !canCreateTicket} type="submit" variant="primary">
-            {saving ? 'Создаём...' : 'Создать'}
+            {saving ? t.tickets.creating : t.tickets.create}
           </Button>
         </footer>
       </form>

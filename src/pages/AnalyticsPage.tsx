@@ -12,6 +12,7 @@ import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { formatWaitingTime, getWaitingMinutes, useCurrentTime } from '@shared/utils'
 import type { Ticket } from '@shared/types'
 import { KPIWidget } from '@shared/ui/components'
+import { useLocale } from '@shared/locales/useLocale'
 import { useQueueStore } from '@store/queue'
 
 function toDateInputValue(date: Date): string {
@@ -124,6 +125,7 @@ function AnalyticsSummaryKpis({ now, tickets }: { now: number; tickets: Ticket[]
 }
 
 export function AnalyticsPage() {
+  const t = useLocale()
   const error = useQueueStore((state) => state.error)
   const hydrated = useQueueStore((state) => state.hydrated)
   const loading = useQueueStore((state) => state.loading)
@@ -253,12 +255,12 @@ export function AnalyticsPage() {
               />
             </label>
             <label className="field">
-              <span>Тип услуги</span>
+                <span>{t.tickets.serviceType}</span>
               <select
                 onChange={(event) => setSelectedServiceTypeId(event.target.value)}
                 value={selectedServiceTypeId}
               >
-                <option value="">Все услуги</option>
+                <option value="">{t.queue.allServices}</option>
                 {serviceTypes.map((serviceType) => (
                   <option key={String(serviceType.id)} value={String(serviceType.id)}>
                     {serviceType.name}
