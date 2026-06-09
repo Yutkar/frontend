@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Monitor, Copy, Check, ExternalLink, Plus, Trash2 } from 'lucide-react'
+import { Monitor, Copy, Check, ExternalLink, Plus, Trash2, Edit3, Save, X } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import {
   getVoiceActionLabel,
@@ -9,7 +9,7 @@ import {
   type VoiceAudience,
   type VoiceSettings,
 } from '@services/voiceSettingsService'
-import type { BoardScreen, BoardSettings, BoardTemplate } from '@services/api'
+import type { BoardScreen, BoardSettings, BoardSettingsProfile, BoardTemplate } from '@services/api'
 import { Button } from '@shared/ui/components'
 import { getRoomBoardId } from '@shared/utils'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
@@ -43,6 +43,7 @@ export function BoardSettingsSection() {
   const [boardSettings, setBoardSettings] = useState<BoardSettings>(defaultBoardSettings)
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => voiceSettingsService.getSettings())
   const [copied, setCopied] = useState<string | null>(null)
+  const [draftProfile, setDraftProfile] = useState<BoardSettingsProfile | null>(null)
   const [newScreenName, setNewScreenName] = useState('')
   const [newScreenRooms, setNewScreenRooms] = useState<string[]>([])
 
@@ -90,6 +91,79 @@ export function BoardSettingsSection() {
     return `${window.location.origin}${getRoomBoardPath(room)}`
   }
 
+  function getProfileUrl(profile: BoardSettingsProfile): string {
+    if (profile.boardType === 'individual' && profile.roomBoardId) {
+      return `${window.location.origin}/board?roomId=${encodeURIComponent(profile.roomBoardId)}`
+    }
+
+    return generalUrl
+  }
+
+  function getDefaultProfile(
+    id: string,
+    name: string,
+    boardType: BoardSettingsProfile['boardType'],
+    roomBoardId = '',
+  ): BoardSettingsProfile {
+    return {
+      boardType,
+      id,
+      name,
+      recentCallsLimit: boardSettings.recentCallsLimit,
+      roomBoardId,
+      showRecentCalls: boardSettings.showRecentCalls,
+      showTime: boardSettings.showTime,
+      template: boardSettings.template,
+      voiceEnabled: boardSettings.voiceEnabled,
+    }
+  }
+
+  function getBoardProfile(
+    id: string,
+    name: string,
+    boardType: BoardSettingsProfile['boardType'],
+    roomBoardId = '',
+  ): BoardSettingsProfile {
+    const savedProfile = boardSettings.profiles?.find((profile) => profile.id === id)
+
+    return savedProfile ?? getDefaultProfile(id, name, boardType, roomBoardId)
+  }
+
+  function startEditProfile(profile: BoardSettingsProfile) {
+    setDraftProfile(profile)
+  }
+
+  function updateDraftProfile(nextProfile: Partial<BoardSettingsProfile>) {
+    setDraftProfile((current: BoardSettingsProfile | null) => current ? { ...current, ...nextProfile } : current)
+  }
+
+  function cancelEditProfile() {
+    setDraftProfile(null)
+  }
+
+  async function saveDraftProfile() {
+    if (!draftProfile) return
+
+    const profiles = boardSettings.profiles ?? []
+    const nextProfiles = profiles.some((profile) => profile.id === draftProfile.id)
+      ? profiles.map((profile) => profile.id === draftProfile.id ? draftProfile : profile)
+      : [...profiles, draftProfile]
+    const savedSettings = await adminService.updateBoardSettings({
+      ...boardSettings,
+      boardType: draftProfile.boardType,
+      profiles: nextProfiles,
+      recentCallsLimit: draftProfile.recentCallsLimit,
+      roomBoardId: draftProfile.roomBoardId,
+      showRecentCalls: draftProfile.showRecentCalls,
+      showTime: draftProfile.showTime,
+      template: draftProfile.template,
+      voiceEnabled: draftProfile.voiceEnabled,
+    })
+
+    setBoardSettings(savedSettings)
+    cancelEditProfile()
+  }
+
   async function copyUrl(url: string) {
     await navigator.clipboard.writeText(url)
     setCopied(url)
@@ -107,14 +181,6 @@ export function BoardSettingsSection() {
     })
 
     setBoardSettings(savedSettings)
-  }
-
-  function getSelectedBoardUrl(): string {
-    if (boardSettings.boardType === 'individual' && boardSettings.roomBoardId) {
-      return `${window.location.origin}/board?roomId=${encodeURIComponent(boardSettings.roomBoardId)}`
-    }
-
-    return generalUrl
   }
 
   async function addScreen() {
@@ -144,8 +210,15 @@ export function BoardSettingsSection() {
 
   const activeRooms = rooms.filter(getRoomActive)
   const generalUrl = `${window.location.origin}/board`
-  const selectedBoardUrl = getSelectedBoardUrl()
+  const generalProfile = getBoardProfile('general', 'Общее табло', 'general')
+  const roomProfiles = rooms.map((room) => {
+    const boardId = getRoomBoardId(room)
 
+    return {
+      profile: getBoardProfile(`room-${boardId}`, getRoomName(room), 'individual', boardId),
+      room,
+    }
+  })
   return (
     <div className="page-stack">
       <section className="admin-page-grid">
@@ -206,12 +279,20 @@ export function BoardSettingsSection() {
                         >
                           {copied === generalUrl ? 'Скопировано' : 'Копировать'}
                         </Button>
+                        <Button
+                          icon={<Edit3 size={14} />}
+                          onClick={() => startEditProfile(generalProfile)}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          Редактировать
+                        </Button>
                       </div>
                     </td>
                   </tr>
 
                   {/* Отдельные места обслуживания */}
-                  {activeRooms.map((room) => {
+                  {roomProfiles.map(({ profile, room }) => {
                     const name = getRoomName(room)
                     const url = getRoomBoardUrl(room)
                     return (
@@ -241,6 +322,14 @@ export function BoardSettingsSection() {
                               variant="secondary"
                             >
                               {copied === url ? 'Скопировано' : 'Копировать'}
+                            </Button>
+                            <Button
+                              icon={<Edit3 size={14} />}
+                              onClick={() => startEditProfile(profile)}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Редактировать
                             </Button>
                           </div>
                         </td>
@@ -300,33 +389,48 @@ export function BoardSettingsSection() {
           <div className="admin-form">
             <div className="panel-header">
               <div>
-                <span className="eyebrow">Настройки</span>
-                <h2>Табло вызовов</h2>
+                <span className="eyebrow">Редактирование</span>
+                <h2>{draftProfile ? draftProfile.name : 'Настройки табло'}</h2>
               </div>
             </div>
+
+            {!draftProfile ? (
+              <p className="admin-muted-text">
+                Выберите табло в списке и нажмите «Редактировать».
+              </p>
+            ) : (
+              <>
+            <label className="field">
+              <span>Название</span>
+              <input
+                onChange={(event) => updateDraftProfile({ name: event.target.value })}
+                value={draftProfile.name}
+              />
+            </label>
 
             <label className="field">
               <span>Тип табло</span>
               <select
-                onChange={(event) => void updateBoardSettings({
+                onChange={(event) => updateDraftProfile({
                   boardType: event.target.value as BoardSettings['boardType'],
+                  roomBoardId: event.target.value === 'general' ? '' : draftProfile.roomBoardId,
                 })}
-                value={boardSettings.boardType}
+                value={draftProfile.boardType}
               >
                 <option value="general">Общее</option>
                 <option value="individual">Индивидуальное</option>
               </select>
             </label>
 
-            {boardSettings.boardType === 'individual' ? (
+            {draftProfile.boardType === 'individual' ? (
               <label className="field">
                 <span>Место обслуживания</span>
                 <select
-                  onChange={(event) => void updateBoardSettings({ roomBoardId: event.target.value })}
-                  value={boardSettings.roomBoardId ?? ''}
+                  onChange={(event) => updateDraftProfile({ roomBoardId: event.target.value })}
+                  value={draftProfile.roomBoardId ?? ''}
                 >
                   <option value="">Выберите место обслуживания</option>
-                  {activeRooms.map((room) => {
+                  {rooms.map((room) => {
                     const boardId = getRoomBoardId(room)
 
                     return (
@@ -341,7 +445,7 @@ export function BoardSettingsSection() {
 
             <div className="admin-link-cell">
               <span>Ссылка выбранного табло:</span>
-              <code>{selectedBoardUrl}</code>
+              <code>{getProfileUrl(draftProfile)}</code>
             </div>
 
             <fieldset className="admin-checkbox-group">
@@ -349,11 +453,11 @@ export function BoardSettingsSection() {
               <div className="board-template-grid">
                 {boardTemplates.map((template) => (
                   <button
-                    className={boardSettings.template === template.value
+                    className={draftProfile.template === template.value
                       ? 'board-template-card active'
                       : 'board-template-card'}
                     key={template.value}
-                    onClick={() => void updateBoardSettings({ template: template.value })}
+                    onClick={() => updateDraftProfile({ template: template.value })}
                     type="button"
                   >
                     <span className={`board-template-preview ${template.value}`} aria-hidden="true">
@@ -370,8 +474,8 @@ export function BoardSettingsSection() {
 
             <label className="admin-toggle-row">
               <input
-                checked={boardSettings.showRecentCalls}
-                onChange={(event) => void updateBoardSettings({ showRecentCalls: event.target.checked })}
+                checked={draftProfile.showRecentCalls}
+                onChange={(event) => updateDraftProfile({ showRecentCalls: event.target.checked })}
                 type="checkbox"
               />
               <span>Показывать последние вызовы</span>
@@ -380,11 +484,11 @@ export function BoardSettingsSection() {
             <label className="field">
               <span>Количество последних вызовов</span>
               <select
-                disabled={!boardSettings.showRecentCalls}
-                onChange={(event) => void updateBoardSettings({
+                disabled={!draftProfile.showRecentCalls}
+                onChange={(event) => updateDraftProfile({
                   recentCallsLimit: Number(event.target.value) as BoardSettings['recentCallsLimit'],
                 })}
-                value={boardSettings.recentCallsLimit}
+                value={draftProfile.recentCallsLimit}
               >
                 <option value={5}>5</option>
                 <option value={10}>10</option>
@@ -394,8 +498,8 @@ export function BoardSettingsSection() {
 
             <label className="admin-toggle-row">
               <input
-                checked={boardSettings.showTime}
-                onChange={(event) => void updateBoardSettings({ showTime: event.target.checked })}
+                checked={draftProfile.showTime}
+                onChange={(event) => updateDraftProfile({ showTime: event.target.checked })}
                 type="checkbox"
               />
               <span>Показывать время</span>
@@ -403,12 +507,31 @@ export function BoardSettingsSection() {
 
             <label className="admin-toggle-row">
               <input
-                checked={boardSettings.voiceEnabled}
-                onChange={(event) => void updateBoardSettings({ voiceEnabled: event.target.checked })}
+                checked={draftProfile.voiceEnabled}
+                onChange={(event) => updateDraftProfile({ voiceEnabled: event.target.checked })}
                 type="checkbox"
               />
               <span>Озвучка включена</span>
             </label>
+            <div className="modal-actions">
+              <Button
+                icon={<X size={16} />}
+                onClick={cancelEditProfile}
+                variant="secondary"
+              >
+                Отмена
+              </Button>
+              <Button
+                disabled={!draftProfile.name.trim() || (draftProfile.boardType === 'individual' && !draftProfile.roomBoardId)}
+                icon={<Save size={16} />}
+                onClick={() => void saveDraftProfile()}
+                variant="primary"
+              >
+                Сохранить
+              </Button>
+            </div>
+              </>
+            )}
           </div>
 
           <div className="admin-form">

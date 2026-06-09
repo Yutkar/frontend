@@ -191,8 +191,21 @@ export type BoardScreen = {
   roomNames: string[]
 }
 
+export type BoardSettingsProfile = {
+  boardType: 'general' | 'individual'
+  id: string
+  name: string
+  recentCallsLimit: 5 | 10 | 15
+  roomBoardId?: string
+  showRecentCalls: boolean
+  showTime: boolean
+  template: BoardTemplate
+  voiceEnabled: boolean
+}
+
 export type BoardSettings = {
   boardType: 'general' | 'individual'
+  profiles?: BoardSettingsProfile[]
   recentCallsLimit: 5 | 10 | 15
   roomBoardId?: string
   screens: BoardScreen[]

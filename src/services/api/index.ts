@@ -29,6 +29,7 @@ export type {
   AuthApi,
   BoardScreen,
   BoardSettings,
+  BoardSettingsProfile,
   BoardTemplate,
   KioskApi,
   QueueApi,

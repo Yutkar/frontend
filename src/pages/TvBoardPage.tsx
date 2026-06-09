@@ -6,7 +6,7 @@ import { queueService } from '@services/queueService'
 import type { BoardSettings } from '@services/api'
 import { useLocale } from '@shared/locales/useLocale'
 import type { Room, Ticket } from '@shared/types'
-import { formatRoomName } from '@shared/utils'
+import { formatRoomName, getRoomBoardId, getRoomPlaceType } from '@shared/utils'
 
 const defaultBoardSettings: BoardSettings = {
   boardType: 'general',
@@ -17,6 +17,54 @@ const defaultBoardSettings: BoardSettings = {
   showTime: true,
   template: 'classic',
   voiceEnabled: true,
+}
+
+function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string): BoardSettings {
+  const profile = roomId
+    ? settings.profiles?.find((item) => (
+      item.boardType === 'individual' && String(item.roomBoardId ?? '') === String(roomId)
+    ))
+    : settings.profiles?.find((item) => item.boardType === 'general')
+
+  if (!profile) {
+    if (
+      roomId &&
+      settings.boardType === 'individual' &&
+      String(settings.roomBoardId ?? '') === String(roomId)
+    ) {
+      return settings
+    }
+
+    if (!roomId && settings.boardType === 'general') {
+      return settings
+    }
+
+    return defaultBoardSettings
+  }
+
+  return {
+    ...settings,
+    boardType: profile.boardType,
+    recentCallsLimit: profile.recentCallsLimit,
+    roomBoardId: profile.roomBoardId,
+    showRecentCalls: profile.showRecentCalls,
+    showTime: profile.showTime,
+    template: profile.template,
+    voiceEnabled: profile.voiceEnabled,
+  }
+}
+
+function isRoomClosed(room?: Room): boolean {
+  return Boolean(room && (room.active === false || room.isActive === false))
+}
+
+function getClosedRoomMessage(room?: Room): string {
+  const placeType = getRoomPlaceType(room)
+
+  if (placeType === 'window') return 'Окно закрыто'
+  if (placeType === 'desk') return 'Стол закрыт'
+
+  return 'Кабинет закрыт'
 }
 
 export function TvBoardPage() {
@@ -98,12 +146,18 @@ export function TvBoardPage() {
     minute: '2-digit',
     second: '2-digit',
   }).format(now)
+  const routeBoardSettings = getBoardSettingsForRoute(boardSettings, roomId)
+  const boardRoom = roomId
+    ? rooms.find((room) => getRoomBoardId(room) === roomId || String(room.id) === roomId) ?? rooms[0]
+    : undefined
+  const roomClosed = Boolean(roomId) && isRoomClosed(boardRoom)
+  const roomHeaderName = roomClosed && roomName && tickets.length > 0 ? `${roomName} — закрыт` : roomName
 
   return (
     <main className="tv-board">
-      {roomName ? (
+      {roomHeaderName ? (
         <header className="tv-header">
-          <strong>{roomName}</strong>
+          <strong>{roomHeaderName}</strong>
         </header>
       ) : null}
       {error ? (
@@ -111,17 +165,23 @@ export function TvBoardPage() {
           <h2>{error}</h2>
         </section>
       ) : null}
-      <CallBoard
-        currentTime={currentTime}
-        recentCallsLimit={boardSettings.recentCallsLimit}
-        rooms={rooms}
-        showRecentCalls={boardSettings.showRecentCalls}
-        showTime={boardSettings.showTime}
-        template={boardSettings.template}
-        tickets={tickets}
-        voiceEnabled={boardSettings.voiceEnabled}
-        labels={t.board}
-      />
+      {roomClosed && tickets.length === 0 ? (
+        <section className="tv-closed-state">
+          <h1>{getClosedRoomMessage(boardRoom)}</h1>
+        </section>
+      ) : (
+        <CallBoard
+          currentTime={currentTime}
+          recentCallsLimit={routeBoardSettings.recentCallsLimit}
+          rooms={rooms}
+          showRecentCalls={routeBoardSettings.showRecentCalls}
+          showTime={routeBoardSettings.showTime}
+          template={routeBoardSettings.template}
+          tickets={tickets}
+          voiceEnabled={routeBoardSettings.voiceEnabled}
+          labels={t.board}
+        />
+      )}
     </main>
   )
 }

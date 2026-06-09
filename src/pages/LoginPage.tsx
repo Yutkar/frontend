@@ -5,14 +5,25 @@ import { getAppInitials, useAppSettings } from '@services/appSettingsService'
 import { appModeService } from '@services/appModeService'
 import { useGlobalStore } from '@store/global'
 import { Button } from '@shared/ui/components'
-import { useLocale } from '@shared/locales/useLocale'
-import { LanguageSelect } from '@shared/ui/core-components'
+import {
+  languageOptions,
+  setLanguage,
+  useLanguage,
+  useLocale,
+  type SmartQLanguage,
+} from '@shared/locales/useLocale'
 import type { Role } from '@shared/types'
 
 const defaultPathByRole: Record<Role, string> = {
   admin: '/dashboard',
   manager: '/dashboard',
   specialist: '/specialist',
+}
+
+const compactLanguageLabels: Record<SmartQLanguage, string> = {
+  en: 'Eng',
+  kk: 'Қаз',
+  ru: 'Рус',
 }
 
 export function LoginPage() {
@@ -22,6 +33,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const language = useLanguage()
 
   const login = useGlobalStore((state) => state.login)
   const navigate = useNavigate()
@@ -64,8 +76,21 @@ export function LoginPage() {
         </div>
 
         <div className="mt-10">
-          <LanguageSelect className="login-language-select" variant="large" />
-          <h2 className="text-2xl font-semibold text-center mb-8">{t.auth.systemLogin}</h2>
+          <div className="login-form-heading">
+            <h2>{t.auth.systemLogin}</h2>
+            <div aria-label={t.common.language} className="login-language-segmented">
+              {languageOptions.map((option) => (
+                <button
+                  className={language === option.value ? 'active' : ''}
+                  key={option.value}
+                  onClick={() => setLanguage(option.value)}
+                  type="button"
+                >
+                  {compactLanguageLabels[option.value]}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6 max-w-md mx-auto">
             {error && (

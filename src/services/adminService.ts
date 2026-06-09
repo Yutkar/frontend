@@ -44,6 +44,7 @@ const legacyBoardScreensStorageKey = 'smartq_board_screens'
 
 const defaultBoardSettings: AdminBoardSettings = {
   boardType: 'general',
+  profiles: [],
   recentCallsLimit: 10,
   roomBoardId: '',
   screens: [],
@@ -114,8 +115,36 @@ function normalizeBoardSettings(settings: Partial<AdminBoardSettings> = {}): Adm
     ? settings.template
     : defaultBoardSettings.template
 
+  const profiles = (settings.profiles ?? [])
+    .map((profile) => normalizeBoardSettings({
+      boardType: profile.boardType,
+      recentCallsLimit: profile.recentCallsLimit,
+      roomBoardId: profile.roomBoardId,
+      screens: [],
+      showRecentCalls: profile.showRecentCalls,
+      showTime: profile.showTime,
+      template: profile.template,
+      voiceEnabled: profile.voiceEnabled,
+    }))
+    .map((profileSettings, index) => {
+      const sourceProfile = settings.profiles?.[index]
+
+      return {
+        boardType: profileSettings.boardType,
+        id: sourceProfile?.id || `${profileSettings.boardType}-${sourceProfile?.roomBoardId || 'general'}`,
+        name: sourceProfile?.name || (profileSettings.boardType === 'general' ? 'Общее табло' : 'Индивидуальное табло'),
+        recentCallsLimit: profileSettings.recentCallsLimit,
+        roomBoardId: profileSettings.roomBoardId,
+        showRecentCalls: profileSettings.showRecentCalls,
+        showTime: profileSettings.showTime,
+        template: profileSettings.template,
+        voiceEnabled: profileSettings.voiceEnabled,
+      }
+    })
+
   return {
     boardType: settings.boardType === 'individual' ? 'individual' : defaultBoardSettings.boardType,
+    profiles,
     recentCallsLimit,
     roomBoardId: settings.roomBoardId ?? defaultBoardSettings.roomBoardId,
     screens: settings.screens ?? defaultBoardSettings.screens,
@@ -333,7 +362,13 @@ export const adminService = {
 
   async getBoardSettings(): Promise<AdminBoardSettings> {
     try {
-      return normalizeBoardSettings(await adminApi.getBoardSettings())
+      const remoteSettings = normalizeBoardSettings(await adminApi.getBoardSettings())
+      const localSettings = readStoredBoardSettings()
+
+      return normalizeBoardSettings({
+        ...remoteSettings,
+        profiles: localSettings.profiles?.length ? localSettings.profiles : remoteSettings.profiles,
+      })
     } catch (error) {
       console.warn('adminService.getBoardSettings: backend endpoint недоступен, используем временное хранилище', error)
 
@@ -346,10 +381,14 @@ export const adminService = {
 
     try {
       const savedSettings = normalizeBoardSettings(await adminApi.updateBoardSettings(localSettings))
+      const mergedSettings = normalizeBoardSettings({
+        ...savedSettings,
+        profiles: localSettings.profiles,
+      })
 
-      writeStoredBoardSettings(savedSettings)
+      writeStoredBoardSettings(mergedSettings)
 
-      return savedSettings
+      return mergedSettings
     } catch (error) {
       console.warn('adminService.updateBoardSettings: backend endpoint недоступен, сохраняем локально', error)
 
