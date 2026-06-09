@@ -132,7 +132,7 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
 
     try {
       await adminService.deleteServiceType(serviceType.id)
-      setSuccessMessage('Тип услуги удалён или деактивирован')
+      setSuccessMessage('Тип услуги деактивирован')
       await loadData()
       onServiceTypesChange?.()
     } catch (deleteError) {

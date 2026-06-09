@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { PlusCircle, TabletSmartphone } from 'lucide-react'
+import { Check, Copy, ExternalLink, PlusCircle, TabletSmartphone } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { AdminTerminalRecord, TicketSettingsServiceTypeOption } from '@services/api'
@@ -53,6 +53,39 @@ function getRoomNames(terminal: AdminTerminalRecord, rooms: AdminRoomRecord[]): 
     .join(', ')
 }
 
+function normalizeServiceId(value?: string | number | null): string {
+  return value == null ? '' : String(value)
+}
+
+function getRoomServiceIds(room: AdminRoomRecord): string[] {
+  const nestedServices = [...(room.serviceTypes ?? []), ...(room.services ?? [])]
+    .map((service) => {
+      if (typeof service === 'string' || typeof service === 'number') {
+        return normalizeServiceId(service)
+      }
+
+      return normalizeServiceId(service.serviceTypeId ?? service.id ?? service.name ?? service.title)
+    })
+
+  return Array.from(new Set([
+    normalizeServiceId(room.serviceTypeId),
+    ...(room.serviceTypeIds ?? []).map(normalizeServiceId),
+    ...nestedServices,
+  ].filter(Boolean)))
+}
+
+function roomMatchesSelectedServices(room: AdminRoomRecord, serviceTypeIds: string[]): boolean {
+  if (serviceTypeIds.length === 0) {
+    return true
+  }
+
+  const roomServiceIds = getRoomServiceIds(room)
+
+  return serviceTypeIds.some((serviceTypeId) => (
+    roomServiceIds.some((roomServiceId) => String(roomServiceId) === String(serviceTypeId))
+  ))
+}
+
 export function TerminalsSection() {
   const [editingTerminalId, setEditingTerminalId] = useState<string | number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -63,6 +96,7 @@ export function TerminalsSection() {
   const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [terminals, setTerminals] = useState<AdminTerminalRecord[]>([])
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
 
   async function loadData() {
     setLoading(true)
@@ -115,6 +149,14 @@ export function TerminalsSection() {
   function toggleServiceType(id: string) {
     setForm((current) => ({
       ...current,
+      roomIds: current.roomIds.filter((roomId) => {
+        const room = rooms.find((item) => String(item.id) === String(roomId))
+        const nextServiceTypeIds = current.serviceTypeIds.includes(id)
+          ? current.serviceTypeIds.filter((item) => item !== id)
+          : [...current.serviceTypeIds, id]
+
+        return room ? roomMatchesSelectedServices(room, nextServiceTypeIds) : false
+      }),
       serviceTypeIds: current.serviceTypeIds.includes(id)
         ? current.serviceTypeIds.filter((item) => item !== id)
         : [...current.serviceTypeIds, id],
@@ -189,7 +231,26 @@ export function TerminalsSection() {
     }
   }
 
+  async function copyUrl(url: string) {
+    await navigator.clipboard.writeText(url)
+    setCopiedUrl(url)
+    window.setTimeout(() => setCopiedUrl(null), 2000)
+  }
+
+  function openUrl(url: string) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  function getTerminalPath(terminal: AdminTerminalRecord): string {
+    return `/kiosk?terminalId=${encodeURIComponent(String(terminal.id))}`
+  }
+
+  function getTerminalUrl(terminal: AdminTerminalRecord): string {
+    return `${window.location.origin}${getTerminalPath(terminal)}`
+  }
+
   const activeRooms = rooms.filter(getRoomActive)
+  const availableRooms = activeRooms.filter((room) => roomMatchesSelectedServices(room, form.serviceTypeIds))
 
   return (
     <div className="page-stack">
@@ -225,30 +286,52 @@ export function TerminalsSection() {
                     <th>Место установки</th>
                     <th>Услуги</th>
                     <th>Места обслуживания</th>
+                    <th>Ссылка на киоск</th>
                     <th>Активен</th>
                     <th>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {terminals.map((terminal) => (
-                    <tr key={String(terminal.id)}>
-                      <td>{terminal.name}</td>
-                      <td>{terminal.location}</td>
-                      <td>{getServiceNames(terminal, serviceTypes)}</td>
-                      <td>{getRoomNames(terminal, rooms)}</td>
-                      <td>{terminal.active ? 'Да' : 'Нет'}</td>
-                      <td>
-                        <div className="button-row">
-                          <Button onClick={() => handleEdit(terminal)} size="sm" variant="secondary">
-                            Редактировать
-                          </Button>
-                          <Button onClick={() => void handleDelete(terminal)} size="sm" variant="danger">
-                            Удалить
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {terminals.map((terminal) => {
+                    const url = getTerminalUrl(terminal)
+
+                    return (
+                      <tr key={String(terminal.id)}>
+                        <td>{terminal.name}</td>
+                        <td>{terminal.location}</td>
+                        <td>{getServiceNames(terminal, serviceTypes)}</td>
+                        <td>{getRoomNames(terminal, rooms)}</td>
+                        <td>
+                          <div className="admin-link-cell">
+                            <span>Ссылка на киоск:</span>
+                            <code>{url}</code>
+                          </div>
+                        </td>
+                        <td>{terminal.active ? 'Да' : 'Нет'}</td>
+                        <td>
+                          <div className="button-row">
+                            <Button icon={<ExternalLink size={14} />} onClick={() => openUrl(url)} size="sm" variant="secondary">
+                              Открыть киоск
+                            </Button>
+                            <Button
+                              icon={copiedUrl === url ? <Check size={14} /> : <Copy size={14} />}
+                              onClick={() => void copyUrl(url)}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              {copiedUrl === url ? 'Скопировано' : 'Скопировать ссылку'}
+                            </Button>
+                            <Button onClick={() => handleEdit(terminal)} size="sm" variant="secondary">
+                              Редактировать
+                            </Button>
+                            <Button onClick={() => void handleDelete(terminal)} size="sm" variant="danger">
+                              Удалить
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -303,7 +386,7 @@ export function TerminalsSection() {
 
             <fieldset className="admin-checkbox-group">
               <legend>Места обслуживания</legend>
-              {activeRooms.length > 0 ? activeRooms.map((room) => (
+              {availableRooms.length > 0 ? availableRooms.map((room) => (
                 <label key={String(room.id)}>
                   <input
                     checked={form.roomIds.includes(String(room.id))}
@@ -312,7 +395,13 @@ export function TerminalsSection() {
                   />
                   <span>{getRoomName(room)}</span>
                 </label>
-              )) : <span className="admin-muted-text">Активные места обслуживания не найдены</span>}
+              )) : (
+                <span className="admin-muted-text">
+                  {form.serviceTypeIds.length > 0
+                    ? 'Нет доступных мест обслуживания для выбранных услуг'
+                    : 'Активные места обслуживания не найдены'}
+                </span>
+              )}
             </fieldset>
 
             <label className="admin-toggle-row">

@@ -8,6 +8,7 @@ import { Button, TicketCard } from '@shared/ui/components'
 import {
   formatDuration,
   formatRoomName,
+  getPriorityMeta,
   getRoomWorkloadRisk,
   normalizeWorkTime,
   useCurrentTime,
@@ -123,6 +124,10 @@ function getRoomWorkTimeText(room: Room): string {
   }
 
   return 'работает весь день'
+}
+
+function isCriticalTicket(ticket: Ticket): boolean {
+  return ticket.priority === 'critical' || getPriorityMeta(ticket.priority).label.toLowerCase() === 'критический'
 }
 
 type RedirectPatientModalProps = {
@@ -334,6 +339,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const [returningTicketId, setReturningTicketId] = useState<string | null>(null)
   const [redirectTicketItem, setRedirectTicketItem] = useState<Ticket | null>(null)
   const [queueServiceTypes, setQueueServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
+  const [callingUrgentTicketId, setCallingUrgentTicketId] = useState<string | null>(null)
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const completeService = useQueueStore((state) => state.completeService)
   const activeTickets = useQueueStore((state) => state.activeTickets)
@@ -474,6 +480,25 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
     void loadQueue({ force: true, successMessage: 'Данные для перенаправления обновлены' })
   }
 
+  const handleCallUrgentTicket = async (ticket: Ticket) => {
+    if (ticket.status !== 'waiting' || String(ticket.roomId) !== String(room.id) || !isCriticalTicket(ticket)) {
+      return
+    }
+
+    setCallingUrgentTicketId(ticket.id)
+    setReturnError(null)
+
+    try {
+      await ticketService.callTicket(ticket.id)
+      await loadQueue({ force: true, successMessage: 'Критический талон вызван вне очереди' })
+    } catch (error) {
+      console.error('Specialist urgent call failed', error)
+      setReturnError('Не удалось вызвать критический талон вне очереди')
+    } finally {
+      setCallingUrgentTicketId(null)
+    }
+  }
+
   return (
     <div className="specialist-workspace">
       <section className="specialist-panel specialist-current-panel">
@@ -608,7 +633,30 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           {waitingTickets.length > 0 ? (
             <div className="specialist-waiting-list">
               {waitingTickets.map((ticket) => (
-                <TicketCard compact key={ticket.id} now={now} ticket={ticket} />
+                <div
+                  className={isCriticalTicket(ticket) ? 'critical-ticket-frame' : undefined}
+                  key={ticket.id}
+                >
+                  <TicketCard
+                    actionSlot={
+                      isCriticalTicket(ticket) && ticket.status === 'waiting' ? (
+                        <div className="button-row">
+                          <Button
+                            disabled={loading || callingUrgentTicketId === ticket.id}
+                            icon={<FastForward size={17} />}
+                            onClick={() => void handleCallUrgentTicket(ticket)}
+                            variant="primary"
+                          >
+                            {callingUrgentTicketId === ticket.id ? 'Вызываем...' : 'Вызвать вне очереди'}
+                          </Button>
+                        </div>
+                      ) : null
+                    }
+                    compact
+                    now={now}
+                    ticket={ticket}
+                  />
+                </div>
               ))}
             </div>
           ) : (

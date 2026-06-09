@@ -75,6 +75,20 @@ export const smartqBusinessRoutes: AppRoute[] = [
     element: <Navigate replace to="/admin" />,
   },
   {
+    path: '/admin/routing',
+    label: 'Администрирование',
+    allowedRoles: ['admin', 'manager'],
+    hideFromSidebar: true,
+    element: <Navigate replace to="/admin" />,
+  },
+  {
+    path: '/admin/queue-routing',
+    label: 'Администрирование',
+    allowedRoles: ['admin', 'manager'],
+    hideFromSidebar: true,
+    element: <Navigate replace to="/admin" />,
+  },
+  {
     path: '/admin/managers',
     label: 'Менеджеры',
     allowedRoles: ['admin', 'manager'],

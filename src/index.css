@@ -1287,6 +1287,17 @@ h3 {
   gap: 12px;
 }
 
+.critical-ticket-frame {
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger), transparent 44%);
+  border-radius: var(--radius);
+  padding: 3px;
+}
+
+.critical-ticket-frame .ticket-card {
+  border-color: color-mix(in srgb, var(--danger), transparent 48%);
+}
+
 .waiting-count {
   align-items: center;
   background: var(--primary-soft);
@@ -4012,6 +4023,16 @@ h3 {
   color: var(--text);
   font-size: clamp(54px, 10vw, 112px);
   line-height: 1;
+}
+
+.kiosk-queue-position {
+  background: var(--primary-soft);
+  border: 1px solid color-mix(in srgb, var(--primary), transparent 58%);
+  border-radius: var(--radius);
+  color: var(--primary-strong);
+  font-size: clamp(18px, 2.4vw, 28px);
+  font-weight: 900;
+  padding: 12px 18px;
 }
 
 .kiosk-result .ticket-print-panel {

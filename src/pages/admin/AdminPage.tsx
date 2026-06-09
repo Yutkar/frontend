@@ -10,12 +10,11 @@ import { ManagersSection } from './AdminManagersPage'
 import { RoomsSection } from './AdminRoomsPage'
 import { StaffSection } from './AdminStaffPage'
 import { BoardSettingsSection } from './AdminBoardSettingsPage'
-import { QueueRoutingSection } from './AdminQueueRoutingPage'
 import { ServiceTypesSection } from './AdminServiceTypesPage'
 import { TerminalsSection } from './AdminTerminalsPage'
 import { AppSettingsSection } from './AdminAppSettingsPage'
 
-type AdminSectionId = 'rooms' | 'service-types' | 'routing' | 'terminals' | 'staff' | 'managers' | 'board' | 'app-settings'
+type AdminSectionId = 'rooms' | 'service-types' | 'terminals' | 'staff' | 'managers' | 'board' | 'app-settings'
 
 type AdminSectionConfig = {
   id: AdminSectionId
@@ -32,7 +31,6 @@ type AdminSummary = {
 const adminSections: AdminSectionConfig[] = [
   { id: 'rooms', roles: ['admin', 'manager'] },
   { id: 'service-types', roles: ['admin', 'manager'] },
-  { id: 'routing', roles: ['admin', 'manager'] },
   { id: 'terminals', roles: ['admin', 'manager'] },
   { id: 'staff', roles: ['admin', 'manager'] },
   { id: 'managers', roles: ['admin'] },
@@ -103,7 +101,6 @@ export function AdminPage() {
 
   function getSectionLabel(section: AdminSectionConfig): string {
     if (section.id === 'service-types') return t.admin.serviceTypes
-    if (section.id === 'routing') return t.admin.routing
     if (section.id === 'terminals') return t.admin.terminals
     if (section.id === 'staff') return t.admin.staff
     if (section.id === 'managers') return t.admin.managers
@@ -159,7 +156,6 @@ export function AdminPage() {
       {selectedSection?.id === 'service-types' ? (
         <ServiceTypesSection onServiceTypesChange={handleServiceTypesChange} />
       ) : null}
-      {selectedSection?.id === 'routing' ? <QueueRoutingSection onRoutingChange={handleRoomsChange} /> : null}
       {selectedSection?.id === 'terminals' ? <TerminalsSection /> : null}
       {selectedSection?.id === 'staff' ? (
         <StaffSection onStaffChange={handleAdminDataChange} refreshKey={roomsVersion} />

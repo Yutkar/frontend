@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { getApiErrorMessage, queueApi, socketClient } from '@services/api'
+import { getRoomQueuePeopleAhead, getTicketPeopleAhead } from '@shared/utils'
 import type {
   AnalyticsPoint,
   QueueEvent,
@@ -322,22 +323,38 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
     try {
       const before = get().tickets
+      const peopleAhead = getRoomQueuePeopleAhead(input.roomId, before)
       const snapshot = await queueApi.createTicket(input)
       const createdTicket = snapshot.tickets.find(
         (ticket) => !before.some((item) => item.id === ticket.id),
       )
+      const enrichedCreatedTicket = createdTicket
+        ? {
+            ...createdTicket,
+            peopleAhead: getTicketPeopleAhead(createdTicket, peopleAhead),
+            queuePosition: createdTicket.queuePosition ?? getTicketPeopleAhead(createdTicket, peopleAhead) + 1,
+          }
+        : undefined
+      const nextSnapshot = enrichedCreatedTicket
+        ? {
+            ...snapshot,
+            tickets: snapshot.tickets.map((ticket) => (
+              ticket.id === enrichedCreatedTicket.id ? enrichedCreatedTicket : ticket
+            )),
+          }
+        : snapshot
 
       set((state) => ({
-        ...createSnapshotUpdate(snapshot, state),
+        ...createSnapshotUpdate(nextSnapshot, state),
         error: null,
         hydrated: true,
         lastUpdatedAt: new Date().toISOString(),
         loading: false,
-        selectedTicketId: createdTicket?.id,
+        selectedTicketId: enrichedCreatedTicket?.id,
         statusMessage: defaultSuccessMessage,
       }))
 
-      return createdTicket
+      return enrichedCreatedTicket
     } catch (error) {
       console.error('Queue ticket create failed', error)
       set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })

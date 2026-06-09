@@ -763,8 +763,22 @@ export const backendAdminApi: AdminApi = {
     return toServiceTypeResponseOption(response.data, { id, ...input })
   },
 
-  deleteServiceType(id) {
-    return deleteRecord('/service-types', id)
+  async deleteServiceType(id) {
+    try {
+      await deleteRecord('/service-types', id)
+    } catch (deleteError) {
+      console.warn('backendAdminApi.deleteServiceType: DELETE failed, trying soft delete', deleteError)
+
+      try {
+        await apiClient.patch(`/service-types/${id}`, {
+          active: false,
+          isActive: false,
+        })
+      } catch (patchError) {
+        console.warn('backendAdminApi.deleteServiceType: soft delete failed', patchError)
+        throw deleteError
+      }
+    }
   },
 
   getRooms() {

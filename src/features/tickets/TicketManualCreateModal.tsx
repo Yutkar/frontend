@@ -14,6 +14,11 @@ import type {
 } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import {
+  formatRoomName,
+  formatPeopleAhead,
+  getRoomQueuePeopleAhead,
+} from '@shared/utils'
+import {
   getAutoRoomForService,
   getAutoSpecialistForRoom,
   getPriorityLabel,
@@ -118,6 +123,10 @@ export function TicketManualCreateModal({
   )
   const noRoomAvailable = Boolean(selectedServiceType && !autoRoom && !loadingOptions)
   const noDoctorAssigned = Boolean(autoRoom && !autoDoctor && !loadingOptions)
+  const peopleAhead = useMemo(
+    () => getRoomQueuePeopleAhead(autoRoom?.id, tickets),
+    [autoRoom?.id, tickets],
+  )
   const canCreateTicket = Boolean(selectedServiceType && autoRoom && priority)
 
   useEffect(() => {
@@ -204,6 +213,11 @@ export function TicketManualCreateModal({
         ) : null}
         {!error && noDoctorAssigned ? (
           <div className="modal-info">Место обслуживания выбрано автоматически, врач не назначен</div>
+        ) : null}
+        {!error && autoRoom ? (
+          <div className="modal-info">
+            Место обслуживания выбрано автоматически: {formatRoomName(autoRoom)}. {formatPeopleAhead(peopleAhead)}.
+          </div>
         ) : null}
 
         <div className="settings-form-grid">

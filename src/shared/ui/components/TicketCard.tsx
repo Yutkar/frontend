@@ -1,7 +1,15 @@
 import type { ReactNode } from 'react'
 import type { Room, Ticket } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
-import { formatRoomName, formatTime, formatWaitingTime, getServiceTypeLabel, getWaitingMinutes } from '@shared/utils'
+import {
+  formatPeopleAhead,
+  formatRoomName,
+  formatTime,
+  formatWaitingTime,
+  getServiceTypeLabel,
+  getTicketPeopleAhead,
+  getWaitingMinutes,
+} from '@shared/utils'
 import { StatusBadge } from './StatusBadge'
 
 type TicketCardProps = {
@@ -40,6 +48,12 @@ export function TicketCard({ actionSlot, compact = false, now, room, ticket }: T
           <small>{t.tickets.created}</small>
           {formatTime(ticket.createdAt)}
         </span>
+        {(ticket.peopleAhead !== undefined || ticket.queuePosition !== undefined) ? (
+          <span>
+            <small>Очередь</small>
+            {formatPeopleAhead(getTicketPeopleAhead(ticket))}
+          </span>
+        ) : null}
         <span>
           <small>{t.tickets.room}</small>
           {formatRoomName(room ?? { id: ticket.roomId, name: ticket.roomName })}
