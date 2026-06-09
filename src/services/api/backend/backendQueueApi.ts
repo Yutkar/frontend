@@ -569,6 +569,48 @@ function filterBoardSnapshotByRoom(
   }
 }
 
+function getBoardHistorySortTime(ticket: QueueSnapshot['tickets'][number]): number {
+  const timestamp = Date.parse(ticket.calledAt ?? ticket.updatedAt ?? ticket.createdAt)
+
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function mergeBoardSnapshots(primary: QueueSnapshot, fallback: QueueSnapshot): QueueSnapshot {
+  const ticketsById = new Map<string, QueueSnapshot['tickets'][number]>()
+
+  fallback.tickets.forEach((ticket) => {
+    ticketsById.set(String(ticket.id), ticket)
+  })
+  primary.tickets.forEach((ticket) => {
+    ticketsById.set(String(ticket.id), ticket)
+  })
+
+  const roomsById = new Map<string, QueueSnapshot['rooms'][number]>()
+
+  fallback.rooms.forEach((room) => roomsById.set(String(room.id), room))
+  primary.rooms.forEach((room) => roomsById.set(String(room.id), room))
+
+  return {
+    ...primary,
+    rooms: Array.from(roomsById.values()),
+    tickets: Array.from(ticketsById.values())
+      .filter((ticket) => Boolean(ticket.calledAt))
+      .sort((left, right) => getBoardHistorySortTime(right) - getBoardHistorySortTime(left)),
+  }
+}
+
+async function getBoardHistoryFallbackSnapshot(): Promise<QueueSnapshot | null> {
+  try {
+    const response = await publicApiClient.get<unknown>('/tickets')
+
+    return toBoardQueueSnapshot(response.data)
+  } catch (error) {
+    console.warn('backendQueueApi: public GET /tickets board history fallback failed', error)
+
+    return null
+  }
+}
+
 function toRedirectBody(input: RedirectTicketInput, includeOptional = true): BackendRedirectBody {
   const note = input.note?.trim()
   const comment = input.comment?.trim() ?? input.reason?.trim()
@@ -597,7 +639,9 @@ export const backendQueueApi: QueueApi = {
           return publicApiClient.get<unknown>('/queue/board')
         })
       : await publicApiClient.get<unknown>('/queue/board')
-    const snapshot = toBoardQueueSnapshot(response.data)
+    const boardSnapshot = toBoardQueueSnapshot(response.data)
+    const fallbackSnapshot = await getBoardHistoryFallbackSnapshot()
+    const snapshot = fallbackSnapshot ? mergeBoardSnapshots(boardSnapshot, fallbackSnapshot) : boardSnapshot
 
     if (!roomId) {
       return snapshot

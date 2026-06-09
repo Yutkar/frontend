@@ -1490,7 +1490,6 @@ function getBoardTicketSortTime(ticket: Ticket): number {
 
 function isBoardCallTicket(ticket: Ticket): boolean {
   return Boolean(ticket.calledAt)
-    && (ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'no_show')
 }
 
 export function toBoardQueueSnapshot(value: unknown): QueueSnapshot {

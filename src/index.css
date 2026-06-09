@@ -3171,6 +3171,15 @@ h3 {
   justify-content: center;
 }
 
+.tv-minimal-stack {
+  display: grid;
+  gap: 28px;
+}
+
+.tv-recent-embedded {
+  min-height: 0;
+}
+
 .tv-layout-minimal .tv-call-card {
   min-height: min(72svh, 680px);
   width: 100%;

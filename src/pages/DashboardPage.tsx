@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownUp,
   PlusCircle,
-  Radio,
   RotateCcw,
   SlidersHorizontal,
   UserX,
@@ -109,7 +108,6 @@ export function DashboardPage() {
   const [busyTicketId, setBusyTicketId] = useState<string | null>(null)
   const now = useCurrentTime()
 
-  const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const error = useQueueStore((state) => state.error)
   const events = useQueueStore((state) => state.events)
   const hydrated = useQueueStore((state) => state.hydrated)
@@ -127,10 +125,8 @@ export function DashboardPage() {
     [now, tickets],
   )
   const selectedTicket = todayTickets.find((ticket) => ticket.id === selectedTicketId) ?? todayTickets[0]
-  const dispatchRoom = rooms.find((room) => room.isActive !== false && room.status === 'open')
   const canManageTicketSettings = user?.role === 'admin' || user?.role === 'manager'
   const canMarkTicketNoShow = user?.role === 'admin' || user?.role === 'specialist'
-  const canUseQueueActions = user?.role === 'admin'
   const visibleSuccessMessage = successMessage ?? statusMessage
   const hasActiveFilters = Object.values(filters).some((value) => value.trim() !== '')
 
@@ -328,16 +324,6 @@ export function DashboardPage() {
                   </button>
                 ))}
               </div>
-              {canUseQueueActions ? (
-                <Button
-                  disabled={!dispatchRoom || loading}
-                  icon={<Radio size={17} />}
-                  onClick={() => dispatchRoom && void callNextTicket(dispatchRoom.id)}
-                  variant="primary"
-                >
-                  {t.queue.callNext}
-                </Button>
-              ) : null}
             </div>
           </div>
           <div className="ticket-filters" aria-label={t.queue.filters}>

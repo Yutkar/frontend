@@ -82,7 +82,6 @@ function getCallKey(ticket?: Ticket): string {
 
 function isBoardCallTicket(ticket: Ticket): boolean {
   return Boolean(ticket.calledAt)
-    && (ticket.status === 'called' || ticket.status === 'in_service' || ticket.status === 'no_show')
 }
 
 function getSpeechLanguage(language: SmartQLanguage): string {
@@ -171,6 +170,40 @@ function buildVoicePhrase(
   const actionText = voiceSettings.action === 'enter' ? locale.voice.enter : locale.voice.approach
 
   return `${audienceText} ${ticketNumber}, ${actionText} ${getRussianPlaceTarget(room)}`
+}
+
+function RecentCallsPanel({
+  labels,
+  recentCalls,
+  rooms,
+  showTime,
+}: {
+  labels: NonNullable<CallBoardProps['labels']>
+  recentCalls: Ticket[]
+  rooms: Room[]
+  showTime: boolean
+}) {
+  return (
+    <section className="tv-recent tv-recent-embedded">
+      <span className="tv-section-label">
+        <BoardMultilingualLabel labelKey="recentCalls" />
+      </span>
+      {recentCalls.length > 0 ? (
+        recentCalls.map((ticket) => (
+          <div className="tv-recent-row" key={ticket.id}>
+            <strong>{ticket.number}</strong>
+            <span>{getRoomName(ticket, rooms)}</span>
+            {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
+            {ticket.status === 'no_show' ? <em>{labels.noShow}</em> : null}
+          </div>
+        ))
+      ) : (
+        <div className="tv-empty-recent">
+          <BoardMultilingualLabel labelKey="waiting" />
+        </div>
+      )}
+    </section>
+  )
 }
 
 export function CallBoard({
@@ -283,20 +316,30 @@ export function CallBoard({
 
   if (template === 'minimal') {
     return (
-      <div className="tv-layout tv-layout-minimal">
-        {currentCall ? (
-          <article
-            className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
-          >
-            <strong>{currentCall.number}</strong>
-            <span>{currentCallRoomName}</span>
-            {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
-          </article>
-        ) : (
-          <div className="tv-empty-call">
-            <BoardMultilingualLabel labelKey="waiting" />
-          </div>
-        )}
+      <div className={showRecentCalls ? 'tv-minimal-stack' : 'tv-layout tv-layout-minimal'}>
+        <div className="tv-layout tv-layout-minimal">
+          {currentCall ? (
+            <article
+              className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
+            >
+              <strong>{currentCall.number}</strong>
+              <span>{currentCallRoomName}</span>
+              {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
+            </article>
+          ) : (
+            <div className="tv-empty-call">
+              <BoardMultilingualLabel labelKey="waiting" />
+            </div>
+          )}
+        </div>
+        {showRecentCalls ? (
+          <RecentCallsPanel
+            labels={labels}
+            recentCalls={recentCalls}
+            rooms={rooms}
+            showTime={showTime}
+          />
+        ) : null}
       </div>
     )
   }
@@ -379,25 +422,12 @@ export function CallBoard({
       </section>
 
       {showRecentCalls ? (
-        <section className="tv-recent">
-          <span className="tv-section-label">
-            <BoardMultilingualLabel labelKey="recentCalls" />
-          </span>
-          {recentCalls.length > 0 ? (
-            recentCalls.map((ticket) => (
-              <div className="tv-recent-row" key={ticket.id}>
-                <strong>{ticket.number}</strong>
-                <span>{getRoomName(ticket, rooms)}</span>
-                {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
-                {ticket.status === 'no_show' ? <em>{labels.noShow}</em> : null}
-              </div>
-            ))
-          ) : (
-            <div className="tv-empty-recent">
-              <BoardMultilingualLabel labelKey="waiting" />
-            </div>
-          )}
-        </section>
+        <RecentCallsPanel
+          labels={labels}
+          recentCalls={recentCalls}
+          rooms={rooms}
+          showTime={showTime}
+        />
       ) : null}
     </div>
   )
