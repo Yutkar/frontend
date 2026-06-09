@@ -3080,7 +3080,7 @@ h3 {
 .tv-grid {
   display: grid;
   gap: 28px;
-  grid-template-columns: minmax(0, 1fr) minmax(500px, 0.48fr);
+  grid-template-columns: minmax(500px, 0.48fr) minmax(0, 1fr);
 }
 
 .tv-grid-single {

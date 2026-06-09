@@ -70,19 +70,18 @@ export function BoardSettingsSection() {
   }
 
   function getScreenUrl(screen: BoardScreen): string {
-    const base = window.location.origin
-    const roomIds = screen.roomIds?.length
-      ? screen.roomIds
-      : activeRooms
-        .filter((room) => screen.roomNames.includes(getRoomName(room)))
-        .map(getRoomBoardId)
-        .filter(Boolean)
+    const profile = getBoardProfile(
+      `screen-${screen.id}`,
+      screen.name,
+      screen.roomIds?.length === 1 ? 'individual' : 'general',
+      screen.roomIds?.[0] ?? '',
+    )
 
-    if (roomIds.length === 1) {
-      return `${base}/board?roomId=${encodeURIComponent(roomIds[0])}`
+    if (profile.boardType === 'individual' && profile.roomBoardId) {
+      return `${window.location.origin}/board?roomId=${encodeURIComponent(profile.roomBoardId)}`
     }
 
-    return `${base}/board`
+    return `${window.location.origin}/board`
   }
 
   function getRoomBoardPath(room: AdminRoomRecord): string {
@@ -147,6 +146,26 @@ export function BoardSettingsSection() {
     if (!draftProfile) return
 
     const profiles = boardSettings.profiles ?? []
+    const nextScreens = draftProfile.id.startsWith('screen-')
+      ? boardSettings.screens.map((screen) => {
+        if (`screen-${screen.id}` !== draftProfile.id) {
+          return screen
+        }
+
+        const selectedRoom = rooms.find((room) => getRoomBoardId(room) === draftProfile.roomBoardId)
+
+        return {
+          ...screen,
+          name: draftProfile.name,
+          roomIds: draftProfile.boardType === 'individual' && draftProfile.roomBoardId
+            ? [draftProfile.roomBoardId]
+            : screen.roomIds,
+          roomNames: draftProfile.boardType === 'individual' && selectedRoom
+            ? [getRoomName(selectedRoom)]
+            : screen.roomNames,
+        }
+      })
+      : boardSettings.screens
     const nextProfiles = profiles.some((profile) => profile.id === draftProfile.id)
       ? profiles.map((profile) => profile.id === draftProfile.id ? draftProfile : profile)
       : [...profiles, draftProfile]
@@ -156,6 +175,7 @@ export function BoardSettingsSection() {
       profiles: nextProfiles,
       recentCallsLimit: draftProfile.recentCallsLimit,
       roomBoardId: draftProfile.roomBoardId,
+      screens: nextScreens,
       showRecentCalls: draftProfile.showRecentCalls,
       showTime: draftProfile.showTime,
       template: draftProfile.template,
@@ -341,10 +361,16 @@ export function BoardSettingsSection() {
 
                   {/* Созданные экраны */}
                   {boardSettings.screens.map((screen) => {
+                    const profile = getBoardProfile(
+                      `screen-${screen.id}`,
+                      screen.name,
+                      screen.roomIds?.length === 1 ? 'individual' : 'general',
+                      screen.roomIds?.[0] ?? '',
+                    )
                     const url = getScreenUrl(screen)
                     return (
                       <tr key={screen.id}>
-                        <td><strong>{screen.name}</strong></td>
+                        <td><strong>{profile.name}</strong></td>
                         <td>{screen.roomNames.join(', ')}</td>
                         <td>
                           <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{url}</code>
@@ -366,6 +392,14 @@ export function BoardSettingsSection() {
                               variant="secondary"
                             >
                               {copied === url ? 'Скопировано' : 'Копировать'}
+                            </Button>
+                            <Button
+                              icon={<Edit3 size={14} />}
+                              onClick={() => startEditProfile(profile)}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Редактировать
                             </Button>
                             <Button
                               icon={<Trash2 size={14} />}

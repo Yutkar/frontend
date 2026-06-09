@@ -91,6 +91,16 @@ function getSpeechLanguage(language: SmartQLanguage): string {
   return 'ru-RU'
 }
 
+function hasSpeechVoice(language: SmartQLanguage): boolean {
+  if (language !== 'kk' || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return true
+  }
+
+  const voices = window.speechSynthesis.getVoices()
+
+  return voices.length === 0 || voices.some((voice) => voice.lang.toLowerCase().startsWith('kk'))
+}
+
 function getEnglishPlaceType(room?: Room | {
   id?: string
   name?: string
@@ -173,11 +183,13 @@ function buildVoicePhrase(
 }
 
 function RecentCallsPanel({
+  highlightedCallKey,
   labels,
   recentCalls,
   rooms,
   showTime,
 }: {
+  highlightedCallKey?: string
   labels: NonNullable<CallBoardProps['labels']>
   recentCalls: Ticket[]
   rooms: Room[]
@@ -190,7 +202,10 @@ function RecentCallsPanel({
       </span>
       {recentCalls.length > 0 ? (
         recentCalls.map((ticket) => (
-          <div className="tv-recent-row" key={ticket.id}>
+          <div
+            className={`tv-recent-row ${highlightedCallKey === getCallKey(ticket) ? 'tv-call-animated' : ''}`}
+            key={ticket.id}
+          >
             <strong>{ticket.number}</strong>
             <span>{getRoomName(ticket, rooms)}</span>
             {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
@@ -237,6 +252,12 @@ export function CallBoard({
     .filter(isBoardCallTicket)
     .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
     .slice(0, recentCallsLimit)
+  const historyCalls = currentCall
+    ? tickets
+      .filter((ticket) => isBoardCallTicket(ticket) && getCallKey(ticket) !== currentCallKey)
+      .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
+      .slice(0, recentCallsLimit)
+    : recentCalls
   const visibleCalls = showRecentCalls ? recentCalls : currentCall ? [currentCall] : []
 
   async function playBeep() {
@@ -277,6 +298,15 @@ export function CallBoard({
     if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
       window.speechSynthesis.cancel()
       const language = ticket.language ?? 'ru'
+
+      if (!hasSpeechVoice(language)) {
+        if (import.meta.env.DEV) {
+          console.warn('Голос kk-KZ недоступен, используется короткий звуковой сигнал')
+        }
+        await playBeep()
+        return
+      }
+
       const utterance = new SpeechSynthesisUtterance(buildVoicePhrase(ticket.number, room, language))
       utterance.lang = getSpeechLanguage(language)
       utterance.rate = 0.92
@@ -333,12 +363,13 @@ export function CallBoard({
           )}
         </div>
         {showRecentCalls ? (
-          <RecentCallsPanel
-            labels={labels}
-            recentCalls={recentCalls}
-            rooms={rooms}
-            showTime={showTime}
-          />
+            <RecentCallsPanel
+              highlightedCallKey={highlightedCallKey}
+              labels={labels}
+              recentCalls={historyCalls}
+              rooms={rooms}
+              showTime={showTime}
+            />
         ) : null}
       </div>
     )
@@ -369,10 +400,13 @@ export function CallBoard({
     return (
       <section className="tv-layout tv-layout-list">
         {visibleCalls.length > 0 ? visibleCalls.map((ticket) => (
-          <div className="tv-list-row" key={ticket.id}>
-            {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
+          <div
+            className={`tv-list-row ${highlightedCallKey === getCallKey(ticket) ? 'tv-call-animated' : ''}`}
+            key={ticket.id}
+          >
             <strong>{ticket.number}</strong>
             <span>{getRoomName(ticket, rooms)}</span>
+            {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
             {ticket.status === 'no_show' ? <em>{labels.noShow}</em> : null}
           </div>
         )) : (
@@ -386,6 +420,16 @@ export function CallBoard({
 
   return (
     <div className={`tv-grid ${showRecentCalls ? '' : 'tv-grid-single'}`}>
+      {showRecentCalls ? (
+        <RecentCallsPanel
+          highlightedCallKey={highlightedCallKey}
+          labels={labels}
+          recentCalls={historyCalls}
+          rooms={rooms}
+          showTime={showTime}
+        />
+      ) : null}
+
       <section className="tv-current">
         <div className="tv-section-heading">
           <span className="tv-section-label">
@@ -402,17 +446,6 @@ export function CallBoard({
               <span>{currentCallRoomName}</span>
               {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
             </article>
-            {showRecentCalls && currentCalls.length > 1 ? (
-              <div className="tv-current-list">
-                {currentCalls.slice(1, Math.min(recentCallsLimit, 6)).map((ticket) => (
-                  <div className="tv-recent-row" key={ticket.id}>
-                    <strong>{ticket.number}</strong>
-                    <span>{getRoomName(ticket, rooms)}</span>
-                    {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
-                  </div>
-                ))}
-              </div>
-            ) : null}
           </>
         ) : (
           <div className="tv-empty-call">
@@ -420,15 +453,6 @@ export function CallBoard({
           </div>
         )}
       </section>
-
-      {showRecentCalls ? (
-        <RecentCallsPanel
-          labels={labels}
-          recentCalls={recentCalls}
-          rooms={rooms}
-          showTime={showTime}
-        />
-      ) : null}
     </div>
   )
 }
