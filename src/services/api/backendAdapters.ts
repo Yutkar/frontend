@@ -72,6 +72,8 @@ export type BackendRoom = {
   workStartTime?: string
   work_end_time?: string
   work_start_time?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 export type BackendTicket = {
@@ -806,8 +808,10 @@ export function toSharedRooms(
       ticketIssueEnabled,
       loadPercent: 0,
       workload: 0,
-      workEndTime: room.workEndTime ?? room.work_end_time,
-      workStartTime: room.workStartTime ?? room.work_start_time,
+      workEndTime: room.workEndTime ?? room.workingEndTime ?? room.work_end_time,
+      workStartTime: room.workStartTime ?? room.workingStartTime ?? room.work_start_time,
+      workingEndTime: room.workingEndTime,
+      workingStartTime: room.workingStartTime,
     })
   })
 
@@ -846,8 +850,10 @@ export function toSharedRooms(
       ticketIssueEnabled: existingRoom?.ticketIssueEnabled ?? true,
       loadPercent: workload,
       workload,
-      workEndTime: existingRoom?.workEndTime,
-      workStartTime: existingRoom?.workStartTime,
+      workEndTime: existingRoom?.workEndTime ?? existingRoom?.workingEndTime,
+      workStartTime: existingRoom?.workStartTime ?? existingRoom?.workingStartTime,
+      workingEndTime: existingRoom?.workingEndTime,
+      workingStartTime: existingRoom?.workingStartTime,
     })
   })
 
@@ -884,8 +890,10 @@ export function toSharedRooms(
       ticketIssueEnabled: getBackendRoomTicketIssueEnabled(ticket.room),
       loadPercent: 0,
       workload: 0,
-      workEndTime: ticket.room?.workEndTime ?? ticket.room?.work_end_time,
-      workStartTime: ticket.room?.workStartTime ?? ticket.room?.work_start_time,
+      workEndTime: ticket.room?.workEndTime ?? ticket.room?.workingEndTime ?? ticket.room?.work_end_time,
+      workStartTime: ticket.room?.workStartTime ?? ticket.room?.workingStartTime ?? ticket.room?.work_start_time,
+      workingEndTime: ticket.room?.workingEndTime,
+      workingStartTime: ticket.room?.workingStartTime,
     })
   })
 

@@ -24,6 +24,8 @@ export type AdminRoomRecord = AdminRecord & {
   workStartTime?: string
   work_end_time?: string
   work_start_time?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 export const roleLabels: Record<Role, string> = {

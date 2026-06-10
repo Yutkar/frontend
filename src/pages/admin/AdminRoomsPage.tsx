@@ -58,8 +58,8 @@ function normalizeRoomNumberInput(value: string): string {
 }
 
 function getRoomWorkTimeLabel(room: AdminRoomRecord): string {
-  const workStartTime = normalizeWorkTime(room.workStartTime ?? room.work_start_time)
-  const workEndTime = normalizeWorkTime(room.workEndTime ?? room.work_end_time)
+  const workStartTime = normalizeWorkTime(room.workStartTime ?? room.workingStartTime ?? room.work_start_time)
+  const workEndTime = normalizeWorkTime(room.workEndTime ?? room.workingEndTime ?? room.work_end_time)
 
   if (workStartTime && workEndTime) {
     return `с ${workStartTime} до ${workEndTime}`
@@ -127,8 +127,8 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
       number: toRoomNumberInput(room),
       placeType: getRoomPlaceType(room),
       serviceTypeIds: getRoomServiceTypeIds(room),
-      workEndTime: room.workEndTime ?? room.work_end_time ?? '',
-      workStartTime: room.workStartTime ?? room.work_start_time ?? '',
+      workEndTime: room.workEndTime ?? room.workingEndTime ?? room.work_end_time ?? '',
+      workStartTime: room.workStartTime ?? room.workingStartTime ?? room.work_start_time ?? '',
     })
     setSuccessMessage(null)
   }
@@ -168,6 +168,8 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
       serviceTypeIds: form.serviceTypeIds.map(normalizeId),
       workEndTime: form.workEndTime || undefined,
       workStartTime: form.workStartTime || undefined,
+      workingEndTime: form.workEndTime || undefined,
+      workingStartTime: form.workStartTime || undefined,
     }
 
     try {

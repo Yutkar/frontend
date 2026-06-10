@@ -158,8 +158,10 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
       services: room.services,
       ticketIssueEnabled: room.ticketIssueEnabled,
       title: room.title,
-      workEndTime: room.workEndTime,
-      workStartTime: room.workStartTime,
+      workEndTime: room.workEndTime ?? room.workingEndTime,
+      workStartTime: room.workStartTime ?? room.workingStartTime,
+      workingEndTime: room.workingEndTime,
+      workingStartTime: room.workingStartTime,
     }))
 
   fallbackRooms
@@ -178,8 +180,10 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
           ticketIssueEnabled: room.ticketIssueEnabled,
           isTicketIssueEnabled: room.isTicketIssueEnabled,
           kioskEnabled: room.kioskEnabled,
-          workEndTime: room.workEndTime,
-          workStartTime: room.workStartTime,
+          workEndTime: room.workEndTime ?? room.workingEndTime,
+          workStartTime: room.workStartTime ?? room.workingStartTime,
+          workingEndTime: room.workingEndTime,
+          workingStartTime: room.workingStartTime,
         })
       }
     })
@@ -251,8 +255,10 @@ function mergeRoomWithFallback(room: TicketSettingsRoomOption, fallbackRooms: Ro
   return {
     ...fallbackRoom,
     ...room,
-    workEndTime: room.workEndTime ?? fallbackRoom?.workEndTime,
-    workStartTime: room.workStartTime ?? fallbackRoom?.workStartTime,
+    workEndTime: room.workEndTime ?? room.workingEndTime ?? fallbackRoom?.workEndTime ?? fallbackRoom?.workingEndTime,
+    workStartTime: room.workStartTime ?? room.workingStartTime ?? fallbackRoom?.workStartTime ?? fallbackRoom?.workingStartTime,
+    workingEndTime: room.workingEndTime ?? fallbackRoom?.workingEndTime,
+    workingStartTime: room.workingStartTime ?? fallbackRoom?.workingStartTime,
   }
 }
 

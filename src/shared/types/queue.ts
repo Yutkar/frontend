@@ -72,6 +72,8 @@ export type Room = {
   loadPercent: number
   workEndTime?: string
   workStartTime?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 export type QueueEventType =

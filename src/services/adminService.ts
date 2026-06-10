@@ -19,13 +19,15 @@ export type AdminRoomPayload = {
   isActive?: boolean
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
-  name: string
+  name?: string
   number?: string | number
   placeType?: string
   serviceTypeIds?: Array<string | number>
   ticketIssueEnabled?: boolean
   workEndTime?: string
   workStartTime?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 export type AdminUserPayload = AdminUserInput & {
@@ -425,6 +427,8 @@ export const adminService = {
           ticketIssueEnabled: typeof room.ticketIssueEnabled === 'boolean' ? room.ticketIssueEnabled : undefined,
           workEndTime: typeof room.workEndTime === 'string' ? room.workEndTime : undefined,
           workStartTime: typeof room.workStartTime === 'string' ? room.workStartTime : undefined,
+          workingEndTime: typeof room.workingEndTime === 'string' ? room.workingEndTime : undefined,
+          workingStartTime: typeof room.workingStartTime === 'string' ? room.workingStartTime : undefined,
         } as AdminRecordInput)
       }))
 

@@ -341,8 +341,8 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
       ? record.active
       : record.status !== 'paused' && record.status !== 'inactive' && record.status !== 'deleted'
   const serviceTypeIds = getServiceTypeIds(record)
-  const workEndTime = getText(record.workEndTime ?? record.work_end_time)
-  const workStartTime = getText(record.workStartTime ?? record.work_start_time)
+  const workEndTime = getText(record.workEndTime ?? record.workingEndTime ?? record.work_end_time)
+  const workStartTime = getText(record.workStartTime ?? record.workingStartTime ?? record.work_start_time)
   const ticketIssueEnabled = typeof record.ticketIssueEnabled === 'boolean'
     ? record.ticketIssueEnabled
     : typeof record.isTicketIssueEnabled === 'boolean'
@@ -363,6 +363,8 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
     serviceTypeIds,
     ...(workEndTime ? { workEndTime } : {}),
     ...(workStartTime ? { workStartTime } : {}),
+    ...(workEndTime ? { workingEndTime: workEndTime } : {}),
+    ...(workStartTime ? { workingStartTime: workStartTime } : {}),
   }
 }
 
@@ -534,8 +536,9 @@ function toRoomCreatePayload(input: AdminRecordInput) {
   const name = getText(input.name) ?? getText(input.title) ?? ''
   const number = getText(input.number)
   const placeType = getText(input.placeType) ?? getText(input.place_type)
-  const workEndTime = getText(input.workEndTime ?? input.work_end_time)
-  const workStartTime = getText(input.workStartTime ?? input.work_start_time)
+  const workEndTime = getText(input.workEndTime ?? input.workingEndTime ?? input.work_end_time)
+  const workStartTime = getText(input.workStartTime ?? input.workingStartTime ?? input.work_start_time)
+  const hasServiceTypeIds = Array.isArray(input.serviceTypeIds)
   const serviceTypeIds = normalizeIdList(input.serviceTypeIds as Array<string | number> | undefined)
   const ticketIssueEnabled = typeof input.ticketIssueEnabled === 'boolean'
     ? input.ticketIssueEnabled
@@ -546,13 +549,15 @@ function toRoomCreatePayload(input: AdminRecordInput) {
         : undefined
 
   return {
-    name,
+    ...(name ? { name } : {}),
     ...(number ? { number } : {}),
     ...(placeType ? { placeType } : {}),
-    serviceTypeIds,
+    ...(hasServiceTypeIds ? { serviceTypeIds } : {}),
     ...(ticketIssueEnabled === undefined ? {} : { ticketIssueEnabled, isTicketIssueEnabled: ticketIssueEnabled }),
     ...(workEndTime ? { workEndTime } : {}),
     ...(workStartTime ? { workStartTime } : {}),
+    ...(workEndTime ? { workingEndTime: workEndTime } : {}),
+    ...(workStartTime ? { workingStartTime: workStartTime } : {}),
   }
 }
 
@@ -629,7 +634,7 @@ async function updateRoom(path: string, id: string | number, input: AdminRecordI
       active: payload.active,
       isTicketIssueEnabled: payload.isTicketIssueEnabled,
       name: payload.name,
-      services: payload.serviceTypeIds,
+      ...(Array.isArray(payload.serviceTypeIds) ? { services: payload.serviceTypeIds } : {}),
       ticketIssueEnabled: payload.ticketIssueEnabled,
     }),
     () => apiClient.put<unknown>(`${path}/${id}`, payload),

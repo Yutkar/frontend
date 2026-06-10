@@ -43,6 +43,8 @@ type BackendRoomOption = {
   workStartTime?: string
   work_end_time?: string
   work_start_time?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 type BackendServiceTypeOption = {
@@ -193,8 +195,8 @@ function isBackendRoomAcceptingTickets(room: BackendRoomOption): boolean {
   }
 
   return isWithinWorkHours({
-    workEndTime: room.workEndTime ?? room.work_end_time,
-    workStartTime: room.workStartTime ?? room.work_start_time,
+    workEndTime: room.workEndTime ?? room.workingEndTime ?? room.work_end_time,
+    workStartTime: room.workStartTime ?? room.workingStartTime ?? room.work_start_time,
   }) && (room.isActive
     ?? room.active
     ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted'))
@@ -332,8 +334,10 @@ function toSettingsOptions(
       services: room.services,
       ticketIssueEnabled: room.ticketIssueEnabled,
       title: room.title,
-      workEndTime: room.workEndTime ?? room.work_end_time,
-      workStartTime: room.workStartTime ?? room.work_start_time,
+      workEndTime: room.workEndTime ?? room.workingEndTime ?? room.work_end_time,
+      workStartTime: room.workStartTime ?? room.workingStartTime ?? room.work_start_time,
+      workingEndTime: room.workingEndTime,
+      workingStartTime: room.workingStartTime,
     })),
     serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({
       active: serviceType.active ?? serviceType.isActive ?? serviceType.enabled,

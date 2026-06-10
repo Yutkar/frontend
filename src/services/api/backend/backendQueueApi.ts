@@ -194,11 +194,15 @@ function isBackendRoomAcceptingTickets(room: BackendRoom): boolean {
   if (!isWithinWorkHours({
     workEndTime: typeof record.workEndTime === 'string'
       ? record.workEndTime
+      : typeof record.workingEndTime === 'string'
+        ? record.workingEndTime
       : typeof record.work_end_time === 'string'
         ? record.work_end_time
         : undefined,
     workStartTime: typeof record.workStartTime === 'string'
       ? record.workStartTime
+      : typeof record.workingStartTime === 'string'
+        ? record.workingStartTime
       : typeof record.work_start_time === 'string'
         ? record.work_start_time
         : undefined,

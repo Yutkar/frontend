@@ -8,7 +8,6 @@ const activeStatuses = new Set(['created', 'waiting', 'called', 'in_service', 'r
 const waitingStatuses = new Set(['created', 'waiting', 'redirected'])
 
 const defaultWorkdayEndHour = 18
-const fallbackRemainingWorkMinutes = 60
 
 const serviceDurationByType: Record<ServiceType, number> = {
   billing: 10,
@@ -204,10 +203,7 @@ export function planRoomLoads(
   tickets: Ticket[],
   now: number | Date = Date.now(),
 ): { rooms: PlannedRoom[]; tickets: Ticket[] } {
-  const defaultRemainingWorkMinutes = Math.max(
-    getDefaultRemainingWorkMinutes(now),
-    fallbackRemainingWorkMinutes,
-  )
+  const defaultRemainingWorkMinutes = getDefaultRemainingWorkMinutes(now)
   const activeRooms = rooms.filter((room) =>
     room.isActive !== false && room.status !== 'paused' && isWithinWorkHours(room, now),
   )

@@ -13,6 +13,8 @@ export const activeWorkloadStatuses = new Set<TicketStatus>([
 type WorkHoursSource = {
   workEndTime?: string | null
   workStartTime?: string | null
+  workingEndTime?: string | null
+  workingStartTime?: string | null
 }
 
 type QueueRiskOptions = {
@@ -76,12 +78,15 @@ export function parseWorkTimeMinutes(value?: string | null): number | undefined 
 }
 
 export function hasWorkHours(source?: WorkHoursSource | null): boolean {
-  return Boolean(normalizeWorkTime(source?.workStartTime) || normalizeWorkTime(source?.workEndTime))
+  return Boolean(
+    normalizeWorkTime(source?.workStartTime ?? source?.workingStartTime) ||
+    normalizeWorkTime(source?.workEndTime ?? source?.workingEndTime),
+  )
 }
 
 export function isWithinWorkHours(source?: WorkHoursSource | null, now: Date | number = new Date()): boolean {
-  const startMinutes = parseWorkTimeMinutes(source?.workStartTime)
-  const endMinutes = parseWorkTimeMinutes(source?.workEndTime)
+  const startMinutes = parseWorkTimeMinutes(source?.workStartTime ?? source?.workingStartTime)
+  const endMinutes = parseWorkTimeMinutes(source?.workEndTime ?? source?.workingEndTime)
 
   if (startMinutes === undefined && endMinutes === undefined) {
     return true
@@ -90,6 +95,10 @@ export function isWithinWorkHours(source?: WorkHoursSource | null, now: Date | n
   const currentMinutes = getCurrentDayMinutes(now)
 
   if (startMinutes !== undefined && endMinutes !== undefined) {
+    if (startMinutes === endMinutes) {
+      return true
+    }
+
     if (startMinutes <= endMinutes) {
       return currentMinutes >= startMinutes && currentMinutes < endMinutes
     }
@@ -105,14 +114,18 @@ export function isWithinWorkHours(source?: WorkHoursSource | null, now: Date | n
 }
 
 export function getRemainingWorkMinutes(source?: WorkHoursSource | null, now: Date | number = new Date()): number | undefined {
-  const endMinutes = parseWorkTimeMinutes(source?.workEndTime)
+  const endMinutes = parseWorkTimeMinutes(source?.workEndTime ?? source?.workingEndTime)
 
   if (endMinutes === undefined) {
     return undefined
   }
 
-  const startMinutes = parseWorkTimeMinutes(source?.workStartTime)
+  const startMinutes = parseWorkTimeMinutes(source?.workStartTime ?? source?.workingStartTime)
   const currentMinutes = getCurrentDayMinutes(now)
+
+  if (startMinutes !== undefined && startMinutes === endMinutes) {
+    return 24 * 60
+  }
 
   if (startMinutes !== undefined && startMinutes > endMinutes) {
     if (currentMinutes >= startMinutes) {
@@ -158,8 +171,8 @@ export function getRoomWorkloadRisk(
     isWorkingNow,
     queueDurationMinutes,
     remainingWorkMinutes,
-    workEndTime: normalizeWorkTime(room.workEndTime),
-    workStartTime: normalizeWorkTime(room.workStartTime),
+    workEndTime: normalizeWorkTime(room.workEndTime ?? room.workingEndTime),
+    workStartTime: normalizeWorkTime(room.workStartTime ?? room.workingStartTime),
   }
 }
 

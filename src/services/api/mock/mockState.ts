@@ -191,8 +191,8 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
   const name = getRecordText(record, ['name', 'title', 'roomName'], currentRoom?.name ?? `Кабинет ${id}`)
   const number = getRecordText(record, ['number'], currentRoom?.number ? String(currentRoom.number) : '')
   const placeType = getRecordText(record, ['placeType', 'place_type'], currentRoom?.placeType ? String(currentRoom.placeType) : '')
-  const workEndTime = getRecordText(record, ['workEndTime', 'work_end_time'], currentRoom?.workEndTime ?? '')
-  const workStartTime = getRecordText(record, ['workStartTime', 'work_start_time'], currentRoom?.workStartTime ?? '')
+  const workEndTime = getRecordText(record, ['workEndTime', 'workingEndTime', 'work_end_time'], currentRoom?.workEndTime ?? '')
+  const workStartTime = getRecordText(record, ['workStartTime', 'workingStartTime', 'work_start_time'], currentRoom?.workStartTime ?? '')
   const nextRoom: SharedRoom = {
     active: isActive,
     department: getRecordText(record, ['department'], currentRoom?.department ?? name),
@@ -225,6 +225,8 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
     workload: currentRoom?.workload ?? 0,
     workEndTime: workEndTime || undefined,
     workStartTime: workStartTime || undefined,
+    workingEndTime: workEndTime || undefined,
+    workingStartTime: workStartTime || undefined,
   }
 
   queueSnapshot.rooms = currentRoom

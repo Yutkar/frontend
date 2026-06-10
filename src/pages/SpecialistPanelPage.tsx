@@ -32,6 +32,16 @@ function getRoomProcedureLabel(room?: Room): string {
   return room.department || getServiceTypeLabel('consultation')
 }
 
+function hasConfiguredServices(room: Room): boolean {
+  const serviceIds = [
+    ...(room.serviceTypeIds ?? []),
+    ...(room.services ?? []).map((service) => (typeof service === 'object' ? service.id ?? service.serviceTypeId : service)),
+    ...(room.serviceTypes ?? []).map((service) => (typeof service === 'object' ? service.id ?? service.serviceTypeId : service)),
+  ].filter((serviceId) => serviceId !== undefined && serviceId !== null && String(serviceId).trim() !== '')
+
+  return Boolean(room.serviceTypeId) || serviceIds.length > 0
+}
+
 function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
   return (
     <div>
@@ -58,29 +68,31 @@ function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
 function SpecialistRoomToggle({ onChanged, room }: { onChanged: (room: Room) => Promise<void>; room: Room }) {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const roomInactive = room.isActive === false || room.status === 'paused'
+  const issueClosed = (room.ticketIssueEnabled ?? room.isTicketIssueEnabled ?? room.kioskEnabled) === false
 
   async function handleToggleRoom() {
     setError(null)
     setSaving(true)
 
     try {
-      const nextActive = roomInactive
+      if (issueClosed && !hasConfiguredServices(room)) {
+        setError('У кабинета не настроены услуги')
+        return
+      }
+
+      const nextIssueEnabled = issueClosed
       await adminService.updateRoom(room.id, {
-        active: nextActive,
-        isActive: nextActive,
-        name: room.name,
-        serviceTypeIds: room.serviceTypeIds,
+        isTicketIssueEnabled: nextIssueEnabled,
+        ticketIssueEnabled: nextIssueEnabled,
       })
       await onChanged({
         ...room,
-        currentTicketId: nextActive ? room.currentTicketId : undefined,
-        isActive: nextActive,
-        status: nextActive ? 'open' : 'paused',
+        isTicketIssueEnabled: nextIssueEnabled,
+        ticketIssueEnabled: nextIssueEnabled,
       })
     } catch (toggleError) {
       console.error('Specialist room toggle failed', toggleError)
-      setError(roomInactive ? 'Не удалось открыть кабинет' : 'Не удалось закрыть кабинет')
+      setError(issueClosed ? 'Не удалось открыть выдачу талонов' : 'Не удалось закрыть выдачу талонов')
     } finally {
       setSaving(false)
     }
@@ -90,13 +102,13 @@ function SpecialistRoomToggle({ onChanged, room }: { onChanged: (room: Room) => 
     <div className="specialist-room-toggle">
       <Button
         disabled={saving}
-        icon={roomInactive ? <Power size={18} /> : <PowerOff size={18} />}
+        icon={issueClosed ? <Power size={18} /> : <PowerOff size={18} />}
         onClick={handleToggleRoom}
-        variant={roomInactive ? 'primary' : 'danger'}
+        variant={issueClosed ? 'primary' : 'danger'}
       >
-        {roomInactive
-          ? saving ? 'Включаем выдачу...' : 'Включить выдачу талонов'
-          : saving ? 'Закрываем выдачу...' : 'Закрыть выдачу талонов'}
+          {issueClosed
+            ? saving ? 'Включаем выдачу...' : 'Включить выдачу талонов'
+            : saving ? 'Закрываем выдачу...' : 'Закрыть выдачу талонов'}
       </Button>
       {error ? <div className="modal-error">{error}</div> : null}
     </div>
