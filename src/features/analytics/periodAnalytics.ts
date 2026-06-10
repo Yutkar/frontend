@@ -139,7 +139,7 @@ function getRangePointLabel(timestamp: number, filters: AnalyticsTicketFilters):
 }
 
 function getServiceMinutes(ticket: Ticket): number | null {
-  const startedAt = parseTimestamp(ticket.startedAt)
+  const startedAt = parseTimestamp(ticket.serviceStartedAt ?? ticket.startedAt)
   const completedAt = parseTimestamp(ticket.completedAt)
 
   if (ticket.status !== 'completed' || startedAt === undefined || completedAt === undefined || completedAt < startedAt) {

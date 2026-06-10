@@ -3,6 +3,8 @@ import { Power, PowerOff } from 'lucide-react'
 import { SpecialistControls } from '@features/specialist/SpecialistControls'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
 import { adminService } from '@services/adminService'
+import { ticketService } from '@services/ticketService'
+import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { t } from '@shared/locales/useLocale'
 import type { Room, User } from '@shared/types'
 import { Button, StatusBadge } from '@shared/ui/components'
@@ -10,23 +12,34 @@ import { formatRoomName, getServiceTypeLabel } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 
-function getRoomProcedureLabel(room?: Room): string {
+function getRoomProcedureLabel(room?: Room, serviceTypes: TicketSettingsServiceTypeOption[] = []): string {
   if (!room) {
     return '-'
   }
 
+  const serviceTypeById = new Map(serviceTypes.map((serviceType) => [String(serviceType.id), serviceType.name]))
   const directServices = [...(room.serviceTypes ?? []), ...(room.services ?? [])]
     .map((service) => {
       if (typeof service === 'string' || typeof service === 'number') {
-        return String(service)
+        return serviceTypeById.get(String(service)) ?? String(service)
       }
 
-      return service.name ?? service.title ?? String(service.serviceTypeId ?? '')
+      const serviceId = String(service.serviceTypeId ?? service.id ?? service._id ?? '')
+
+      return service.name ?? service.title ?? serviceTypeById.get(serviceId) ?? serviceId
     })
     .filter(Boolean)
 
   if (directServices.length > 0) {
     return Array.from(new Set(directServices)).join(', ')
+  }
+
+  const serviceNames = [room.serviceTypeId, ...(room.serviceTypeIds ?? [])]
+    .map((serviceTypeId) => serviceTypeById.get(String(serviceTypeId)))
+    .filter((name): name is string => Boolean(name))
+
+  if (serviceNames.length > 0) {
+    return Array.from(new Set(serviceNames)).join(', ')
   }
 
   return room.department || getServiceTypeLabel('consultation')
@@ -42,7 +55,15 @@ function hasConfiguredServices(room: Room): boolean {
   return Boolean(room.serviceTypeId) || serviceIds.length > 0
 }
 
-function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
+function SpecialistUserSummary({
+  room,
+  serviceTypes,
+  user,
+}: {
+  room: Room
+  serviceTypes: TicketSettingsServiceTypeOption[]
+  user: User
+}) {
   return (
     <div>
       <span className="eyebrow">Текущий специалист</span>
@@ -58,7 +79,7 @@ function SpecialistUserSummary({ room, user }: { room: Room; user: User }) {
         </div>
         <div>
           <dt>Специальность</dt>
-          <dd>{user.department || getRoomProcedureLabel(room)}</dd>
+          <dd>{user.department || getRoomProcedureLabel(room, serviceTypes)}</dd>
         </div>
       </dl>
     </div>
@@ -120,6 +141,7 @@ export function SpecialistPanelPage() {
 
   const [roomOverride, setRoomOverride] = useState<Room | null>(null)
   const [roomStatusChecked, setRoomStatusChecked] = useState(false)
+  const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const user = useGlobalStore((state) => state.user)
   const hydrated = useQueueStore((state) => state.hydrated)
   const loadRoomNoShowTickets = useQueueStore((state) => state.loadRoomNoShowTickets)
@@ -183,6 +205,28 @@ export function SpecialistPanelPage() {
     }
   }, [loadRoomNoShowTickets, loadRoomQueue, specialistRoomId])
 
+  useEffect(() => {
+    let active = true
+
+    ticketService
+      .getTicketSettingsOptions()
+      .then((options) => {
+        if (active) {
+          setServiceTypes(options.serviceTypes)
+        }
+      })
+      .catch((loadError) => {
+        console.error('Specialist service types load failed', loadError)
+        if (active) {
+          setServiceTypes([])
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   if (!user) {
     return null
   }
@@ -210,7 +254,7 @@ export function SpecialistPanelPage() {
   return (
     <div className="page-stack">
       <section className="specialist-header">
-        <SpecialistUserSummary room={room} user={user} />
+        <SpecialistUserSummary room={room} serviceTypes={serviceTypes} user={user} />
         <div className="specialist-header-actions">
           <StatusBadge
             label={roomInactive ? 'Выдача остановлена' : t.status[room.status]}

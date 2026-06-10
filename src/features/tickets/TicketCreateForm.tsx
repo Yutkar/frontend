@@ -6,7 +6,13 @@ import type { TicketSettingsOptions } from '@services/api'
 import type { Room, Ticket, TicketCreateInput, TicketPriority } from '@shared/types'
 import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
-import { formatPeopleAhead, formatRoomName, getPriorityMeta, getRoomQueuePeopleAhead } from '@shared/utils'
+import {
+  formatPeopleAhead,
+  formatRoomName,
+  getAverageServiceDurationStats,
+  getPriorityMeta,
+  getRoomQueuePeopleAhead,
+} from '@shared/utils'
 import {
   getAutoRoomForService,
   getRoomsForService,
@@ -54,9 +60,9 @@ export function TicketCreateForm({
       rooms,
       fallbackRooms,
       tickets,
-      selectedServiceType?.averageDurationMinutes ?? 10,
+      getAverageServiceDurationStats(tickets, selectedServiceType?.id, selectedServiceType?.code).averageMinutes,
     ),
-    [fallbackRooms, rooms, selectedServiceType?.averageDurationMinutes, tickets],
+    [fallbackRooms, rooms, selectedServiceType?.code, selectedServiceType?.id, tickets],
   )
   const peopleAhead = useMemo(
     () => getRoomQueuePeopleAhead(autoRoom?.id, tickets),

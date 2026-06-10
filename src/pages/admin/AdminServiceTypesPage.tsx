@@ -8,7 +8,6 @@ import { getAdminErrorMessage } from './adminPageHelpers'
 
 type ServiceTypeFormState = {
   active: boolean
-  averageDurationMinutes: string
   code: ServiceType
   name: string
 }
@@ -19,21 +18,13 @@ type ServiceTypesSectionProps = {
 
 const emptyForm: ServiceTypeFormState = {
   active: true,
-  averageDurationMinutes: '10',
   code: 'consultation',
   name: '',
-}
-
-function toPositiveNumber(value: string, fallback: number): number {
-  const numberValue = Number(value)
-
-  return Number.isFinite(numberValue) ? Math.max(1, Math.round(numberValue)) : fallback
 }
 
 function toForm(serviceType: TicketSettingsServiceTypeOption): ServiceTypeFormState {
   return {
     active: serviceType.active !== false,
-    averageDurationMinutes: String(serviceType.averageDurationMinutes ?? 10),
     code: serviceType.code,
     name: serviceType.name,
   }
@@ -42,7 +33,6 @@ function toForm(serviceType: TicketSettingsServiceTypeOption): ServiceTypeFormSt
 function toPayload(form: ServiceTypeFormState): AdminServiceTypePayload {
   return {
     active: form.active,
-    averageDurationMinutes: toPositiveNumber(form.averageDurationMinutes, 10),
     code: form.code,
     name: form.name.trim(),
     priorityWeight: 1,
@@ -153,7 +143,7 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
               </span>
               <h2>Типы услуг</h2>
               <p className="admin-section-description">
-                Управляйте услугами, временем обслуживания и доступностью.
+                Управляйте услугами и их доступностью.
               </p>
             </div>
             <Button icon={<PlusCircle size={17} />} onClick={resetForm} variant="secondary">
@@ -174,7 +164,6 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
                 <thead>
                   <tr>
                     <th>Название услуги</th>
-                    <th>Среднее время</th>
                     <th>Активна</th>
                     <th>Действия</th>
                   </tr>
@@ -183,7 +172,6 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
                   {serviceTypes.map((serviceType) => (
                     <tr key={String(serviceType.id)}>
                       <td>{serviceType.name}</td>
-                      <td>{serviceType.averageDurationMinutes ?? 10} мин</td>
                       <td>
                         <StatusBadge
                           label={serviceType.active === false ? 'Неактивна' : 'Активна'}
@@ -228,19 +216,6 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                 placeholder="Консультация терапевта"
                 value={form.name}
-              />
-            </label>
-
-            <label className="field">
-              <span>Среднее время обслуживания, мин</span>
-              <input
-                min={1}
-                onChange={(event) => setForm((current) => ({
-                  ...current,
-                  averageDurationMinutes: event.target.value,
-                }))}
-                type="number"
-                value={form.averageDurationMinutes}
               />
             </label>
 

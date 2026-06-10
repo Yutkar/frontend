@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { CheckCircle2, FastForward, Play, RotateCcw, Shuffle, UserX, X } from 'lucide-react'
 import { ticketService } from '@services/ticketService'
-import type { TicketSettingsOptions, TicketSettingsServiceTypeOption } from '@services/api'
-import type { RedirectTicketInput, Room, ServiceType, Ticket, TicketPriority } from '@shared/types'
+import type { TicketSettingsOptions } from '@services/api'
+import type { RedirectTicketInput, Room, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
 import {
   formatDuration,
   formatRoomName,
+  getAverageServiceDurationStats,
   getPriorityMeta,
+  getQueueServiceDurationMinutes,
   getRoomWorkloadRisk,
   normalizeWorkTime,
   useCurrentTime,
@@ -35,14 +37,6 @@ const priorityOrder: Record<TicketPriority, number> = {
 
 const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
 const fallbackServiceMinutes = 10
-const fallbackServiceMinutesByType: Record<ServiceType, number> = {
-  billing: 10,
-  consultation: 12,
-  diagnostics: 20,
-  laboratory: 12,
-  pharmacy: 8,
-  registration: 10,
-}
 
 const emptyTicketSettingsOptions: TicketSettingsOptions = {
   rooms: [],
@@ -52,51 +46,6 @@ const emptyTicketSettingsOptions: TicketSettingsOptions = {
 
 function normalizeId(value?: string | number | null): string {
   return value == null ? '' : String(value)
-}
-
-function getServiceTypeDuration(
-  ticket: Ticket,
-  serviceTypes: TicketSettingsServiceTypeOption[],
-  completedAverageMinutes?: number,
-): number {
-  const serviceType = serviceTypes.find((item) => (
-    normalizeId(item.id) === normalizeId(ticket.serviceTypeId) ||
-    item.code === ticket.serviceType
-  ))
-
-  return serviceType?.averageDurationMinutes
-    ?? completedAverageMinutes
-    ?? fallbackServiceMinutesByType[ticket.serviceType]
-    ?? fallbackServiceMinutes
-}
-
-function getCompletedAverageMinutes(tickets: Ticket[], roomId: string | number): number | undefined {
-  const serviceDurations = tickets
-    .filter((ticket) => String(ticket.roomId) === String(roomId))
-    .filter((ticket) => ticket.status === 'completed')
-    .map((ticket) => {
-      if (!ticket.startedAt || !ticket.completedAt) {
-        return undefined
-      }
-
-      const startedAt = Date.parse(ticket.startedAt)
-      const completedAt = Date.parse(ticket.completedAt)
-
-      if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt)) {
-        return undefined
-      }
-
-      return Math.max(1, Math.round((completedAt - startedAt) / 60_000))
-    })
-    .filter((minutes): minutes is number => minutes !== undefined)
-
-  if (serviceDurations.length === 0) {
-    return undefined
-  }
-
-  const total = serviceDurations.reduce((sum, minutes) => sum + minutes, 0)
-
-  return Math.max(1, Math.round(total / serviceDurations.length))
 }
 
 function formatWorkDuration(minutes?: number): string {
@@ -210,9 +159,9 @@ function RedirectPatientModal({
       rooms,
       fallbackRooms,
       tickets,
-      selectedServiceType?.averageDurationMinutes ?? fallbackServiceMinutes,
+      getAverageServiceDurationStats(tickets, selectedServiceType?.id, selectedServiceType?.code).averageMinutes,
     ),
-    [fallbackRooms, rooms, selectedServiceType?.averageDurationMinutes, tickets],
+    [fallbackRooms, rooms, selectedServiceType?.code, selectedServiceType?.id, tickets],
   )
   const noRoomAvailable = Boolean(selectedServiceType && !autoRoom && !loadingOptions)
   const isBusy = saving || loadingOptions
@@ -338,7 +287,6 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const [returnError, setReturnError] = useState<string | null>(null)
   const [returningTicketId, setReturningTicketId] = useState<string | null>(null)
   const [redirectTicketItem, setRedirectTicketItem] = useState<Ticket | null>(null)
-  const [queueServiceTypes, setQueueServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const [callingUrgentTicketId, setCallingUrgentTicketId] = useState<string | null>(null)
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const completeService = useQueueStore((state) => state.completeService)
@@ -353,28 +301,6 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const startService = useQueueStore((state) => state.startService)
   const tickets = useQueueStore((state) => state.tickets)
   const now = useCurrentTime()
-
-  useEffect(() => {
-    let active = true
-
-    ticketService
-      .getTicketSettingsOptions()
-      .then((options) => {
-        if (active) {
-          setQueueServiceTypes(options.serviceTypes)
-        }
-      })
-      .catch((loadError) => {
-        console.error('Specialist queue calculation options load failed', loadError)
-        if (active) {
-          setQueueServiceTypes([])
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   const roomTickets = useMemo(
     () =>
@@ -424,25 +350,45 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         }),
     [noShowTickets, room.id],
   )
-  const completedAverageMinutes = useMemo(
-    () => getCompletedAverageMinutes(tickets, room.id),
-    [room.id, tickets],
-  )
+  const roomCompletedStats = useMemo(() => {
+    const roomCompletedMinutes = tickets
+      .filter((ticket) => String(ticket.roomId) === String(room.id) && ticket.status === 'completed')
+      .map((ticket) => getAverageServiceDurationStats([ticket], ticket.serviceTypeId, ticket.serviceType))
+      .filter((stats) => stats.hasData)
+      .map((stats) => stats.averageMinutes)
+
+    if (roomCompletedMinutes.length === 0) {
+      return {
+        averageMinutes: fallbackServiceMinutes,
+        hasData: false,
+      }
+    }
+
+    return {
+      averageMinutes: Math.max(
+        1,
+        Math.round(roomCompletedMinutes.reduce((sum, minutes) => sum + minutes, 0) / roomCompletedMinutes.length),
+      ),
+      hasData: true,
+    }
+  }, [room.id, tickets])
   const queueCalculation = useMemo(() => {
     const activeWaitingCount = roomTickets.length
-    const queueDurationMinutes = roomTickets.reduce((total, ticket) => (
-      total + getServiceTypeDuration(ticket, queueServiceTypes, completedAverageMinutes)
-    ), 0)
+    const queueDurationMinutes = getQueueServiceDurationMinutes(roomTickets, tickets)
     const averageServiceMinutes = activeWaitingCount > 0
       ? Math.max(1, Math.round(queueDurationMinutes / activeWaitingCount))
-      : completedAverageMinutes ?? fallbackServiceMinutes
+      : roomCompletedStats.averageMinutes
+    const hasDurationData = activeWaitingCount > 0
+      ? roomTickets.some((ticket) => getAverageServiceDurationStats(tickets, ticket.serviceTypeId, ticket.serviceType).hasData)
+      : roomCompletedStats.hasData
 
     return {
       activeWaitingCount,
       averageServiceMinutes,
+      hasDurationData,
       queueDurationMinutes,
     }
-  }, [completedAverageMinutes, queueServiceTypes, roomTickets])
+  }, [roomCompletedStats.averageMinutes, roomCompletedStats.hasData, roomTickets, tickets])
   const workTimeCalculation = useMemo(() => getRoomWorkloadRisk(room, tickets, {
     averageServiceMinutes: queueCalculation.averageServiceMinutes,
     now,
@@ -573,7 +519,11 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
             </div>
             <div>
               <dt>Среднее обслуживание</dt>
-              <dd>{queueCalculation.averageServiceMinutes} мин</dd>
+              <dd>
+                {queueCalculation.hasDurationData
+                  ? `${queueCalculation.averageServiceMinutes} мин`
+                  : 'Нет данных'}
+              </dd>
             </div>
             <div>
               <dt>Очередь займёт примерно</dt>

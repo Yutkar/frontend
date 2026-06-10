@@ -3,20 +3,12 @@ import {
   getRemainingWorkMinutes as getRoomRemainingWorkMinutes,
   isWithinWorkHours,
 } from './workingHours'
+import { getAverageServiceMinutesForTicket } from './serviceDuration'
 
 const activeStatuses = new Set(['created', 'waiting', 'called', 'in_service', 'redirected'])
 const waitingStatuses = new Set(['created', 'waiting', 'redirected'])
 
 const defaultWorkdayEndHour = 18
-
-const serviceDurationByType: Record<ServiceType, number> = {
-  billing: 10,
-  consultation: 18,
-  diagnostics: 25,
-  laboratory: 12,
-  pharmacy: 8,
-  registration: 10,
-}
 
 const serviceTypeIdsByType: Record<ServiceType, string[]> = {
   billing: ['14'],
@@ -67,16 +59,12 @@ function getDefaultRemainingWorkMinutes(now: number | Date = Date.now(), endHour
   return Math.max(0, minutes)
 }
 
-function getServiceDurationMinutes(ticket: Ticket): number {
-  return serviceDurationByType[ticket.serviceType] ?? serviceDurationByType.consultation
-}
-
-function getRemainingServiceMinutes(ticket: Ticket, now: number | Date = Date.now()): number {
+function getRemainingServiceMinutes(ticket: Ticket, allTickets: Ticket[], now: number | Date = Date.now()): number {
   if (!activeStatuses.has(ticket.status)) {
     return 0
   }
 
-  const durationMinutes = getServiceDurationMinutes(ticket)
+  const durationMinutes = getAverageServiceMinutesForTicket(allTickets, ticket)
 
   if (ticket.status !== 'in_service') {
     return durationMinutes
@@ -147,9 +135,11 @@ function roomSupportsTicket(room: Room, ticket: Ticket): boolean {
     .filter((value): value is string => Boolean(value))
   const serviceTypeIds = (room.serviceTypeIds ?? []).map((id) => String(id).trim().toLowerCase())
   const ticketServiceTypeIds = serviceTypeIdsByType[ticket.serviceType]
+  const ticketServiceTypeId = normalizeServiceValue(ticket.serviceTypeId)
 
   if (serviceTypeIds.length > 0) {
-    return ticketServiceTypeIds.some((id) => serviceTypeIds.includes(id)) ||
+    return Boolean(ticketServiceTypeId && serviceTypeIds.includes(ticketServiceTypeId)) ||
+      ticketServiceTypeIds.some((id) => serviceTypeIds.includes(id)) ||
       serviceValues.includes(ticket.serviceType.toLowerCase())
   }
 
@@ -226,7 +216,7 @@ export function planRoomLoads(
       }
 
       accumulator.assignedTickets.push(ticket)
-      accumulator.serviceMinutes += getRemainingServiceMinutes(ticket, now)
+      accumulator.serviceMinutes += getRemainingServiceMinutes(ticket, plannedTickets, now)
     })
 
   activeTickets
@@ -240,7 +230,7 @@ export function planRoomLoads(
 
       ticket.roomId = accumulator.room.id
       accumulator.assignedTickets.push(ticket)
-      accumulator.serviceMinutes += getRemainingServiceMinutes(ticket, now)
+      accumulator.serviceMinutes += getRemainingServiceMinutes(ticket, plannedTickets, now)
     })
 
   accumulators.forEach((accumulator) => {
@@ -252,7 +242,7 @@ export function planRoomLoads(
         ticket.etaMinutes = waitingStatuses.has(ticket.status)
           ? Math.max(0, Math.round(minutesBeforeTicket))
           : 0
-        minutesBeforeTicket += getRemainingServiceMinutes(ticket, now)
+        minutesBeforeTicket += getRemainingServiceMinutes(ticket, plannedTickets, now)
       })
   })
 

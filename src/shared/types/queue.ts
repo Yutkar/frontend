@@ -37,6 +37,7 @@ export type Ticket = {
   createdAt: string
   hasActualCreatedAt?: boolean
   calledAt?: string
+  serviceStartedAt?: string
   startedAt?: string
   completedAt?: string
   updatedAt?: string

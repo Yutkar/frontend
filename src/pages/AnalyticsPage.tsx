@@ -35,11 +35,13 @@ function subtractMonths(date: Date, months: number): Date {
 }
 
 function getCompletedServiceMinutes(ticket: Ticket): number | null {
-  if (ticket.status !== 'completed' || !ticket.startedAt || !ticket.completedAt) {
+  const serviceStartedAt = ticket.serviceStartedAt ?? ticket.startedAt
+
+  if (ticket.status !== 'completed' || !serviceStartedAt || !ticket.completedAt) {
     return null
   }
 
-  const startedAt = Date.parse(ticket.startedAt)
+  const startedAt = Date.parse(serviceStartedAt)
   const completedAt = Date.parse(ticket.completedAt)
 
   if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt) || completedAt < startedAt) {

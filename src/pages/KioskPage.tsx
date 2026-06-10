@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { TicketPrintPreview, type TicketPrintData } from '@features/tickets/TicketPrintPreview'
 import {
+  getAutoRoomForService,
   getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
@@ -13,16 +14,16 @@ import { kioskService } from '@services/kioskService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type { AdminTerminalRecord, TicketSettingsOptions, TicketSettingsRoomOption } from '@services/api'
-import type { Room, Ticket } from '@shared/types'
+import type { Ticket } from '@shared/types'
 import { getLocale, useLanguage, useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { LanguageSelect } from '@shared/ui/core-components'
 import {
   formatPeopleAhead,
   formatRoomName,
+  getAverageServiceDurationStats,
   getRoomQueuePeopleAhead,
   getTicketPeopleAhead,
-  isWithinWorkHours,
 } from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
@@ -32,62 +33,6 @@ const emptyOptions: TicketSettingsOptions = {
   specialists: [],
 }
 const kioskRefreshIntervalMs = 10_000
-const activeTicketStatuses = new Set(['created', 'waiting', 'called', 'in_service', 'redirected'])
-
-function normalizeId(value?: string | number | null): string {
-  return value == null ? '' : String(value)
-}
-
-function getFallbackRoom(room: TicketSettingsRoomOption, fallbackRooms: Room[]): Room | undefined {
-  const roomId = normalizeId(room.id)
-
-  return fallbackRooms.find((item) => normalizeId(item.id) === roomId)
-}
-
-function isKioskRoomAvailable(room: TicketSettingsRoomOption, fallbackRooms: Room[]): boolean {
-  const fallbackRoom = getFallbackRoom(room, fallbackRooms)
-  const ticketIssueEnabled = room.ticketIssueEnabled
-    ?? room.isTicketIssueEnabled
-    ?? room.kioskEnabled
-    ?? fallbackRoom?.ticketIssueEnabled
-    ?? fallbackRoom?.isTicketIssueEnabled
-    ?? fallbackRoom?.kioskEnabled
-  const isActive = room.isActive !== false &&
-    room.active !== false &&
-    fallbackRoom?.isActive !== false &&
-    fallbackRoom?.active !== false &&
-    fallbackRoom?.status !== 'paused'
-
-  return isActive &&
-    ticketIssueEnabled !== false &&
-    isWithinWorkHours({
-      workEndTime: room.workEndTime ?? room.workingEndTime ?? fallbackRoom?.workEndTime ?? fallbackRoom?.workingEndTime,
-      workStartTime: room.workStartTime ?? room.workingStartTime ?? fallbackRoom?.workStartTime ?? fallbackRoom?.workingStartTime,
-    })
-}
-
-function getRoomQueueCount(roomId: string | number, tickets: Array<{ roomId?: string | number; status: string }>): number {
-  const normalizedRoomId = normalizeId(roomId)
-
-  return tickets.filter((ticket) => (
-    normalizeId(ticket.roomId) === normalizedRoomId && activeTicketStatuses.has(ticket.status)
-  )).length
-}
-
-function getAutoKioskRoomForService(
-  rooms: TicketSettingsRoomOption[],
-  fallbackRooms: Room[],
-  tickets: Array<{ roomId?: string | number; status: string }>,
-): TicketSettingsRoomOption | undefined {
-  return [...rooms]
-    .filter((room) => isKioskRoomAvailable(room, fallbackRooms))
-    .map((room, index) => ({ index, room }))
-    .sort((left, right) => {
-      const queueDelta = getRoomQueueCount(left.room.id, tickets) - getRoomQueueCount(right.room.id, tickets)
-
-      return queueDelta || left.index - right.index
-    })[0]?.room
-}
 
 export function KioskPage() {
   const appSettings = useAppSettings()
@@ -330,10 +275,16 @@ export function KioskPage() {
         getRoomsForService(latestOptions, latestServiceType?.id, latestRooms),
         latestTerminal,
       )
-      const latestRoom = getAutoKioskRoomForService(
+      const averageServiceMinutes = getAverageServiceDurationStats(
+        latestTickets,
+        latestServiceType?.id,
+        latestServiceType?.code,
+      ).averageMinutes
+      const latestRoom = getAutoRoomForService(
         latestServiceRooms,
         latestRooms,
         latestTickets,
+        averageServiceMinutes,
       )
       const peopleAhead = getRoomQueuePeopleAhead(latestRoom?.id, latestTickets)
 

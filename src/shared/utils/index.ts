@@ -33,6 +33,12 @@ export {
   parseWorkTimeMinutes,
 } from './workingHours'
 export {
+  fallbackServiceDurationMinutes,
+  getAverageServiceDurationStats,
+  getAverageServiceMinutesForTicket,
+  getQueueServiceDurationMinutes,
+} from './serviceDuration'
+export {
   getPriorityMeta,
   getServiceTypeLabel,
   getTicketStatusMeta,

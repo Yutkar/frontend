@@ -13,6 +13,8 @@ import type {
   TicketStatus,
 } from '@shared/types'
 import {
+  fallbackServiceDurationMinutes,
+  getAverageServiceDurationStats,
   getPriorityMeta,
   getRoomWorkloadRisk,
   getTicketStatusMeta,
@@ -265,8 +267,8 @@ function mergeRoomWithFallback(room: TicketSettingsRoomOption, fallbackRooms: Ro
 export function isRoomAvailableForTicket(
   room: TicketSettingsRoomOption,
   fallbackRooms: Room[],
-  tickets: Array<{ roomId?: string | number; status: TicketStatus }> = [],
-  averageServiceMinutes = 10,
+  tickets: Ticket[] = [],
+  averageServiceMinutes = fallbackServiceDurationMinutes,
   now: Date | number = new Date(),
 ): boolean {
   const fallbackRoom = getFallbackRoom(room, fallbackRooms)
@@ -300,8 +302,8 @@ export function getRoomQueueCount(roomId: string | number, tickets: Array<{ room
 export function getAutoRoomForService(
   rooms: TicketSettingsRoomOption[],
   fallbackRooms: Room[],
-  tickets: Array<{ roomId?: string | number; status: TicketStatus }>,
-  averageServiceMinutes = 10,
+  tickets: Ticket[],
+  averageServiceMinutes = fallbackServiceDurationMinutes,
   now: Date | number = new Date(),
 ): TicketSettingsRoomOption | undefined {
   return [...rooms]
@@ -328,11 +330,15 @@ export function getAutoSpecialistForRoom(
 export function getAvailableServiceTypes(
   options: TicketSettingsOptions,
   fallbackRooms: Room[],
-  tickets: Array<{ roomId?: string | number; status: TicketStatus }>,
+  tickets: Ticket[],
 ): TicketSettingsServiceTypeOption[] {
   return getServiceTypes(options).filter((serviceType) => {
     const serviceRooms = getRoomsForService(options, serviceType.id, fallbackRooms)
-    const averageServiceMinutes = serviceType.averageDurationMinutes ?? 10
+    const averageServiceMinutes = getAverageServiceDurationStats(
+      tickets,
+      serviceType.id,
+      serviceType.code,
+    ).averageMinutes
 
     return Boolean(getAutoRoomForService(serviceRooms, fallbackRooms, tickets, averageServiceMinutes))
   })

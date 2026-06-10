@@ -43,11 +43,13 @@ function getCompletedServiceMinutes(ticket: Ticket): number | null {
     return null
   }
 
-  if (!ticket.startedAt || !ticket.completedAt) {
+  const serviceStartedAt = ticket.serviceStartedAt ?? ticket.startedAt
+
+  if (!serviceStartedAt || !ticket.completedAt) {
     return null
   }
 
-  const startedAt = Date.parse(ticket.startedAt)
+  const startedAt = Date.parse(serviceStartedAt)
   const completedAt = Date.parse(ticket.completedAt)
 
   if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt) || completedAt < startedAt) {

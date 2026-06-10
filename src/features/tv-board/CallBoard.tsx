@@ -93,7 +93,7 @@ function getCallKey(ticket?: Ticket): string {
 function getCallAnnouncementKey(ticket?: Ticket): string {
   if (!ticket) return ''
 
-  return `${ticket.id}:${ticket.calledAt ?? 'called'}`
+  return `${ticket.id}_${ticket.calledAt ?? 'called'}`
 }
 
 function isBoardCallTicket(ticket: Ticket): boolean {
@@ -286,11 +286,12 @@ export function CallBoard({
   const audioContextRef = useRef<AudioContext | null>(null)
   const activeAnnouncementKeyRef = useRef('')
   const announcedCallKeysRef = useRef<Set<string>>(new Set())
-  const pendingAnnouncementRef = useRef<PendingAnnouncement | null>(null)
+  const announcementQueueRef = useRef<PendingAnnouncement[]>([])
+  const highlightTimeoutRef = useRef<number | null>(null)
+  const isAnnouncementPlayingRef = useRef(false)
   const speechKeepAliveIntervalRef = useRef<number | null>(null)
   const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
   const hasRenderedRef = useRef(false)
-  const previousCallKeyRef = useRef('')
 
   const currentCalls = useMemo(
     () => tickets
@@ -360,34 +361,66 @@ export function CallBoard({
     }, 1_000)
   }
 
-  function finishAnnouncement(announcementKey: string, utterance: SpeechSynthesisUtterance) {
+  function clearHighlightTimeout() {
+    if (highlightTimeoutRef.current !== null) {
+      window.clearTimeout(highlightTimeoutRef.current)
+      highlightTimeoutRef.current = null
+    }
+  }
+
+  function highlightCall(ticket: Ticket) {
+    clearHighlightTimeout()
+    setHighlightedCallKey(getCallKey(ticket))
+    highlightTimeoutRef.current = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
+  }
+
+  function processNextAnnouncement() {
+    if (isAnnouncementPlayingRef.current) {
+      return
+    }
+
+    const nextAnnouncement = announcementQueueRef.current.shift()
+
+    if (!nextAnnouncement) {
+      return
+    }
+
+    isAnnouncementPlayingRef.current = true
+    highlightCall(nextAnnouncement.ticket)
+    void announceCall(
+      nextAnnouncement.ticket,
+      nextAnnouncement.room,
+      nextAnnouncement.key,
+    ).catch(() => {
+      finishAnnouncement(nextAnnouncement.key)
+    })
+  }
+
+  function enqueueAnnouncement(announcement: PendingAnnouncement) {
+    const alreadyQueued = announcementQueueRef.current.some((item) => item.key === announcement.key)
+
+    if (alreadyQueued || activeAnnouncementKeyRef.current === announcement.key) {
+      return
+    }
+
+    announcementQueueRef.current.push(announcement)
+    processNextAnnouncement()
+  }
+
+  function finishAnnouncement(announcementKey: string, utterance?: SpeechSynthesisUtterance) {
     if (activeAnnouncementKeyRef.current === announcementKey) {
       activeAnnouncementKeyRef.current = ''
     }
-    if (speechUtteranceRef.current === utterance) {
+    if (!utterance || speechUtteranceRef.current === utterance) {
       speechUtteranceRef.current = null
     }
+    isAnnouncementPlayingRef.current = false
     stopSpeechKeepAlive()
-
-    const pendingAnnouncement = pendingAnnouncementRef.current
-    pendingAnnouncementRef.current = null
-
-    if (pendingAnnouncement) {
-      void announceCall(
-        pendingAnnouncement.ticket,
-        pendingAnnouncement.room,
-        pendingAnnouncement.key,
-      ).catch(() => undefined)
-    }
+    processNextAnnouncement()
   }
 
   async function announceCall(ticket: Ticket, room?: TicketRoom, announcementKey = getCallAnnouncementKey(ticket)) {
     if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
-      if (activeAnnouncementKeyRef.current && activeAnnouncementKeyRef.current !== announcementKey) {
-        pendingAnnouncementRef.current = { key: announcementKey, room, ticket }
-        return
-      }
-
       if (activeAnnouncementKeyRef.current === announcementKey && window.speechSynthesis.speaking) {
         return
       }
@@ -425,9 +458,12 @@ export function CallBoard({
     }
 
     await playBeep()
+    finishAnnouncement(announcementKey)
   }
 
   useEffect(() => () => {
+    announcementQueueRef.current = []
+    clearHighlightTimeout()
     stopSpeechKeepAlive()
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
@@ -435,38 +471,46 @@ export function CallBoard({
   }, [])
 
   useEffect(() => {
-    if (!currentCallKey) {
-      previousCallKeyRef.current = ''
+    const callsWithCalledAt = currentCalls.filter((ticket) => Boolean(ticket.calledAt))
+
+    if (!hasRenderedRef.current) {
+      callsWithCalledAt.forEach((ticket) => {
+        const announcementKey = getCallAnnouncementKey(ticket)
+
+        if (announcementKey) {
+          announcedCallKeysRef.current.add(announcementKey)
+        }
+      })
       hasRenderedRef.current = true
       return
     }
 
-    const previousCallKey = previousCallKeyRef.current
-    const shouldHighlight = hasRenderedRef.current && previousCallKey !== currentCallKey
-
-    previousCallKeyRef.current = currentCallKey
-    hasRenderedRef.current = true
-
-    if (!shouldHighlight) {
+    if (!voiceEnabled || callsWithCalledAt.length === 0) {
       return
     }
 
-    setHighlightedCallKey(currentCallKey)
-    const highlightTimeout = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
-    const announcementKey = getCallAnnouncementKey(currentCall)
+    callsWithCalledAt
+      .filter((ticket) => {
+        const announcementKey = getCallAnnouncementKey(ticket)
 
-    if (
-      voiceEnabled &&
-      currentCall &&
-      announcementKey &&
-      !announcedCallKeysRef.current.has(announcementKey)
-    ) {
-      announcedCallKeysRef.current.add(announcementKey)
-      void announceCall(currentCall, currentCallRoom, announcementKey).catch(() => undefined)
-    }
+        return Boolean(announcementKey && !announcedCallKeysRef.current.has(announcementKey))
+      })
+      .sort((left, right) => getCallTimestamp(left) - getCallTimestamp(right))
+      .forEach((ticket) => {
+        const announcementKey = getCallAnnouncementKey(ticket)
 
-    return () => window.clearTimeout(highlightTimeout)
-  }, [currentCall, currentCallKey, currentCallRoom, voiceEnabled])
+        if (!announcementKey) {
+          return
+        }
+
+        announcedCallKeysRef.current.add(announcementKey)
+        enqueueAnnouncement({
+          key: announcementKey,
+          room: getTicketRoom(ticket, rooms),
+          ticket,
+        })
+      })
+  }, [currentCalls, rooms, voiceEnabled])
 
   if (template === 'minimal') {
     return (

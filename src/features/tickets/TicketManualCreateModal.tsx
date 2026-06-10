@@ -17,6 +17,7 @@ import { Button } from '@shared/ui/components'
 import {
   formatRoomName,
   formatPeopleAhead,
+  getAverageServiceDurationStats,
   getRoomQueuePeopleAhead,
 } from '@shared/utils'
 import {
@@ -115,9 +116,9 @@ export function TicketManualCreateModal({
       rooms,
       fallbackRooms,
       tickets,
-      selectedServiceType?.averageDurationMinutes ?? 10,
+      getAverageServiceDurationStats(tickets, selectedServiceType?.id, selectedServiceType?.code).averageMinutes,
     ),
-    [fallbackRooms, rooms, selectedServiceType?.averageDurationMinutes, tickets],
+    [fallbackRooms, rooms, selectedServiceType?.code, selectedServiceType?.id, tickets],
   )
   const autoDoctor = useMemo(
     () => autoRoom ? getAutoSpecialistForRoom(autoRoom.id, options.specialists) : undefined,
