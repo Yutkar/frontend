@@ -3,8 +3,6 @@ import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { TicketPrintPreview, type TicketPrintData } from '@features/tickets/TicketPrintPreview'
 import {
-  getAutoRoomForService,
-  getAvailableServiceTypes,
   getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
@@ -15,17 +13,80 @@ import { kioskService } from '@services/kioskService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type { AdminTerminalRecord, TicketSettingsOptions, TicketSettingsRoomOption } from '@services/api'
-import type { Ticket } from '@shared/types'
+import type { Room, Ticket } from '@shared/types'
 import { getLocale, useLanguage, useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { LanguageSelect } from '@shared/ui/core-components'
-import { formatPeopleAhead, formatRoomName, getRoomQueuePeopleAhead, getTicketPeopleAhead } from '@shared/utils'
+import {
+  formatPeopleAhead,
+  formatRoomName,
+  getRoomQueuePeopleAhead,
+  getTicketPeopleAhead,
+  isWithinWorkHours,
+} from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 
 const emptyOptions: TicketSettingsOptions = {
   rooms: [],
   serviceTypes: [],
   specialists: [],
+}
+const kioskRefreshIntervalMs = 10_000
+const activeTicketStatuses = new Set(['created', 'waiting', 'called', 'in_service', 'redirected'])
+
+function normalizeId(value?: string | number | null): string {
+  return value == null ? '' : String(value)
+}
+
+function getFallbackRoom(room: TicketSettingsRoomOption, fallbackRooms: Room[]): Room | undefined {
+  const roomId = normalizeId(room.id)
+
+  return fallbackRooms.find((item) => normalizeId(item.id) === roomId)
+}
+
+function isKioskRoomAvailable(room: TicketSettingsRoomOption, fallbackRooms: Room[]): boolean {
+  const fallbackRoom = getFallbackRoom(room, fallbackRooms)
+  const ticketIssueEnabled = room.ticketIssueEnabled
+    ?? room.isTicketIssueEnabled
+    ?? room.kioskEnabled
+    ?? fallbackRoom?.ticketIssueEnabled
+    ?? fallbackRoom?.isTicketIssueEnabled
+    ?? fallbackRoom?.kioskEnabled
+  const isActive = room.isActive !== false &&
+    room.active !== false &&
+    fallbackRoom?.isActive !== false &&
+    fallbackRoom?.active !== false &&
+    fallbackRoom?.status !== 'paused'
+
+  return isActive &&
+    ticketIssueEnabled !== false &&
+    isWithinWorkHours({
+      workEndTime: room.workEndTime ?? room.workingEndTime ?? fallbackRoom?.workEndTime ?? fallbackRoom?.workingEndTime,
+      workStartTime: room.workStartTime ?? room.workingStartTime ?? fallbackRoom?.workStartTime ?? fallbackRoom?.workingStartTime,
+    })
+}
+
+function getRoomQueueCount(roomId: string | number, tickets: Array<{ roomId?: string | number; status: string }>): number {
+  const normalizedRoomId = normalizeId(roomId)
+
+  return tickets.filter((ticket) => (
+    normalizeId(ticket.roomId) === normalizedRoomId && activeTicketStatuses.has(ticket.status)
+  )).length
+}
+
+function getAutoKioskRoomForService(
+  rooms: TicketSettingsRoomOption[],
+  fallbackRooms: Room[],
+  tickets: Array<{ roomId?: string | number; status: string }>,
+): TicketSettingsRoomOption | undefined {
+  return [...rooms]
+    .filter((room) => isKioskRoomAvailable(room, fallbackRooms))
+    .map((room, index) => ({ index, room }))
+    .sort((left, right) => {
+      const queueDelta = getRoomQueueCount(left.room.id, tickets) - getRoomQueueCount(right.room.id, tickets)
+
+      return queueDelta || left.index - right.index
+    })[0]?.room
 }
 
 export function KioskPage() {
@@ -36,7 +97,6 @@ export function KioskPage() {
   const terminalId = searchParams.get('terminalId') ?? ''
   const loadQueue = useQueueStore((state) => state.loadQueue)
   const queueRooms = useQueueStore((state) => state.rooms)
-  const queueTickets = useQueueStore((state) => state.tickets)
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -90,6 +150,41 @@ export function KioskPage() {
   useEffect(() => {
     let active = true
 
+    async function refreshKioskData() {
+      if (!active || document.hidden || createdTicket) {
+        return
+      }
+
+      try {
+        await Promise.all([
+          loadQueue({ force: true, successMessage: '' }),
+          loadTicketOptions(),
+          terminalId
+            ? adminService.getTerminals().then((terminals) => {
+                if (active) {
+                  setTerminal(terminals.find((item) => String(item.id) === terminalId) ?? null)
+                }
+              })
+            : Promise.resolve(),
+        ])
+      } catch (refreshError) {
+        console.error('Kiosk auto refresh failed', refreshError)
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshKioskData()
+    }, kioskRefreshIntervalMs)
+
+    return () => {
+      active = false
+      window.clearInterval(intervalId)
+    }
+  }, [createdTicket, loadQueue, loadTicketOptions, terminalId])
+
+  useEffect(() => {
+    let active = true
+
     if (!terminalId) {
       setTerminal(null)
       setLoadingTerminal(false)
@@ -137,10 +232,10 @@ export function KioskPage() {
 
   const serviceTypes = useMemo(
     () => {
-      const availableServiceTypes = getAvailableServiceTypes(options, queueRooms, queueTickets)
+      const enabledServiceTypes = getServiceTypes(options)
 
       if (!terminalId) {
-        return availableServiceTypes
+        return enabledServiceTypes
       }
 
       if (!terminal?.active) {
@@ -149,25 +244,9 @@ export function KioskPage() {
 
       const allowedServiceTypeIds = new Set(terminal.serviceTypeIds.map(String))
 
-      return availableServiceTypes.filter((serviceType) => {
-        if (!allowedServiceTypeIds.has(String(serviceType.id))) {
-          return false
-        }
-
-        const serviceRooms = filterTerminalRooms(
-          getRoomsForService(options, serviceType.id, queueRooms),
-          terminal,
-        )
-
-        return Boolean(getAutoRoomForService(
-          serviceRooms,
-          queueRooms,
-          queueTickets,
-          serviceType.averageDurationMinutes ?? 10,
-        ))
-      })
+      return enabledServiceTypes.filter((serviceType) => allowedServiceTypeIds.has(String(serviceType.id)))
     },
-    [options, queueRooms, queueTickets, terminal, terminalId],
+    [options, terminal, terminalId],
   )
   const selectedServiceType = serviceTypes.find(
     (serviceType) => String(serviceType.id) === selectedServiceTypeId,
@@ -176,16 +255,6 @@ export function KioskPage() {
     () => filterTerminalRooms(getRoomsForService(options, selectedServiceType?.id, queueRooms), terminal),
     [options, queueRooms, selectedServiceType?.id, terminal, terminalId],
   )
-  const selectedRoom = useMemo(
-    () => getAutoRoomForService(
-      rooms,
-      queueRooms,
-      queueTickets,
-      selectedServiceType?.averageDurationMinutes ?? 10,
-    ),
-    [queueRooms, queueTickets, rooms, selectedServiceType?.averageDurationMinutes],
-  )
-
   useEffect(() => {
     const selectedServiceAvailable = serviceTypes.some(
       (serviceType) => String(serviceType.id) === selectedServiceTypeId,
@@ -239,7 +308,7 @@ export function KioskPage() {
   }
 
   async function handleCreateTicket() {
-    if (!selectedServiceType || !selectedRoom || loading) {
+    if (!selectedServiceType || loading) {
       return
     }
 
@@ -261,16 +330,15 @@ export function KioskPage() {
         getRoomsForService(latestOptions, latestServiceType?.id, latestRooms),
         latestTerminal,
       )
-      const latestRoom = getAutoRoomForService(
+      const latestRoom = getAutoKioskRoomForService(
         latestServiceRooms,
         latestRooms,
         latestTickets,
-        latestServiceType?.averageDurationMinutes ?? 10,
       )
       const peopleAhead = getRoomQueuePeopleAhead(latestRoom?.id, latestTickets)
 
       if (!latestServiceType || !latestRoom) {
-        setError(t.kiosk.noRoomsForService)
+        setError(t.kiosk.serviceClosedToday)
         return
       }
 
@@ -343,10 +411,7 @@ export function KioskPage() {
         </div>
 
         {error ? <div className="modal-error">{error}</div> : null}
-        {!loadingOptions && !loadingTerminal && serviceTypes.length === 0 ? (
-          <div className="modal-error">{t.kiosk.noServices}</div>
-        ) : null}
-        {selectedServiceType && !selectedRoom ? (
+        {!error && !loadingOptions && !loadingTerminal && serviceTypes.length === 0 ? (
           <div className="modal-error">{t.kiosk.noRoomsForService}</div>
         ) : null}
 
@@ -360,7 +425,10 @@ export function KioskPage() {
                 className={selected ? 'kiosk-service-button active' : 'kiosk-service-button'}
                 disabled={loading || loadingOptions || loadingTerminal}
                 key={id}
-                onClick={() => setSelectedServiceTypeId(id)}
+                onClick={() => {
+                  setSelectedServiceTypeId(id)
+                  setError(null)
+                }}
                 type="button"
               >
                 {getServiceOptionLabel(serviceType, language)}
@@ -371,7 +439,7 @@ export function KioskPage() {
 
         <Button
           className="kiosk-submit"
-          disabled={loading || loadingOptions || loadingTerminal || !selectedServiceType || !selectedRoom}
+          disabled={loading || loadingOptions || loadingTerminal || !selectedServiceType}
           onClick={handleCreateTicket}
           size="lg"
           variant="primary"

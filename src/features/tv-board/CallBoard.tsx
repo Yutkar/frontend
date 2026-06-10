@@ -455,7 +455,12 @@ export function CallBoard({
     const highlightTimeout = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
     const announcementKey = getCallAnnouncementKey(currentCall)
 
-    if (voiceEnabled && currentCall && announcementKey && !announcedCallKeysRef.current.has(announcementKey)) {
+    if (
+      voiceEnabled &&
+      currentCall &&
+      announcementKey &&
+      !announcedCallKeysRef.current.has(announcementKey)
+    ) {
       announcedCallKeysRef.current.add(announcementKey)
       void announceCall(currentCall, currentCallRoom, announcementKey).catch(() => undefined)
     }

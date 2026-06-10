@@ -76,28 +76,34 @@ export function BoardSettingsSection() {
       screen.roomIds?.length === 1 ? 'individual' : 'general',
       screen.roomIds?.[0] ?? '',
     )
+    const profileParam = `profileId=${encodeURIComponent(profile.id)}`
 
     if (profile.boardType === 'individual' && profile.roomBoardId) {
-      return `${window.location.origin}/board?roomId=${encodeURIComponent(profile.roomBoardId)}`
+      return `${window.location.origin}/board?roomId=${encodeURIComponent(profile.roomBoardId)}&${profileParam}`
     }
 
-    return `${window.location.origin}/board`
+    return `${window.location.origin}/board?${profileParam}`
   }
 
-  function getRoomBoardPath(room: AdminRoomRecord): string {
-    return `/board?roomId=${encodeURIComponent(getRoomBoardId(room))}`
+  function getRoomBoardPath(room: AdminRoomRecord, profile?: BoardSettingsProfile): string {
+    const roomBoardId = getRoomBoardId(room)
+    const profileParam = profile ? `&profileId=${encodeURIComponent(profile.id)}` : ''
+
+    return `/board?roomId=${encodeURIComponent(roomBoardId)}${profileParam}`
   }
 
-  function getRoomBoardUrl(room: AdminRoomRecord): string {
-    return `${window.location.origin}${getRoomBoardPath(room)}`
+  function getRoomBoardUrl(room: AdminRoomRecord, profile?: BoardSettingsProfile): string {
+    return `${window.location.origin}${getRoomBoardPath(room, profile)}`
   }
 
   function getProfileUrl(profile: BoardSettingsProfile): string {
+    const profileParam = `profileId=${encodeURIComponent(profile.id)}`
+
     if (profile.boardType === 'individual' && profile.roomBoardId) {
-      return `${window.location.origin}/board?roomId=${encodeURIComponent(profile.roomBoardId)}`
+      return `${window.location.origin}/board?roomId=${encodeURIComponent(profile.roomBoardId)}&${profileParam}`
     }
 
-    return generalUrl
+    return `${window.location.origin}/board?${profileParam}`
   }
 
   function getDefaultProfile(
@@ -316,7 +322,7 @@ export function BoardSettingsSection() {
                   {/* Отдельные места обслуживания */}
                   {roomProfiles.map(({ profile, room }) => {
                     const name = getRoomName(room)
-                    const url = getRoomBoardUrl(room)
+                    const url = getRoomBoardUrl(room, profile)
                     return (
                       <tr key={String(room.id)}>
                         <td>{name}</td>
@@ -510,6 +516,15 @@ export function BoardSettingsSection() {
 
             <label className="admin-toggle-row">
               <input
+                checked={draftProfile.voiceEnabled}
+                onChange={(event) => updateDraftProfile({ voiceEnabled: event.target.checked })}
+                type="checkbox"
+              />
+              <span>Озвучка включена</span>
+            </label>
+
+            <label className="admin-toggle-row">
+              <input
                 checked={draftProfile.showRecentCalls}
                 onChange={(event) => updateDraftProfile({ showRecentCalls: event.target.checked })}
                 type="checkbox"
@@ -541,14 +556,6 @@ export function BoardSettingsSection() {
               <span>Показывать время</span>
             </label>
 
-            <label className="admin-toggle-row">
-              <input
-                checked={draftProfile.voiceEnabled}
-                onChange={(event) => updateDraftProfile({ voiceEnabled: event.target.checked })}
-                type="checkbox"
-              />
-              <span>Озвучка включена</span>
-            </label>
             <div className="modal-actions">
               <Button
                 icon={<X size={16} />}

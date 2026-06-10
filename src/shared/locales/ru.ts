@@ -60,7 +60,8 @@ export const ru = {
     createTicket: 'Получить талон',
     creatingTicket: 'Создаём талон...',
     noServices: 'Сейчас нет доступных услуг. Обратитесь к администратору.',
-    noRoomsForService: 'Нет доступных мест обслуживания для выбранной услуги',
+    noRoomsForService: 'Для выбранной услуги нет свободных мест.',
+    serviceClosedToday: 'Данный тип услуг закрыт на сегодня.',
     createError: 'Не удалось создать талон. Попробуйте ещё раз.',
   },
   ticketPrint: {

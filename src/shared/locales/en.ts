@@ -65,6 +65,7 @@ export const en: Locale = {
     creatingTicket: 'Creating ticket...',
     noServices: 'No services are available now. Please contact an administrator.',
     noRoomsForService: 'No service places are available for the selected service',
+    serviceClosedToday: 'This service type is closed for today.',
     createError: 'Could not create a ticket. Please try again.',
   },
   ticketPrint: {

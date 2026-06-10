@@ -65,6 +65,7 @@ export const kk: Locale = {
     creatingTicket: 'Талон жасалуда...',
     noServices: 'Қазір қолжетімді қызметтер жоқ. Әкімшіге хабарласыңыз.',
     noRoomsForService: 'Таңдалған қызмет үшін қолжетімді қызмет көрсету орны жоқ',
+    serviceClosedToday: 'Бұл қызмет түрі бүгінге жабық.',
     createError: 'Талон жасау мүмкін болмады. Қайталап көріңіз.',
   },
   ticketPrint: {

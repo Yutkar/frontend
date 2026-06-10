@@ -19,12 +19,15 @@ const defaultBoardSettings: BoardSettings = {
   voiceEnabled: true,
 }
 
-function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string): BoardSettings {
-  const profile = roomId
+function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, profileId?: string): BoardSettings {
+  const profileById = profileId
+    ? settings.profiles?.find((item) => String(item.id) === String(profileId))
+    : undefined
+  const profile = profileById ?? (roomId
     ? settings.profiles?.find((item) => (
       item.boardType === 'individual' && String(item.roomBoardId ?? '') === String(roomId)
     ))
-    : settings.profiles?.find((item) => item.boardType === 'general')
+    : settings.profiles?.find((item) => item.boardType === 'general'))
 
   if (!profile) {
     if (
@@ -62,6 +65,7 @@ export function TvBoardPage() {
   const t = useLocale()
   const [searchParams] = useSearchParams()
   const roomId = searchParams.get('roomId') ?? undefined
+  const profileId = searchParams.get('profileId') ?? undefined
   const [error, setError] = useState<string | null>(null)
   const [boardSettings, setBoardSettings] = useState<BoardSettings>(defaultBoardSettings)
   const [rooms, setRooms] = useState<Room[]>([])
@@ -77,18 +81,24 @@ export function TvBoardPage() {
   useEffect(() => {
     let active = true
 
-    adminService.getBoardSettings()
-      .then((nextSettings) => {
-        if (active) {
-          setBoardSettings(nextSettings)
-        }
-      })
-      .catch((settingsError) => {
-        console.error('Board settings load failed', settingsError)
-      })
+    const loadSettings = () => {
+      adminService.getBoardSettings()
+        .then((nextSettings) => {
+          if (active) {
+            setBoardSettings(nextSettings)
+          }
+        })
+        .catch((settingsError) => {
+          console.error('Board settings load failed', settingsError)
+        })
+    }
+
+    loadSettings()
+    const interval = window.setInterval(loadSettings, 5_000)
 
     return () => {
       active = false
+      window.clearInterval(interval)
     }
   }, [])
 
@@ -137,7 +147,7 @@ export function TvBoardPage() {
     minute: '2-digit',
     second: '2-digit',
   }).format(now)
-  const routeBoardSettings = getBoardSettingsForRoute(boardSettings, roomId)
+  const routeBoardSettings = getBoardSettingsForRoute(boardSettings, roomId, profileId)
   const boardRoom = roomId
     ? rooms.find((room) => getRoomBoardId(room) === roomId || String(room.id) === roomId) ?? rooms[0]
     : undefined
