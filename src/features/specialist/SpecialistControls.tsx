@@ -5,7 +5,16 @@ import type { TicketSettingsOptions } from '@services/api'
 import type { RedirectTicketInput, Room, Ticket, TicketPriority } from '@shared/types'
 import { t } from '@shared/locales/useLocale'
 import { Button, TicketCard } from '@shared/ui/components'
-import { formatRoomName, useCurrentTime } from '@shared/utils'
+import {
+  formatDuration,
+  formatRoomName,
+  getAverageServiceDurationStats,
+  getPriorityMeta,
+  getQueueServiceDurationMinutes,
+  getRoomWorkloadRisk,
+  normalizeWorkTime,
+  useCurrentTime,
+} from '@shared/utils'
 import { useQueueStore } from '@store/queue'
 import {
   getAutoRoomForService,
@@ -27,6 +36,7 @@ const priorityOrder: Record<TicketPriority, number> = {
 }
 
 const specialistVisibleStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+const fallbackServiceMinutes = 10
 
 const emptyTicketSettingsOptions: TicketSettingsOptions = {
   rooms: [],
@@ -36,6 +46,37 @@ const emptyTicketSettingsOptions: TicketSettingsOptions = {
 
 function normalizeId(value?: string | number | null): string {
   return value == null ? '' : String(value)
+}
+
+function formatWorkDuration(minutes?: number): string {
+  if (minutes === undefined) {
+    return 'Весь день'
+  }
+
+  return minutes > 0 ? formatDuration(minutes) : '0 мин'
+}
+
+function getRoomWorkTimeText(room: Room): string {
+  const workStartTime = normalizeWorkTime(room.workStartTime)
+  const workEndTime = normalizeWorkTime(room.workEndTime)
+
+  if (workStartTime && workEndTime) {
+    return `работает с ${workStartTime} до ${workEndTime}`
+  }
+
+  if (workStartTime) {
+    return `работает с ${workStartTime}`
+  }
+
+  if (workEndTime) {
+    return `работает до ${workEndTime}`
+  }
+
+  return 'работает весь день'
+}
+
+function isCriticalTicket(ticket: Ticket): boolean {
+  return ticket.priority === 'critical' || getPriorityMeta(ticket.priority).label.toLowerCase() === 'критический'
 }
 
 type RedirectPatientModalProps = {
@@ -114,8 +155,13 @@ function RedirectPatientModal({
     [fallbackRooms, options, selectedServiceType?.id],
   )
   const autoRoom = useMemo(
-    () => getAutoRoomForService(rooms, fallbackRooms, tickets),
-    [fallbackRooms, rooms, tickets],
+    () => getAutoRoomForService(
+      rooms,
+      fallbackRooms,
+      tickets,
+      getAverageServiceDurationStats(tickets, selectedServiceType?.id, selectedServiceType?.code).averageMinutes,
+    ),
+    [fallbackRooms, rooms, selectedServiceType?.code, selectedServiceType?.id, tickets],
   )
   const noRoomAvailable = Boolean(selectedServiceType && !autoRoom && !loadingOptions)
   const isBusy = saving || loadingOptions
@@ -132,12 +178,12 @@ function RedirectPatientModal({
     }
 
     if (!selectedServiceType) {
-      setError('Выберите новую услугу.')
+      setError(t.tickets.selectService)
       return
     }
 
     if (!autoRoom) {
-      setError('Нет доступного кабинета для выбранной услуги')
+      setError(t.tickets.noServicePlace)
       return
     }
 
@@ -188,10 +234,10 @@ function RedirectPatientModal({
 
         {error ? <div className="modal-error">{error}</div> : null}
         {!error && noRoomAvailable ? (
-          <div className="modal-error">Нет доступного кабинета для выбранной услуги</div>
+          <div className="modal-error">{t.tickets.noServicePlace}</div>
         ) : null}
         {!error && autoRoom ? (
-          <div className="modal-info">Кабинет выбран автоматически: {formatRoomName(autoRoom)}</div>
+          <div className="modal-info">{t.tickets.autoPlaceSelected}: {formatRoomName(autoRoom)}</div>
         ) : null}
 
         <div className="settings-form-grid">
@@ -205,7 +251,7 @@ function RedirectPatientModal({
               }}
               value={serviceTypeId}
             >
-              <option value="">Выберите услугу</option>
+              <option value="">{t.tickets.selectService}</option>
               {serviceTypes.map((serviceType) => (
                 <option key={String(serviceType.id)} value={String(serviceType.id)}>
                   {getServiceOptionLabel(serviceType)}
@@ -215,7 +261,7 @@ function RedirectPatientModal({
           </label>
 
           <label className="field settings-comment-field">
-            <span>Примечание</span>
+            <span>{t.tickets.note}</span>
             <input
               disabled={isBusy}
               onChange={(event) => setNote(event.target.value)}
@@ -241,6 +287,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const [returnError, setReturnError] = useState<string | null>(null)
   const [returningTicketId, setReturningTicketId] = useState<string | null>(null)
   const [redirectTicketItem, setRedirectTicketItem] = useState<Ticket | null>(null)
+  const [callingUrgentTicketId, setCallingUrgentTicketId] = useState<string | null>(null)
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
   const completeService = useQueueStore((state) => state.completeService)
   const activeTickets = useQueueStore((state) => state.activeTickets)
@@ -303,6 +350,55 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         }),
     [noShowTickets, room.id],
   )
+  const roomCompletedStats = useMemo(() => {
+    const roomCompletedMinutes = tickets
+      .filter((ticket) => String(ticket.roomId) === String(room.id) && ticket.status === 'completed')
+      .map((ticket) => getAverageServiceDurationStats([ticket], ticket.serviceTypeId, ticket.serviceType))
+      .filter((stats) => stats.hasData)
+      .map((stats) => stats.averageMinutes)
+
+    if (roomCompletedMinutes.length === 0) {
+      return {
+        averageMinutes: fallbackServiceMinutes,
+        hasData: false,
+      }
+    }
+
+    return {
+      averageMinutes: Math.max(
+        1,
+        Math.round(roomCompletedMinutes.reduce((sum, minutes) => sum + minutes, 0) / roomCompletedMinutes.length),
+      ),
+      hasData: true,
+    }
+  }, [room.id, tickets])
+  const queueCalculation = useMemo(() => {
+    const activeWaitingCount = roomTickets.length
+    const queueDurationMinutes = getQueueServiceDurationMinutes(roomTickets, tickets)
+    const averageServiceMinutes = activeWaitingCount > 0
+      ? Math.max(1, Math.round(queueDurationMinutes / activeWaitingCount))
+      : roomCompletedStats.averageMinutes
+    const hasDurationData = activeWaitingCount > 0
+      ? roomTickets.some((ticket) => getAverageServiceDurationStats(tickets, ticket.serviceTypeId, ticket.serviceType).hasData)
+      : roomCompletedStats.hasData
+
+    return {
+      activeWaitingCount,
+      averageServiceMinutes,
+      hasDurationData,
+      queueDurationMinutes,
+    }
+  }, [roomCompletedStats.averageMinutes, roomCompletedStats.hasData, roomTickets, tickets])
+  const workTimeCalculation = useMemo(() => getRoomWorkloadRisk(room, tickets, {
+    averageServiceMinutes: queueCalculation.averageServiceMinutes,
+    now,
+    queueDurationMinutes: queueCalculation.queueDurationMinutes,
+  }), [now, queueCalculation.averageServiceMinutes, queueCalculation.queueDurationMinutes, room, tickets])
+  const workTimeStatus = workTimeCalculation.isAtRisk
+    ? 'Не успевает обслужить очередь'
+    : workTimeCalculation.isWorkingNow
+      ? 'Нагрузка в норме'
+      : 'Сейчас не работает'
 
   const handleReturnTicket = async (ticketId: string) => {
     setReturnError(null)
@@ -328,6 +424,25 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const openRedirectModal = (ticket: Ticket) => {
     setRedirectTicketItem(ticket)
     void loadQueue({ force: true, successMessage: 'Данные для перенаправления обновлены' })
+  }
+
+  const handleCallUrgentTicket = async (ticket: Ticket) => {
+    if (ticket.status !== 'waiting' || String(ticket.roomId) !== String(room.id) || !isCriticalTicket(ticket)) {
+      return
+    }
+
+    setCallingUrgentTicketId(ticket.id)
+    setReturnError(null)
+
+    try {
+      await ticketService.callTicket(ticket.id)
+      await loadQueue({ force: true, successMessage: 'Критический талон вызван вне очереди' })
+    } catch (error) {
+      console.error('Specialist urgent call failed', error)
+      setReturnError('Не удалось вызвать критический талон вне очереди')
+    } finally {
+      setCallingUrgentTicketId(null)
+    }
   }
 
   return (
@@ -390,6 +505,72 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
       </section>
 
       <aside className="specialist-panel specialist-waiting-panel">
+        <section className="specialist-side-section queue-calculation">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">Статистика места обслуживания</span>
+              <h2>Расчёт очереди</h2>
+            </div>
+          </div>
+          <dl className="queue-calculation-list">
+            <div>
+              <dt>Пациентов в очереди</dt>
+              <dd>{queueCalculation.activeWaitingCount}</dd>
+            </div>
+            <div>
+              <dt>Среднее обслуживание</dt>
+              <dd>
+                {queueCalculation.hasDurationData
+                  ? `${queueCalculation.averageServiceMinutes} мин`
+                  : 'Нет данных'}
+              </dd>
+            </div>
+            <div>
+              <dt>Очередь займёт примерно</dt>
+              <dd>
+                {queueCalculation.queueDurationMinutes > 0
+                  ? formatDuration(queueCalculation.queueDurationMinutes)
+                  : '0 мин'}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="specialist-side-section working-hours-section">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">График места обслуживания</span>
+              <h2>Рабочее время</h2>
+            </div>
+          </div>
+          <dl className="queue-calculation-list">
+            <div>
+              <dt>График</dt>
+              <dd>{getRoomWorkTimeText(room)}</dd>
+            </div>
+            <div>
+              <dt>Осталось до закрытия</dt>
+              <dd>{formatWorkDuration(workTimeCalculation.remainingWorkMinutes)}</dd>
+            </div>
+            <div>
+              <dt>Очередь займёт</dt>
+              <dd>{formatWorkDuration(workTimeCalculation.queueDurationMinutes)}</dd>
+            </div>
+            <div>
+              <dt>Статус</dt>
+              <dd>{workTimeStatus}</dd>
+            </div>
+          </dl>
+          {workTimeCalculation.isAtRisk ? (
+            <div className="modal-error">
+              Очередь не успевает обслужиться до конца рабочего времени. Рекомендуется закрыть выдачу талонов.
+            </div>
+          ) : null}
+          {!workTimeCalculation.isWorkingNow ? (
+            <div className="modal-info">Место обслуживания сейчас не работает.</div>
+          ) : null}
+        </section>
+
         <section className="specialist-side-section">
           <div className="panel-header">
             <div>
@@ -402,7 +583,30 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           {waitingTickets.length > 0 ? (
             <div className="specialist-waiting-list">
               {waitingTickets.map((ticket) => (
-                <TicketCard compact key={ticket.id} now={now} ticket={ticket} />
+                <div
+                  className={isCriticalTicket(ticket) ? 'critical-ticket-frame' : undefined}
+                  key={ticket.id}
+                >
+                  <TicketCard
+                    actionSlot={
+                      isCriticalTicket(ticket) && ticket.status === 'waiting' ? (
+                        <div className="button-row">
+                          <Button
+                            disabled={loading || callingUrgentTicketId === ticket.id}
+                            icon={<FastForward size={17} />}
+                            onClick={() => void handleCallUrgentTicket(ticket)}
+                            variant="primary"
+                          >
+                            {callingUrgentTicketId === ticket.id ? 'Вызываем...' : 'Вызвать вне очереди'}
+                          </Button>
+                        </div>
+                      ) : null
+                    }
+                    compact
+                    now={now}
+                    ticket={ticket}
+                  />
+                </div>
               ))}
             </div>
           ) : (

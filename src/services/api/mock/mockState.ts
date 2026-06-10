@@ -1,7 +1,16 @@
 import { createInitialQueueSnapshot, calculateQueueKpi } from '@mock/queue.mock'
-import { createMockTicket, createQueueEvent, getServiceTypeLabel, planRoomLoads } from '@shared/utils'
+import {
+  createMockTicket,
+  createQueueEvent,
+  createRoomWorkTimeRecommendation,
+  getRoomQueuePeopleAhead,
+  getServiceTypeLabel,
+  isWithinWorkHours,
+  planRoomLoads,
+} from '@shared/utils'
 import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
 import type {
+  QueueRecommendation as SharedQueueRecommendation,
   QueueSnapshot,
   Room as SharedRoom,
   ServiceType as SharedServiceType,
@@ -20,13 +29,10 @@ import type {
 } from '../../../types'
 import type {
   QueueOverloadRoom,
+  AdminServiceTypeInput,
   TicketSettingsPayload,
   TicketSettingsServiceTypeOption,
 } from '../types'
-
-const sharedServiceTypeByArchitectureId: Record<string, SharedServiceType> = Object.fromEntries(
-  fallbackServiceTypeOptions.map((serviceType) => [String(serviceType.id), serviceType.code]),
-) as Record<string, SharedServiceType>
 
 const architectureCodeByServiceType: Record<SharedServiceType, ArchitectureServiceType['code']> = {
   billing: 'consultation',
@@ -74,7 +80,7 @@ const priorityWeight: Record<SharedTicketPriority, number> = {
   low: 1,
 }
 
-const serviceTypeOptions: TicketSettingsServiceTypeOption[] = fallbackServiceTypeOptions
+let serviceTypeOptions: TicketSettingsServiceTypeOption[] = clone(fallbackServiceTypeOptions)
 
 let queueSnapshot = createInitialQueueSnapshot()
 
@@ -104,7 +110,8 @@ function isRoomAcceptingTickets(room?: SharedRoom): boolean {
     room.ticketIssueEnabled !== false &&
     room.isTicketIssueEnabled !== false &&
     room.kioskEnabled !== false &&
-    room.status !== 'paused',
+    room.status !== 'paused' &&
+    isWithinWorkHours(room),
   )
 }
 
@@ -116,7 +123,7 @@ export function assertMockRoomAcceptsTickets(roomId?: string | number): void {
   const room = findRoom(String(roomId))
 
   if (!isRoomAcceptingTickets(room)) {
-    throw new Error('Ticket issuance is closed for this room.')
+    throw new Error('Выдача талонов в это место обслуживания закрыта.')
   }
 }
 
@@ -144,30 +151,37 @@ function refreshQueueSnapshot(): void {
   queueSnapshot.rooms = plannedQueue.rooms
   queueSnapshot.tickets = plannedQueue.tickets
   queueSnapshot.kpi = calculateQueueKpi(queueSnapshot.tickets, queueSnapshot.rooms)
-  queueSnapshot.recommendations = queueSnapshot.recommendations.map((recommendation) => {
-    const ticket = recommendation.ticket
-      ?? (recommendation.ticketId
-        ? queueSnapshot.tickets.find((item) => item.id === recommendation.ticketId)
-        : undefined)
-      ?? (recommendation.relatedRoomId
-        ? queueSnapshot.tickets.find((item) =>
-          item.roomId === recommendation.relatedRoomId &&
-          ['critical', 'high'].includes(item.priority) &&
-          ['created', 'waiting', 'called', 'redirected'].includes(item.status),
-        )
-        : undefined)
-    const roomId = recommendation.relatedRoomId ?? ticket?.roomId
-    const room = roomId ? queueSnapshot.rooms.find((item) => item.id === roomId) : undefined
+  const preservedRecommendations = queueSnapshot.recommendations
+    .filter((recommendation) => !recommendation.id.startsWith('room-') || !recommendation.id.endsWith('-worktime-risk'))
+    .map((recommendation) => {
+      const ticket = recommendation.ticket
+        ?? (recommendation.ticketId
+          ? queueSnapshot.tickets.find((item) => item.id === recommendation.ticketId)
+          : undefined)
+        ?? (recommendation.relatedRoomId
+          ? queueSnapshot.tickets.find((item) =>
+            item.roomId === recommendation.relatedRoomId &&
+            ['critical', 'high'].includes(item.priority) &&
+            ['created', 'waiting', 'called', 'redirected'].includes(item.status),
+          )
+          : undefined)
+      const roomId = recommendation.relatedRoomId ?? ticket?.roomId
+      const room = roomId ? queueSnapshot.rooms.find((item) => item.id === roomId) : undefined
 
-    return {
-      ...recommendation,
-      isResolved: recommendation.isResolved ?? false,
-      relatedRoomId: roomId,
-      relatedRoomName: recommendation.relatedRoomName ?? room?.name,
-      ticket,
-      ticketId: recommendation.ticketId ?? ticket?.id,
-    }
-  })
+      return {
+        ...recommendation,
+        isResolved: recommendation.isResolved ?? false,
+        relatedRoomId: roomId,
+        relatedRoomName: recommendation.relatedRoomName ?? room?.name,
+        ticket,
+        ticketId: recommendation.ticketId ?? ticket?.id,
+      }
+    })
+  const workTimeRecommendations = queueSnapshot.rooms
+    .map((room) => createRoomWorkTimeRecommendation(room, queueSnapshot.tickets))
+    .filter((recommendation): recommendation is SharedQueueRecommendation => Boolean(recommendation))
+
+  queueSnapshot.recommendations = [...preservedRecommendations, ...workTimeRecommendations]
 }
 
 export function upsertMockQueueRoom(record: { id: string | number } & Record<string, unknown>): void {
@@ -175,6 +189,10 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
   const currentRoom = queueSnapshot.rooms.find((room) => room.id === id)
   const isActive = getRecordActive(record)
   const name = getRecordText(record, ['name', 'title', 'roomName'], currentRoom?.name ?? `Кабинет ${id}`)
+  const number = getRecordText(record, ['number'], currentRoom?.number ? String(currentRoom.number) : '')
+  const placeType = getRecordText(record, ['placeType', 'place_type'], currentRoom?.placeType ? String(currentRoom.placeType) : '')
+  const workEndTime = getRecordText(record, ['workEndTime', 'workingEndTime', 'work_end_time'], currentRoom?.workEndTime ?? '')
+  const workStartTime = getRecordText(record, ['workStartTime', 'workingStartTime', 'work_start_time'], currentRoom?.workStartTime ?? '')
   const nextRoom: SharedRoom = {
     active: isActive,
     department: getRecordText(record, ['department'], currentRoom?.department ?? name),
@@ -188,6 +206,8 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
       : currentRoom?.kioskEnabled,
     loadPercent: currentRoom?.loadPercent ?? 0,
     name,
+    number,
+    placeType: placeType || undefined,
     serviceTypeIds: Array.isArray(record.serviceTypeIds)
       ? record.serviceTypeIds
       : currentRoom?.serviceTypeIds,
@@ -203,6 +223,10 @@ export function upsertMockQueueRoom(record: { id: string | number } & Record<str
       ? record.ticketIssueEnabled
       : currentRoom?.ticketIssueEnabled,
     workload: currentRoom?.workload ?? 0,
+    workEndTime: workEndTime || undefined,
+    workStartTime: workStartTime || undefined,
+    workingEndTime: workEndTime || undefined,
+    workingStartTime: workStartTime || undefined,
   }
 
   queueSnapshot.rooms = currentRoom
@@ -253,9 +277,11 @@ function pushEvent(ticket: SharedTicket, status: SharedTicketStatus): void {
 }
 
 function toArchitectureServiceType(serviceType: SharedServiceType): ArchitectureServiceType {
+  const serviceTypeId = serviceTypeOptions.find((option) => option.code === serviceType)?.id ?? 1
+
   return {
     code: architectureCodeByServiceType[serviceType],
-    id: String(Object.entries(sharedServiceTypeByArchitectureId).find(([, value]) => value === serviceType)?.[0] ?? 1),
+    id: String(serviceTypeId),
     name: getServiceTypeLabel(serviceType),
   }
 }
@@ -331,6 +357,10 @@ export function createSharedTicket(input: SharedTicketCreateInput): SharedTicket
   assertMockRoomAcceptsTickets(input.roomId)
 
   const ticket = createMockTicket(input, queueSnapshot.tickets.length)
+  const peopleAhead = getRoomQueuePeopleAhead(input.roomId, queueSnapshot.tickets)
+
+  ticket.peopleAhead = peopleAhead
+  ticket.queuePosition = peopleAhead + 1
 
   queueSnapshot.tickets = [ticket, ...queueSnapshot.tickets]
   pushEvent(ticket, 'created')
@@ -340,7 +370,7 @@ export function createSharedTicket(input: SharedTicketCreateInput): SharedTicket
 }
 
 export function createArchitectureTicket(input: ArchitectureCreateTicketInput): ArchitectureTicket {
-  const serviceType = sharedServiceTypeByArchitectureId[String(input.serviceTypeId)] ?? 'consultation'
+  const serviceType = getSharedServiceTypeByOptionId(input.serviceTypeId)
   const ticket = createSharedTicket({
     patientName: `Patient ${Date.now().toString().slice(-4)}`,
     priority: sharedPriorityByArchitecturePriority[input.priority],
@@ -356,7 +386,51 @@ export function getMockServiceTypeOptions(): TicketSettingsServiceTypeOption[] {
 }
 
 export function getSharedServiceTypeByOptionId(id: string | number): SharedServiceType {
-  return sharedServiceTypeByArchitectureId[String(id)] ?? 'consultation'
+  return serviceTypeOptions.find((serviceType) => String(serviceType.id) === String(id))?.code ?? 'consultation'
+}
+
+export function createMockServiceType(input: AdminServiceTypeInput): TicketSettingsServiceTypeOption {
+  const serviceType: TicketSettingsServiceTypeOption = {
+    active: input.active ?? true,
+    averageDurationMinutes: input.averageDurationMinutes,
+    code: input.code ?? 'consultation',
+    id: `service-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    name: input.name,
+    priorityWeight: input.priorityWeight,
+  }
+
+  serviceTypeOptions = [...serviceTypeOptions, serviceType]
+
+  return clone(serviceType)
+}
+
+export function updateMockServiceType(
+  id: string | number,
+  input: Partial<AdminServiceTypeInput>,
+): TicketSettingsServiceTypeOption {
+  const index = serviceTypeOptions.findIndex((serviceType) => String(serviceType.id) === String(id))
+
+  if (index === -1) {
+    throw new Error(`Service type ${id} was not found.`)
+  }
+
+  serviceTypeOptions[index] = {
+    ...serviceTypeOptions[index],
+    ...input,
+    id: serviceTypeOptions[index].id,
+    name: input.name ?? serviceTypeOptions[index].name,
+    code: input.code ?? serviceTypeOptions[index].code,
+  }
+
+  return clone(serviceTypeOptions[index])
+}
+
+export function deleteMockServiceType(id: string | number): void {
+  serviceTypeOptions = serviceTypeOptions.map((serviceType) => (
+    String(serviceType.id) === String(id)
+      ? { ...serviceType, active: false }
+      : serviceType
+  ))
 }
 
 export function updateSharedTicketStatus(
@@ -408,7 +482,7 @@ export function redirectSharedTicket(
   ticket.status = 'redirected'
   ticket.roomId = String(newRoomId)
   if (serviceTypeId !== undefined) {
-    ticket.serviceType = sharedServiceTypeByArchitectureId[String(serviceTypeId)] ?? ticket.serviceType
+    ticket.serviceType = getSharedServiceTypeByOptionId(serviceTypeId)
   }
   pushEvent(ticket, 'redirected')
   refreshQueueSnapshot()
@@ -422,7 +496,7 @@ export function updateSharedTicketSettings(id: string, payload: TicketSettingsPa
   if (payload.serviceType) {
     ticket.serviceType = payload.serviceType
   } else if (payload.serviceTypeId) {
-    ticket.serviceType = sharedServiceTypeByArchitectureId[String(payload.serviceTypeId)] ?? ticket.serviceType
+    ticket.serviceType = getSharedServiceTypeByOptionId(payload.serviceTypeId)
   }
 
   if (payload.roomId !== undefined) {

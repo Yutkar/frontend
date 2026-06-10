@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Building2, CheckCircle2, Stethoscope, UsersRound } from 'lucide-react'
 import { adminService } from '@services/adminService'
+import { useLocale } from '@shared/locales/useLocale'
 import type { Role } from '@shared/types'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
@@ -9,13 +10,14 @@ import { ManagersSection } from './AdminManagersPage'
 import { RoomsSection } from './AdminRoomsPage'
 import { StaffSection } from './AdminStaffPage'
 import { BoardSettingsSection } from './AdminBoardSettingsPage'
-import { QueueRoutingSection } from './AdminQueueRoutingPage'
+import { ServiceTypesSection } from './AdminServiceTypesPage'
+import { TerminalsSection } from './AdminTerminalsPage'
+import { AppSettingsSection } from './AdminAppSettingsPage'
 
-type AdminSectionId = 'rooms' | 'routing' | 'staff' | 'managers' | 'board'
+type AdminSectionId = 'rooms' | 'service-types' | 'terminals' | 'staff' | 'managers' | 'board' | 'app-settings'
 
 type AdminSectionConfig = {
   id: AdminSectionId
-  label: string
   roles: Role[]
 }
 
@@ -27,11 +29,13 @@ type AdminSummary = {
 }
 
 const adminSections: AdminSectionConfig[] = [
-  { id: 'rooms', label: 'Кабинеты', roles: ['admin', 'manager'] },
-  { id: 'routing', label: 'Настройки очередей', roles: ['admin', 'manager'] },
-  { id: 'staff', label: 'Персонал', roles: ['admin', 'manager'] },
-  { id: 'managers', label: 'Менеджеры', roles: ['admin'] },
-  { id: 'board', label: 'Табло', roles: ['admin', 'manager'] },
+  { id: 'rooms', roles: ['admin', 'manager'] },
+  { id: 'service-types', roles: ['admin', 'manager'] },
+  { id: 'terminals', roles: ['admin', 'manager'] },
+  { id: 'staff', roles: ['admin', 'manager'] },
+  { id: 'managers', roles: ['admin'] },
+  { id: 'board', roles: ['admin', 'manager'] },
+  { id: 'app-settings', roles: ['admin'] },
 ]
 
 const emptySummary: AdminSummary = {
@@ -42,6 +46,7 @@ const emptySummary: AdminSummary = {
 }
 
 export function AdminPage() {
+  const t = useLocale()
   const user = useGlobalStore((state) => state.user)
   const loadQueue = useQueueStore((state) => state.loadQueue)
   const [activeSection, setActiveSection] = useState<AdminSectionId>('rooms')
@@ -90,6 +95,21 @@ export function AdminPage() {
     void loadSummary()
   }
 
+  function handleServiceTypesChange() {
+    void loadQueue({ force: true, successMessage: 'Типы услуг обновлены' })
+  }
+
+  function getSectionLabel(section: AdminSectionConfig): string {
+    if (section.id === 'service-types') return t.admin.serviceTypes
+    if (section.id === 'terminals') return t.admin.terminals
+    if (section.id === 'staff') return t.admin.staff
+    if (section.id === 'managers') return t.admin.managers
+    if (section.id === 'board') return t.nav.tvBoard
+    if (section.id === 'app-settings') return t.admin.appSettings
+
+    return t.admin.rooms
+  }
+
   return (
     <div className="page-stack">
       <p className="admin-page-lead">Настройка кабинетов, персонала и доступов</p>
@@ -127,13 +147,16 @@ export function AdminPage() {
             onClick={() => setActiveSection(section.id)}
             type="button"
           >
-            {section.label}
+            {getSectionLabel(section)}
           </button>
         ))}
       </nav>
 
       {selectedSection?.id === 'rooms' ? <RoomsSection onRoomsChange={handleRoomsChange} /> : null}
-      {selectedSection?.id === 'routing' ? <QueueRoutingSection onRoutingChange={handleRoomsChange} /> : null}
+      {selectedSection?.id === 'service-types' ? (
+        <ServiceTypesSection onServiceTypesChange={handleServiceTypesChange} />
+      ) : null}
+      {selectedSection?.id === 'terminals' ? <TerminalsSection /> : null}
       {selectedSection?.id === 'staff' ? (
         <StaffSection onStaffChange={handleAdminDataChange} refreshKey={roomsVersion} />
       ) : null}
@@ -141,6 +164,7 @@ export function AdminPage() {
         <ManagersSection onManagersChange={handleAdminDataChange} />
       ) : null}
       {selectedSection?.id === 'board' ? <BoardSettingsSection /> : null}
+      {selectedSection?.id === 'app-settings' && canManageManagers ? <AppSettingsSection /> : null}
     </div>
   )
 }

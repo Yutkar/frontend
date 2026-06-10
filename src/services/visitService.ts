@@ -1,5 +1,6 @@
 import { queueApi, toServiceError } from './api'
 import type { Ticket, TicketPriority, TicketStatus } from '@shared/types'
+import { formatRoomName } from '@shared/utils'
 
 export type Visit = {
   id: string
@@ -15,12 +16,12 @@ export type Visit = {
 }
 
 export type VisitFilters = {
-  roomId?: string
-  roomIds?: string[]
-  userId?: string
+  roomId?: string | number
+  roomIds?: Array<string | number>
+  userId?: string | number
 }
 
-const visibleVisitStatuses: TicketStatus[] = ['called', 'in_service', 'completed', 'cancelled', 'no_show']
+const visibleVisitStatuses: TicketStatus[] = ['completed', 'no_show', 'cancelled', 'redirected']
 
 function getVisitTimestamp(ticket: Ticket): number {
   const value = ticket.completedAt ?? ticket.startedAt ?? ticket.calledAt ?? ticket.updatedAt ?? ticket.createdAt
@@ -44,10 +45,10 @@ function formatVisitTime(timestamp: number): string {
 
 function matchesVisitFilters(ticket: Ticket, filters: VisitFilters): boolean {
   const filterRoomIds = filters.roomIds?.length ? filters.roomIds : filters.roomId ? [filters.roomId] : []
-  const roomMatches = filterRoomIds.length > 0 && ticket.roomId
-    ? filterRoomIds.includes(ticket.roomId)
+  const roomMatches = filterRoomIds.length > 0 && ticket.roomId !== undefined
+    ? filterRoomIds.map(String).includes(String(ticket.roomId))
     : false
-  const userMatches = filters.userId ? ticket.assignedTo === filters.userId : false
+  const userMatches = filters.userId ? String(ticket.assignedTo) === String(filters.userId) : false
 
   if (filterRoomIds.length === 0 && !filters.userId) {
     return true
@@ -66,7 +67,7 @@ function ticketToVisit(ticket: Ticket): Visit {
     patient: ticket.patientName || `Пациент ${ticket.number}`,
     ticket: ticket.number,
     service: ticket.serviceType,
-    room: ticket.roomName,
+    room: formatRoomName({ id: ticket.roomId, name: ticket.roomName }),
     status: ticket.status,
     priority: ticket.priority,
     eta: ticket.etaMinutes,

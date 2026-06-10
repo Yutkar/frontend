@@ -4,8 +4,12 @@ import { apiClient, publicApiClient } from '../client'
 import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
 import type {
   AdminApi,
+  AdminTerminalInput,
+  AdminTerminalRecord,
+  BoardSettings,
   AdminRecord,
   AdminRecordInput,
+  AdminServiceTypeInput,
   AdminUserInput,
   TicketSettingsServiceTypeOption,
 } from '../types'
@@ -35,6 +39,17 @@ type BackendUserResponse = BackendUser & {
   accessToken?: string
   token?: string
   user?: BackendUser
+}
+
+const defaultBoardSettings: BoardSettings = {
+  boardType: 'general',
+  recentCallsLimit: 10,
+  roomBoardId: '',
+  screens: [],
+  showRecentCalls: true,
+  showTime: true,
+  template: 'classic',
+  voiceEnabled: true,
 }
 
 const serviceCodeByBackendName: Record<string, ServiceType> = {
@@ -194,8 +209,30 @@ function toServiceCode(option: UnknownRecord): ServiceType {
 
 function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOption {
   const code = toServiceCode(option)
+  const averageDurationMinutes = getPositiveNumber(
+    option.averageDurationMinutes
+      ?? option.average_duration_minutes
+      ?? option.avgServiceMinutes
+      ?? option.avg_service_minutes
+      ?? option.durationMinutes
+      ?? option.duration_minutes,
+  )
+  const priorityWeight = getPositiveNumber(
+    option.priorityWeight
+      ?? option.priority_weight
+      ?? option.weight,
+  )
+  const active = typeof option.active === 'boolean'
+    ? option.active
+    : typeof option.isActive === 'boolean'
+      ? option.isActive
+      : typeof option.enabled === 'boolean'
+        ? option.enabled
+        : undefined
 
   return {
+    ...(active === undefined ? {} : { active }),
+    ...(averageDurationMinutes === undefined ? {} : { averageDurationMinutes }),
     code,
     id: getId(option),
     name: getText(option.name)
@@ -203,6 +240,57 @@ function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOp
       ?? getText(option.label)
       ?? getText(option.code)
       ?? serviceLabelByCode[code],
+    ...(priorityWeight === undefined ? {} : { priorityWeight }),
+  }
+}
+
+function getServiceTypeRecord(value: unknown): UnknownRecord | undefined {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  for (const key of ['serviceType', 'service_type', 'data', 'item', 'record']) {
+    const nested = value[key]
+
+    if (isRecord(nested)) {
+      return nested
+    }
+  }
+
+  return value
+}
+
+function toServiceTypeResponseOption(
+  value: unknown,
+  fallback: Partial<TicketSettingsServiceTypeOption> & Partial<AdminServiceTypeInput>,
+): TicketSettingsServiceTypeOption {
+  return toServiceTypeOption({
+    ...fallback,
+    ...(getServiceTypeRecord(value) ?? {}),
+  })
+}
+
+function getPositiveNumber(value: unknown): number | undefined {
+  const numberValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value)
+      : Number.NaN
+
+  return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : undefined
+}
+
+function toServiceTypePayload(input: Partial<AdminServiceTypeInput>) {
+  return {
+    ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+    ...(input.code !== undefined ? { code: input.code } : {}),
+    ...(input.averageDurationMinutes !== undefined
+      ? { averageDurationMinutes: Math.max(1, Math.round(input.averageDurationMinutes)) }
+      : {}),
+    ...(input.priorityWeight !== undefined
+      ? { priorityWeight: Math.max(0, Math.round(input.priorityWeight)) }
+      : {}),
+    ...(input.active === undefined ? {} : { active: input.active, isActive: input.active }),
   }
 }
 
@@ -257,6 +345,8 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
       ? record.active
       : record.status !== 'paused' && record.status !== 'inactive' && record.status !== 'deleted'
   const serviceTypeIds = getServiceTypeIds(record)
+  const workEndTime = getText(record.workEndTime ?? record.workingEndTime ?? record.work_end_time)
+  const workStartTime = getText(record.workStartTime ?? record.workingStartTime ?? record.work_start_time)
   const ticketIssueEnabled = typeof record.ticketIssueEnabled === 'boolean'
     ? record.ticketIssueEnabled
     : typeof record.isTicketIssueEnabled === 'boolean'
@@ -272,7 +362,94 @@ function toRoomRecord(record: UnknownRecord): AdminRecord {
     isActive,
     ...(ticketIssueEnabled === undefined ? {} : { ticketIssueEnabled, isTicketIssueEnabled: ticketIssueEnabled }),
     name,
+    ...(getText(record.number) ? { number: getText(record.number) } : {}),
+    ...(getText(record.placeType ?? record.place_type) ? { placeType: getText(record.placeType ?? record.place_type) } : {}),
     serviceTypeIds,
+    ...(workEndTime ? { workEndTime } : {}),
+    ...(workStartTime ? { workStartTime } : {}),
+    ...(workEndTime ? { workingEndTime: workEndTime } : {}),
+    ...(workStartTime ? { workingStartTime: workStartTime } : {}),
+  }
+}
+
+function normalizeRecordIdList(values: unknown): Array<string | number> {
+  if (!Array.isArray(values)) {
+    return []
+  }
+
+  return values
+    .map((value) => {
+      if (typeof value === 'string' && value.trim()) return value.trim()
+      if (typeof value === 'number' && Number.isFinite(value)) return value
+      return undefined
+    })
+    .filter((value): value is string | number => value !== undefined)
+}
+
+function toTerminalRecord(record: UnknownRecord): AdminTerminalRecord {
+  return {
+    active: typeof record.active === 'boolean' ? record.active : record.isActive !== false,
+    id: getId(record),
+    location: getText(record.location ?? record.place ?? record.installationPlace) ?? '',
+    name: getText(record.name ?? record.title) ?? 'Терминал',
+    roomIds: normalizeRecordIdList(record.roomIds ?? record.rooms),
+    serviceTypeIds: normalizeRecordIdList(record.serviceTypeIds ?? record.services ?? record.serviceTypes),
+  }
+}
+
+function toTerminalPayload(input: AdminTerminalInput | Partial<AdminTerminalInput>) {
+  return {
+    active: input.active ?? true,
+    isActive: input.active ?? true,
+    location: input.location ?? '',
+    name: input.name ?? '',
+    roomIds: normalizeIdList(input.roomIds),
+    serviceTypeIds: normalizeIdList(input.serviceTypeIds),
+  }
+}
+
+function normalizeBoardTemplate(value: unknown): BoardSettings['template'] {
+  return value === 'grid' || value === 'list' || value === 'minimal' ? value : 'classic'
+}
+
+function normalizeRecentCallsLimit(value: unknown): BoardSettings['recentCallsLimit'] {
+  return value === 5 || value === 15 ? value : 10
+}
+
+function toBoardSettings(value: unknown): BoardSettings {
+  const record = isRecord(value) ? value : {}
+  const screens = Array.isArray(record.screens)
+    ? record.screens.filter(isRecord).map((screen) => ({
+        id: getText(screen.id) ?? `screen-${Math.random().toString(36).slice(2, 8)}`,
+        name: getText(screen.name) ?? 'Экран',
+        roomIds: normalizeRecordIdList(screen.roomIds).map(String),
+        roomNames: normalizeRecordIdList(screen.roomNames).map(String),
+      }))
+    : []
+  const profiles = Array.isArray(record.profiles)
+    ? record.profiles.filter(isRecord).map((profile) => ({
+        boardType: (profile.boardType === 'individual' ? 'individual' : 'general') as BoardSettings['boardType'],
+        id: getText(profile.id) ?? `${profile.boardType === 'individual' ? 'individual' : 'general'}-${getText(profile.roomBoardId) ?? 'general'}`,
+        name: getText(profile.name) ?? (profile.boardType === 'individual' ? 'Индивидуальное табло' : 'Общее табло'),
+        recentCallsLimit: normalizeRecentCallsLimit(profile.recentCallsLimit),
+        roomBoardId: getText(profile.roomBoardId),
+        showRecentCalls: typeof profile.showRecentCalls === 'boolean' ? profile.showRecentCalls : true,
+        showTime: typeof profile.showTime === 'boolean' ? profile.showTime : true,
+        template: normalizeBoardTemplate(profile.template),
+        voiceEnabled: typeof profile.voiceEnabled === 'boolean' ? profile.voiceEnabled : true,
+      }))
+    : []
+
+  return {
+    boardType: record.boardType === 'individual' ? 'individual' : 'general',
+    profiles,
+    recentCallsLimit: normalizeRecentCallsLimit(record.recentCallsLimit),
+    roomBoardId: getText(record.roomBoardId),
+    screens,
+    showRecentCalls: typeof record.showRecentCalls === 'boolean' ? record.showRecentCalls : true,
+    showTime: typeof record.showTime === 'boolean' ? record.showTime : true,
+    template: normalizeBoardTemplate(record.template),
+    voiceEnabled: typeof record.voiceEnabled === 'boolean' ? record.voiceEnabled : true,
   }
 }
 
@@ -335,7 +512,7 @@ function hasUserId(user: User): boolean {
 }
 
 function getDesiredRoomIds(input: Partial<AdminUserInput>): Array<string | number> {
-  const roomIds = [
+  const roomIds: Array<string | number | undefined> = [
     input.roomId,
     input.assignedRoomId,
     ...(input.roomIds ?? []),
@@ -393,6 +570,11 @@ function toUserUpdatePayload(input: Partial<AdminUserInput>) {
 
 function toRoomCreatePayload(input: AdminRecordInput) {
   const name = getText(input.name) ?? getText(input.title) ?? ''
+  const number = getText(input.number)
+  const placeType = getText(input.placeType) ?? getText(input.place_type)
+  const workEndTime = getText(input.workEndTime ?? input.workingEndTime ?? input.work_end_time)
+  const workStartTime = getText(input.workStartTime ?? input.workingStartTime ?? input.work_start_time)
+  const hasServiceTypeIds = Array.isArray(input.serviceTypeIds)
   const serviceTypeIds = normalizeIdList(input.serviceTypeIds as Array<string | number> | undefined)
   const ticketIssueEnabled = typeof input.ticketIssueEnabled === 'boolean'
     ? input.ticketIssueEnabled
@@ -403,9 +585,15 @@ function toRoomCreatePayload(input: AdminRecordInput) {
         : undefined
 
   return {
-    name,
-    serviceTypeIds,
+    ...(name ? { name } : {}),
+    ...(number ? { number } : {}),
+    ...(placeType ? { placeType } : {}),
+    ...(hasServiceTypeIds ? { serviceTypeIds } : {}),
     ...(ticketIssueEnabled === undefined ? {} : { ticketIssueEnabled, isTicketIssueEnabled: ticketIssueEnabled }),
+    ...(workEndTime ? { workEndTime } : {}),
+    ...(workStartTime ? { workStartTime } : {}),
+    ...(workEndTime ? { workingEndTime: workEndTime } : {}),
+    ...(workStartTime ? { workingStartTime: workStartTime } : {}),
   }
 }
 
@@ -482,7 +670,7 @@ async function updateRoom(path: string, id: string | number, input: AdminRecordI
       active: payload.active,
       isTicketIssueEnabled: payload.isTicketIssueEnabled,
       name: payload.name,
-      services: payload.serviceTypeIds,
+      ...(Array.isArray(payload.serviceTypeIds) ? { services: payload.serviceTypeIds } : {}),
       ticketIssueEnabled: payload.ticketIssueEnabled,
     }),
     () => apiClient.put<unknown>(`${path}/${id}`, payload),
@@ -634,6 +822,36 @@ export const backendAdminApi: AdminApi = {
     }
   },
 
+  async createServiceType(input) {
+    const response = await apiClient.post<unknown>('/service-types', toServiceTypePayload(input))
+
+    return toServiceTypeResponseOption(response.data, input)
+  },
+
+  async updateServiceType(id, input) {
+    const response = await apiClient.patch<unknown>(`/service-types/${id}`, toServiceTypePayload(input))
+
+    return toServiceTypeResponseOption(response.data, { id, ...input })
+  },
+
+  async deleteServiceType(id) {
+    try {
+      await deleteRecord('/service-types', id)
+    } catch (deleteError) {
+      console.warn('backendAdminApi.deleteServiceType: DELETE failed, trying soft delete', deleteError)
+
+      try {
+        await apiClient.patch(`/service-types/${id}`, {
+          active: false,
+          isActive: false,
+        })
+      } catch (patchError) {
+        console.warn('backendAdminApi.deleteServiceType: soft delete failed', patchError)
+        throw deleteError
+      }
+    }
+  },
+
   getRooms() {
     const getRoomsRecords = async (path: string) => {
       const records = await getAdminRecords(path, ['rooms'])
@@ -749,5 +967,51 @@ export const backendAdminApi: AdminApi = {
 
   assignDoctorToRoom(userId, roomId) {
     return assignUserToRoom(userId, roomId)
+  },
+
+  async getTerminals() {
+    const response = await apiClient.get<unknown>('/terminals')
+
+    return toArray(response.data, ['terminals']).map(toTerminalRecord)
+  },
+
+  async createTerminal(input) {
+    const response = await apiClient.post<unknown>('/terminals', toTerminalPayload(input))
+
+    return toTerminalRecord(isRecord(response.data) ? response.data : { ...input, id: Date.now() })
+  },
+
+  async updateTerminal(id, input) {
+    const response = await apiClient.patch<unknown>(`/terminals/${id}`, toTerminalPayload(input))
+
+    return toTerminalRecord(isRecord(response.data) ? response.data : { ...input, id })
+  },
+
+  deleteTerminal(id) {
+    return deleteRecord('/terminals', id)
+  },
+
+  async getBoardSettings() {
+    const response = await requestFirst([
+      () => apiClient.get<unknown>('/board-settings').then((result) => result.data),
+      () => apiClient.get<unknown>('/settings/board').then((result) => result.data),
+    ])
+
+    return toBoardSettings(isRecord(response) && isRecord(response.settings) ? response.settings : response)
+  },
+
+  async updateBoardSettings(input) {
+    const payload = {
+      ...defaultBoardSettings,
+      ...input,
+      screens: input.screens ?? defaultBoardSettings.screens,
+    }
+    const response = await requestFirst([
+      () => apiClient.patch<unknown>('/board-settings', payload).then((result) => result.data),
+      () => apiClient.put<unknown>('/board-settings', payload).then((result) => result.data),
+      () => apiClient.patch<unknown>('/settings/board', payload).then((result) => result.data),
+    ])
+
+    return toBoardSettings(isRecord(response) && isRecord(response.settings) ? response.settings : response)
   },
 }

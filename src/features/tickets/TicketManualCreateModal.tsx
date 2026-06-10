@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PlusCircle, X } from 'lucide-react'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type {
   TicketCreateSettingsPayload,
@@ -11,7 +12,14 @@ import type {
   Ticket,
   TicketPriority,
 } from '@shared/types'
+import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
+import {
+  formatRoomName,
+  formatPeopleAhead,
+  getAverageServiceDurationStats,
+  getRoomQueuePeopleAhead,
+} from '@shared/utils'
 import {
   getAutoRoomForService,
   getAutoSpecialistForRoom,
@@ -47,6 +55,7 @@ export function TicketManualCreateModal({
   open,
   tickets,
 }: TicketManualCreateModalProps) {
+  const t = useLocale()
   const [error, setError] = useState<string | null>(null)
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [note, setNote] = useState('')
@@ -54,6 +63,21 @@ export function TicketManualCreateModal({
   const [priority, setPriority] = useState<TicketPriority>('normal')
   const [saving, setSaving] = useState(false)
   const [serviceTypeId, setServiceTypeId] = useState('')
+
+  const loadOptions = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setLoadingOptions(true)
+    }
+
+    try {
+      setOptions(await ticketService.getTicketSettingsOptions())
+    } catch (loadError) {
+      console.error('Ticket create options load failed', loadError)
+      setOptions(emptyOptions)
+    } finally {
+      setLoadingOptions(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) {
@@ -72,32 +96,14 @@ export function TicketManualCreateModal({
       return
     }
 
-    let active = true
+    void loadOptions()
+  }, [loadOptions, open])
 
-    setLoadingOptions(true)
-    ticketService
-      .getTicketSettingsOptions()
-      .then((nextOptions) => {
-        if (active) {
-          setOptions(nextOptions)
-        }
-      })
-      .catch((loadError) => {
-        console.error('Ticket create options load failed', loadError)
-        if (active) {
-          setOptions(emptyOptions)
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoadingOptions(false)
-        }
-      })
-
-    return () => {
-      active = false
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    if (open) {
+      void loadOptions(false)
     }
-  }, [open])
+  }), [loadOptions, open])
 
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
   const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
@@ -106,8 +112,13 @@ export function TicketManualCreateModal({
     [fallbackRooms, options, selectedServiceType?.id],
   )
   const autoRoom = useMemo(
-    () => getAutoRoomForService(rooms, fallbackRooms, tickets),
-    [fallbackRooms, rooms, tickets],
+    () => getAutoRoomForService(
+      rooms,
+      fallbackRooms,
+      tickets,
+      getAverageServiceDurationStats(tickets, selectedServiceType?.id, selectedServiceType?.code).averageMinutes,
+    ),
+    [fallbackRooms, rooms, selectedServiceType?.code, selectedServiceType?.id, tickets],
   )
   const autoDoctor = useMemo(
     () => autoRoom ? getAutoSpecialistForRoom(autoRoom.id, options.specialists) : undefined,
@@ -115,6 +126,10 @@ export function TicketManualCreateModal({
   )
   const noRoomAvailable = Boolean(selectedServiceType && !autoRoom && !loadingOptions)
   const noDoctorAssigned = Boolean(autoRoom && !autoDoctor && !loadingOptions)
+  const peopleAhead = useMemo(
+    () => getRoomQueuePeopleAhead(autoRoom?.id, tickets),
+    [autoRoom?.id, tickets],
+  )
   const canCreateTicket = Boolean(selectedServiceType && autoRoom && priority)
 
   useEffect(() => {
@@ -137,12 +152,12 @@ export function TicketManualCreateModal({
     event.preventDefault()
 
     if (!selectedServiceType) {
-      setError('Выберите тип услуги.')
+      setError(t.tickets.selectService)
       return
     }
 
     if (!autoRoom) {
-      setError('Нет доступного кабинета для выбранной услуги')
+      setError(t.tickets.noServicePlace)
       return
     }
 
@@ -167,7 +182,7 @@ export function TicketManualCreateModal({
       await onSaved()
     } catch (saveError) {
       console.error('Manual ticket create failed', saveError)
-      setError('Не удалось создать талон.')
+      setError(t.tickets.createError)
     } finally {
       setSaving(false)
     }
@@ -180,12 +195,12 @@ export function TicketManualCreateModal({
           <div>
             <span className="eyebrow">
               <PlusCircle size={14} />
-              Управление
+              {t.nav.dashboard}
             </span>
-            <h2>Создать талон</h2>
+            <h2>{t.tickets.createTicket}</h2>
           </div>
           <button
-            aria-label="Отмена"
+            aria-label={t.common.cancel}
             className="modal-close"
             disabled={saving}
             onClick={onClose}
@@ -197,15 +212,20 @@ export function TicketManualCreateModal({
 
         {error ? <div className="modal-error">{error}</div> : null}
         {!error && noRoomAvailable ? (
-          <div className="modal-error">Нет доступного кабинета для выбранной услуги</div>
+          <div className="modal-error">{t.tickets.noServicePlace}</div>
         ) : null}
         {!error && noDoctorAssigned ? (
-          <div className="modal-info">Кабинет выбран автоматически, врач не назначен</div>
+          <div className="modal-info">{t.tickets.autoPlaceNoSpecialist}</div>
+        ) : null}
+        {!error && autoRoom ? (
+          <div className="modal-info">
+            {t.tickets.autoPlaceSelected}: {formatRoomName(autoRoom)}. {formatPeopleAhead(peopleAhead)}.
+          </div>
         ) : null}
 
         <div className="settings-form-grid">
           <label className="field service-type-field">
-            <span>Тип услуги</span>
+            <span>{t.tickets.serviceType}</span>
             <select
               disabled={isBusy}
               onChange={(event) => {
@@ -223,7 +243,7 @@ export function TicketManualCreateModal({
           </label>
 
           <label className="field">
-            <span>Приоритет</span>
+            <span>{t.tickets.priority}</span>
             <select
               disabled={isBusy}
               onChange={(event) => setPriority(event.target.value as TicketPriority)}
@@ -238,7 +258,7 @@ export function TicketManualCreateModal({
           </label>
 
           <label className="field settings-comment-field">
-            <span>Примечание</span>
+            <span>{t.tickets.note}</span>
             <input
               disabled={isBusy}
               onChange={(event) => setNote(event.target.value)}
@@ -249,10 +269,10 @@ export function TicketManualCreateModal({
 
         <footer className="modal-actions">
           <Button disabled={saving} onClick={onClose} variant="ghost">
-            Отмена
+            {t.common.cancel}
           </Button>
           <Button disabled={isBusy || !canCreateTicket} type="submit" variant="primary">
-            {saving ? 'Создаём...' : 'Создать'}
+            {saving ? t.tickets.creating : t.tickets.create}
           </Button>
         </footer>
       </form>

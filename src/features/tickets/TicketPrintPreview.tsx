@@ -1,9 +1,13 @@
 import { Printer } from 'lucide-react'
+import { getLocale, useLocale, type SmartQLanguage } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
+import { formatPeopleAhead } from '@shared/utils'
 
 export type TicketPrintData = {
   date: Date
   doctorName?: string
+  language?: SmartQLanguage
+  peopleAhead?: number
   priorityLabel: string
   roomName: string
   serviceName: string
@@ -16,16 +20,20 @@ type TicketPrintPreviewProps = {
 }
 
 export function TicketPrintPreview({ data, onPrint }: TicketPrintPreviewProps) {
+  const currentLocale = useLocale()
+
   if (!data) {
     return (
       <div className="ticket-print-empty">
-        <span className="eyebrow">Печать талона</span>
-        <h2>Талон ещё не создан</h2>
-        <p>После создания здесь появится готовый чек для печати через автомат.</p>
+        <span className="eyebrow">{currentLocale.ticketPrint.title}</span>
+        <h2>{currentLocale.ticketPrint.emptyTitle}</h2>
+        <p>{currentLocale.ticketPrint.emptyDescription}</p>
       </div>
     )
   }
 
+  const locale = getLocale(data.language)
+  const labels = locale.ticketPrint
   const formattedDate = new Intl.DateTimeFormat('ru-RU', {
     day: '2-digit',
     month: '2-digit',
@@ -46,40 +54,46 @@ export function TicketPrintPreview({ data, onPrint }: TicketPrintPreviewProps) {
       <div className="ticket-print-preview">
         <strong className="ticket-print-brand">SmartQ</strong>
         <div className="ticket-print-number">
-          <span>Номер талона</span>
+          <span>{labels.ticketNumber}</span>
           <strong>{data.ticketNumber}</strong>
         </div>
 
         <dl>
           <div>
-            <dt>Услуга</dt>
+            <dt>{labels.service}</dt>
             <dd>{data.serviceName}</dd>
           </div>
           <div>
-            <dt>Кабинет</dt>
+            <dt>{labels.servicePlace}</dt>
             <dd>{data.roomName}</dd>
           </div>
+          {data.peopleAhead !== undefined ? (
+            <div>
+              <dt>{labels.queue}</dt>
+              <dd>{formatPeopleAhead(data.peopleAhead, data.language)}</dd>
+            </div>
+          ) : null}
           {data.doctorName ? (
             <div>
-              <dt>Врач</dt>
+              <dt>{labels.doctor}</dt>
               <dd>{data.doctorName}</dd>
             </div>
           ) : null}
           <div>
-            <dt>Приоритет</dt>
+            <dt>{labels.priority}</dt>
             <dd>{data.priorityLabel}</dd>
           </div>
           <div>
-            <dt>Дата</dt>
+            <dt>{labels.date}</dt>
             <dd>{formattedDate}</dd>
           </div>
           <div>
-            <dt>Время</dt>
+            <dt>{labels.time}</dt>
             <dd>{formattedTime}</dd>
           </div>
         </dl>
 
-        <p>Ожидайте вызова на табло</p>
+        <p>{labels.waitBoard}</p>
       </div>
 
       <Button
@@ -88,7 +102,7 @@ export function TicketPrintPreview({ data, onPrint }: TicketPrintPreviewProps) {
         onClick={handlePrint}
         variant="secondary"
       >
-        Печать талона
+        {labels.printButton}
       </Button>
     </section>
   )

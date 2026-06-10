@@ -1,3 +1,5 @@
+import type { SmartQLanguage } from '@shared/locales/types'
+
 export type TicketStatus =
   | 'created'
   | 'waiting'
@@ -22,6 +24,8 @@ export type ServiceType =
 
 export type RoomStatus = 'open' | 'busy' | 'paused'
 
+export type ServicePlaceType = 'room' | 'window' | 'desk'
+
 export type Ticket = {
   id: string
   number: string
@@ -33,19 +37,25 @@ export type Ticket = {
   createdAt: string
   hasActualCreatedAt?: boolean
   calledAt?: string
+  serviceStartedAt?: string
   startedAt?: string
   completedAt?: string
   updatedAt?: string
   roomId?: string
   roomName?: string
   assignedTo?: string
+  language?: SmartQLanguage
   etaMinutes: number
   notes?: string
+  peopleAhead?: number
+  queuePosition?: number
 }
 
 export type Room = {
   id: string
   name: string
+  number?: string | number
+  placeType?: ServicePlaceType | string
   department: string
   specialistName: string
   status: RoomStatus
@@ -61,6 +71,10 @@ export type Room = {
   currentTicketId?: string
   workload?: number
   loadPercent: number
+  workEndTime?: string
+  workStartTime?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 export type QueueEventType =
@@ -104,6 +118,7 @@ export type AnalyticsPoint = {
   label: string
   waiting: number
   completed: number
+  noShow?: number
   avgWaitMinutes: number
   avgServiceMinutes?: number
 }
@@ -130,6 +145,7 @@ export type TicketCreateInput = {
   serviceTypeId?: string | number
   priority: TicketPriority
   roomId?: string | number
+  language?: SmartQLanguage
   notes?: string
 }
 

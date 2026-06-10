@@ -210,7 +210,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                     <th>Имя</th>
                     <th>Логин</th>
                     <th>Роль</th>
-                    <th>Кабинет</th>
+                    <th>Место обслуживания</th>
                     <th>Действия</th>
                   </tr>
                 </thead>
@@ -312,7 +312,6 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                 )
               })}
             </fieldset>
-
             <div className="modal-actions">
               <Button disabled={saving} onClick={resetForm} variant="ghost">
                 Отмена

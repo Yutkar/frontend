@@ -10,6 +10,7 @@ import type {
   TicketStatus as SharedTicketStatus,
   User as SharedUser,
 } from '@shared/types'
+import type { SmartQLanguage } from '@shared/locales/types'
 import type {
   CreateTicketInput as ArchitectureCreateTicketInput,
   QueueStats as ArchitectureQueueStats,
@@ -25,9 +26,12 @@ export type QueueOverloadRoom = {
 }
 
 export type TicketSettingsServiceTypeOption = {
+  active?: boolean
+  averageDurationMinutes?: number
   id: string | number
   code: SharedServiceType
   name: string
+  priorityWeight?: number
 }
 
 export type TicketSettingsUserOption = {
@@ -53,6 +57,8 @@ export type TicketSettingsRoomOption = Pick<SharedRoom, 'id' | 'name'> & {
   isActive?: boolean
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
+  number?: string | number
+  placeType?: SharedRoom['placeType']
   roomId?: string | number
   roomName?: string
   serviceTypeId?: string | number
@@ -61,6 +67,10 @@ export type TicketSettingsRoomOption = Pick<SharedRoom, 'id' | 'name'> & {
   services?: Array<string | number | TicketSettingsRoomServiceOption>
   ticketIssueEnabled?: boolean
   title?: string
+  workEndTime?: string
+  workStartTime?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 export type TicketSettingsOptions = {
@@ -79,6 +89,7 @@ export type TicketSettingsPayload = {
   comment?: string
   note?: string
   etaMinutes?: number
+  language?: SmartQLanguage
 }
 
 export type TicketCreateSettingsPayload = TicketSettingsPayload & {
@@ -100,7 +111,7 @@ export type TicketApi = {
   cancelTicket: (id: string) => Promise<ArchitectureTicket>
   noShowTicket: (id: string) => Promise<ArchitectureTicket>
   skipTicket: (id: string) => Promise<ArchitectureTicket>
-  returnTicket: (id: string) => Promise<ArchitectureTicket>
+  returnTicket: (id: string, roomId?: string | number) => Promise<ArchitectureTicket>
   redirectTicket: (id: string, newRoomId: string | number) => Promise<ArchitectureTicket>
   updateTicketStatus: (input: UpdateTicketStatusInput) => Promise<ArchitectureTicket | undefined>
   createTicketWithSettings: (payload: TicketCreateSettingsPayload) => Promise<SharedTicket>
@@ -158,6 +169,64 @@ export type AdminRecord = {
 
 export type AdminRecordInput = Record<string, unknown>
 
+export type AdminTerminalRecord = {
+  active: boolean
+  id: string | number
+  location: string
+  name: string
+  roomIds: Array<string | number>
+  serviceTypeIds: Array<string | number>
+}
+
+export type AdminTerminalInput = {
+  active?: boolean
+  location: string
+  name: string
+  roomIds?: Array<string | number>
+  serviceTypeIds?: Array<string | number>
+}
+
+export type BoardTemplate = 'classic' | 'grid' | 'list' | 'minimal'
+
+export type BoardScreen = {
+  id: string
+  name: string
+  roomIds?: string[]
+  roomNames: string[]
+}
+
+export type BoardSettingsProfile = {
+  boardType: 'general' | 'individual'
+  id: string
+  name: string
+  recentCallsLimit: 5 | 10 | 15
+  roomBoardId?: string
+  showRecentCalls: boolean
+  showTime: boolean
+  template: BoardTemplate
+  voiceEnabled: boolean
+}
+
+export type BoardSettings = {
+  boardType: 'general' | 'individual'
+  profiles?: BoardSettingsProfile[]
+  recentCallsLimit: 5 | 10 | 15
+  roomBoardId?: string
+  screens: BoardScreen[]
+  showRecentCalls: boolean
+  showTime: boolean
+  template: BoardTemplate
+  voiceEnabled: boolean
+}
+
+export type AdminServiceTypeInput = {
+  active?: boolean
+  averageDurationMinutes?: number
+  code?: SharedServiceType
+  name: string
+  priorityWeight?: number
+}
+
 export type AdminUserInput = Partial<SharedUser> & {
   assignedRoomIds?: Array<string | number>
   email?: string
@@ -169,6 +238,9 @@ export type AdminUserInput = Partial<SharedUser> & {
 
 export type AdminApi = {
   getServiceTypes: () => Promise<TicketSettingsServiceTypeOption[]>
+  createServiceType: (input: AdminServiceTypeInput) => Promise<TicketSettingsServiceTypeOption>
+  updateServiceType: (id: string | number, input: Partial<AdminServiceTypeInput>) => Promise<TicketSettingsServiceTypeOption>
+  deleteServiceType: (id: string | number) => Promise<void>
   getRooms: () => Promise<AdminRecord[]>
   createRoom: (input: AdminRecordInput) => Promise<AdminRecord>
   updateRoom: (id: string | number, input: AdminRecordInput) => Promise<AdminRecord>
@@ -182,6 +254,12 @@ export type AdminApi = {
   updateUser: (id: string | number, input: Partial<AdminUserInput>) => Promise<SharedUser>
   deleteUser: (id: string | number) => Promise<void>
   assignDoctorToRoom: (userId: string | number, roomId: string | number) => Promise<SharedUser>
+  getTerminals: () => Promise<AdminTerminalRecord[]>
+  createTerminal: (input: AdminTerminalInput) => Promise<AdminTerminalRecord>
+  updateTerminal: (id: string | number, input: Partial<AdminTerminalInput>) => Promise<AdminTerminalRecord>
+  deleteTerminal: (id: string | number) => Promise<void>
+  getBoardSettings: () => Promise<BoardSettings>
+  updateBoardSettings: (input: Partial<BoardSettings>) => Promise<BoardSettings>
 }
 
 export type KioskApi = {

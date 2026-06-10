@@ -1,4 +1,5 @@
 import type { ServiceType as SharedServiceType, TicketPriority } from '@shared/types'
+import { isWithinWorkHours } from '@shared/utils'
 import type { TicketStatus } from '../../../types'
 import {
   toArchitectureTicket,
@@ -26,6 +27,9 @@ type BackendRoomOption = {
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
   name?: string
+  number?: string | number
+  place_type?: string
+  placeType?: string
   roomId?: string | number
   roomName?: string
   serviceTypeId?: string | number
@@ -35,12 +39,28 @@ type BackendRoomOption = {
   status?: string
   ticketIssueEnabled?: boolean
   title?: string
+  workEndTime?: string
+  workStartTime?: string
+  work_end_time?: string
+  work_start_time?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 type BackendServiceTypeOption = {
+  active?: boolean
+  averageDurationMinutes?: number
+  average_duration_minutes?: number
+  avgServiceMinutes?: number
   code?: string
+  durationMinutes?: number
+  enabled?: boolean
   id: string | number
+  isActive?: boolean
   name?: string
+  priorityWeight?: number
+  priority_weight?: number
+  weight?: number
 }
 
 type BackendUserOption = {
@@ -96,6 +116,7 @@ const serviceCodeByBackendName: Record<string, SharedServiceType> = {
 
 type TicketCreateBody = {
   doctorId?: number
+  language?: string
   note?: string
   priority: number
   roomId?: number
@@ -124,7 +145,7 @@ function withoutOptionalCreateFields(payload: TicketCreateBody): TicketCreateBod
 }
 
 function hasOptionalCreateFields(payload: TicketCreateBody): boolean {
-  return payload.doctorId !== undefined || payload.note !== undefined
+  return payload.doctorId !== undefined || payload.note !== undefined || payload.language !== undefined
 }
 
 async function createBackendTicket(
@@ -177,9 +198,12 @@ function isBackendRoomAcceptingTickets(room: BackendRoomOption): boolean {
     return false
   }
 
-  return room.isActive
+  return isWithinWorkHours({
+    workEndTime: room.workEndTime ?? room.workingEndTime ?? room.work_end_time,
+    workStartTime: room.workStartTime ?? room.workingStartTime ?? room.work_start_time,
+  }) && (room.isActive
     ?? room.active
-    ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted')
+    ?? (room.status !== 'paused' && room.status !== 'inactive' && room.status !== 'deleted'))
 }
 
 function getBackendRoomOptionActive(room: BackendRoomOption): boolean {
@@ -202,7 +226,7 @@ async function assertRoomAcceptsTickets(roomId?: string | number) {
   const room = rooms.find((item) => String(item.id ?? item.roomId ?? item._id) === String(roomId))
 
   if (!room || !isBackendRoomAcceptingTickets(room)) {
-    throw new Error('Ticket issuance is closed for this room.')
+    throw new Error('Выдача талонов в это место обслуживания закрыта.')
   }
 }
 
@@ -281,6 +305,16 @@ function toServiceCode(option: BackendServiceTypeOption): SharedServiceType {
   return serviceCodeByBackendName[normalized] ?? 'consultation'
 }
 
+function getPositiveNumber(value: unknown): number | undefined {
+  const numberValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value)
+      : Number.NaN
+
+  return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : undefined
+}
+
 function toSettingsOptions(
   rooms: BackendRoomOption[],
   serviceTypes: BackendServiceTypeOption[],
@@ -303,6 +337,8 @@ function toSettingsOptions(
       isTicketIssueEnabled: room.isTicketIssueEnabled,
       kioskEnabled: room.kioskEnabled,
       name: room.name ?? room.title ?? room.roomName ?? 'Кабинет без названия',
+      number: room.number,
+      placeType: room.placeType ?? room.place_type,
       roomId: room.roomId,
       roomName: room.roomName,
       serviceTypeId: room.serviceTypeId,
@@ -311,11 +347,27 @@ function toSettingsOptions(
       services: room.services,
       ticketIssueEnabled: room.ticketIssueEnabled,
       title: room.title,
+      workEndTime: room.workEndTime ?? room.workingEndTime ?? room.work_end_time,
+      workStartTime: room.workStartTime ?? room.workingStartTime ?? room.work_start_time,
+      workingEndTime: room.workingEndTime,
+      workingStartTime: room.workingStartTime,
     })),
     serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({
+      active: serviceType.active ?? serviceType.isActive ?? serviceType.enabled,
+      averageDurationMinutes: getPositiveNumber(
+        serviceType.averageDurationMinutes
+          ?? serviceType.average_duration_minutes
+          ?? serviceType.avgServiceMinutes
+          ?? serviceType.durationMinutes,
+      ),
       code: toServiceCode(serviceType),
       id: serviceType.id,
       name: serviceType.name ?? serviceType.code ?? `Услуга ${serviceType.id}`,
+      priorityWeight: getPositiveNumber(
+        serviceType.priorityWeight
+          ?? serviceType.priority_weight
+          ?? serviceType.weight,
+      ),
     })),
     specialists: users.map((user) => {
       const userRoomIds = getUserRoomIds(user)
@@ -406,6 +458,7 @@ function toBackendCreateSettingsPayload(payload: TicketSettingsPayload & { prior
   return {
     ...(doctorId !== undefined ? { doctorId } : {}),
     ...(note ? { note } : {}),
+    ...(payload.language ? { language: payload.language } : {}),
     priority: toBackendPriority(payload.priority),
     ...(roomId !== undefined ? { roomId } : {}),
     serviceTypeId: serviceTypeId ?? payload.serviceTypeId ?? 1,
@@ -478,8 +531,8 @@ export const backendTicketApi: TicketApi = {
     return backendTicketApi.noShowTicket(id)
   },
 
-  async returnTicket(id: string) {
-    return toArchitectureTicket(await requestTicketReturn(id))
+  async returnTicket(id: string, roomId?: string | number) {
+    return toArchitectureTicket(await requestTicketReturn(id, { roomId }))
   },
 
   async redirectTicket(id: string, newRoomId: string | number) {

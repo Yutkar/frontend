@@ -4,7 +4,7 @@ import type {
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
+import { getLocale } from '@shared/locales/useLocale'
 
 type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 
@@ -13,44 +13,69 @@ type Meta = {
   tone: Tone
 }
 
+const statusTones: Record<TicketStatus, Tone> = {
+  called: 'info',
+  cancelled: 'danger',
+  completed: 'success',
+  created: 'neutral',
+  in_service: 'success',
+  no_show: 'danger',
+  redirected: 'warning',
+  waiting: 'neutral',
+}
+
+const priorityTones: Record<TicketPriority, Tone> = {
+  above_normal: 'warning',
+  critical: 'danger',
+  high: 'warning',
+  low: 'neutral',
+  normal: 'info',
+}
+
 export const ticketStatusMeta: Record<TicketStatus, Meta> = {
-  created: { label: t.status.created, tone: 'neutral' },
-  waiting: { label: t.status.waiting, tone: 'neutral' },
-  called: { label: t.status.called, tone: 'info' },
-  in_service: { label: t.status.in_service, tone: 'success' },
-  completed: { label: t.status.completed, tone: 'success' },
-  cancelled: { label: t.status.cancelled, tone: 'danger' },
-  no_show: { label: t.status.no_show, tone: 'danger' },
-  redirected: { label: t.status.redirected, tone: 'warning' },
+  called: { label: getLocale().status.called, tone: statusTones.called },
+  cancelled: { label: getLocale().status.cancelled, tone: statusTones.cancelled },
+  completed: { label: getLocale().status.completed, tone: statusTones.completed },
+  created: { label: getLocale().status.created, tone: statusTones.created },
+  in_service: { label: getLocale().status.in_service, tone: statusTones.in_service },
+  no_show: { label: getLocale().status.no_show, tone: statusTones.no_show },
+  redirected: { label: getLocale().status.redirected, tone: statusTones.redirected },
+  waiting: { label: getLocale().status.waiting, tone: statusTones.waiting },
 }
 
 export const priorityMeta: Record<TicketPriority, Meta> = {
-  low: { label: t.priority.low, tone: 'neutral' },
-  normal: { label: t.priority.normal, tone: 'info' },
-  above_normal: { label: t.priority.above_normal, tone: 'warning' },
-  high: { label: t.priority.high, tone: 'warning' },
-  critical: { label: t.priority.critical, tone: 'danger' },
+  above_normal: { label: getLocale().priority.above_normal, tone: priorityTones.above_normal },
+  critical: { label: getLocale().priority.critical, tone: priorityTones.critical },
+  high: { label: getLocale().priority.high, tone: priorityTones.high },
+  low: { label: getLocale().priority.low, tone: priorityTones.low },
+  normal: { label: getLocale().priority.normal, tone: priorityTones.normal },
 }
 
 export const serviceTypeLabel: Record<ServiceType, string> = {
-  registration: t.serviceType.registration,
-  consultation: t.serviceType.consultation,
-  diagnostics: t.serviceType.diagnostics,
-  laboratory: t.serviceType.laboratory,
-  pharmacy: t.serviceType.pharmacy,
-  billing: t.serviceType.billing,
+  billing: getLocale().serviceType.billing,
+  consultation: getLocale().serviceType.consultation,
+  diagnostics: getLocale().serviceType.diagnostics,
+  laboratory: getLocale().serviceType.laboratory,
+  pharmacy: getLocale().serviceType.pharmacy,
+  registration: getLocale().serviceType.registration,
 }
 
 export function getTicketStatusMeta(status: TicketStatus): Meta {
-  return ticketStatusMeta[status]
+  return {
+    label: getLocale().status[status],
+    tone: statusTones[status],
+  }
 }
 
 export function getPriorityMeta(priority: TicketPriority): Meta {
-  return priorityMeta[priority]
+  return {
+    label: getLocale().priority[priority],
+    tone: priorityTones[priority],
+  }
 }
 
 export function getServiceTypeLabel(serviceType: ServiceType): string {
-  return serviceTypeLabel[serviceType]
+  return getLocale().serviceType[serviceType]
 }
 
 export function isActiveTicket(ticket: Ticket): boolean {

@@ -123,7 +123,7 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
                     <dd>{getServiceTypeLabel(recommendation.ticket.serviceType)}</dd>
                   </div>
                   <div>
-                    <dt>Кабинет</dt>
+                    <dt>Место обслуживания</dt>
                     <dd>{roomName}</dd>
                   </div>
                   <div>
@@ -142,7 +142,7 @@ export function RecommendationPanel({ recommendations, rooms }: RecommendationPa
               ) : roomName ? (
                 <dl className="recommendation-details">
                   <div>
-                    <dt>Кабинет</dt>
+                    <dt>Место обслуживания</dt>
                     <dd>{roomName}</dd>
                   </div>
                 </dl>

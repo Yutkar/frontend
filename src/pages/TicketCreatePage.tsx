@@ -28,7 +28,7 @@ export function TicketCreatePage() {
               <h2>{t.tickets.createPatientTicket}</h2>
             </div>
           </div>
-          <TicketCreateForm loading={loading} onSubmit={handleCreateTicket} />
+          <TicketCreateForm fallbackRooms={rooms} loading={loading} onSubmit={handleCreateTicket} tickets={tickets} />
         </div>
 
         <aside className="side-column">

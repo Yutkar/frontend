@@ -1,23 +1,32 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ClipboardPlus } from 'lucide-react'
 import { ticketService } from '@services/ticketService'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsOptions } from '@services/api'
-import type { TicketCreateInput, TicketPriority } from '@shared/types'
-import { t } from '@shared/locales/useLocale'
+import type { Room, Ticket, TicketCreateInput, TicketPriority } from '@shared/types'
+import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
-import { formatRoomName, getPriorityMeta } from '@shared/utils'
 import {
+  formatPeopleAhead,
+  formatRoomName,
+  getAverageServiceDurationStats,
+  getPriorityMeta,
+  getRoomQueuePeopleAhead,
+} from '@shared/utils'
+import {
+  getAutoRoomForService,
   getRoomsForService,
   getServiceOptionLabel,
   getServiceTypes,
-  isRoomAvailableForTicket,
 } from './ticketFormOptions'
 
 const priorities: TicketPriority[] = ['low', 'normal', 'high', 'critical']
 
 type TicketCreateFormProps = {
+  fallbackRooms?: Room[]
   loading: boolean
   onSubmit: (input: TicketCreateInput) => Promise<void>
+  tickets?: Ticket[]
 }
 
 const emptyOptions: TicketSettingsOptions = {
@@ -26,11 +35,16 @@ const emptyOptions: TicketSettingsOptions = {
   specialists: [],
 }
 
-export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
+export function TicketCreateForm({
+  fallbackRooms = [],
+  loading,
+  onSubmit,
+  tickets = [],
+}: TicketCreateFormProps) {
+  const t = useLocale()
   const [error, setError] = useState<string | null>(null)
   const [patientName, setPatientName] = useState('')
   const [priority, setPriority] = useState<TicketPriority>('normal')
-  const [roomId, setRoomId] = useState('')
   const [options, setOptions] = useState<TicketSettingsOptions>(emptyOptions)
   const [optionsLoading, setOptionsLoading] = useState(true)
   const [serviceTypeId, setServiceTypeId] = useState('')
@@ -38,49 +52,48 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
   const serviceTypes = useMemo(() => getServiceTypes(options), [options])
   const selectedServiceType = serviceTypes.find((item) => String(item.id) === serviceTypeId) ?? serviceTypes[0]
   const rooms = useMemo(
-    () => getRoomsForService(options, selectedServiceType?.id)
-      .filter((room) => isRoomAvailableForTicket(room, [])),
-    [options, selectedServiceType?.id],
+    () => getRoomsForService(options, selectedServiceType?.id, fallbackRooms),
+    [fallbackRooms, options, selectedServiceType?.id],
   )
-  const selectedRoomExists = useMemo(
-    () => rooms.some((room) => String(room.id) === roomId),
-    [roomId, rooms],
+  const autoRoom = useMemo(
+    () => getAutoRoomForService(
+      rooms,
+      fallbackRooms,
+      tickets,
+      getAverageServiceDurationStats(tickets, selectedServiceType?.id, selectedServiceType?.code).averageMinutes,
+    ),
+    [fallbackRooms, rooms, selectedServiceType?.code, selectedServiceType?.id, tickets],
   )
-  const canCreateTicket = Boolean(selectedServiceType && selectedRoomExists && priority)
+  const peopleAhead = useMemo(
+    () => getRoomQueuePeopleAhead(autoRoom?.id, tickets),
+    [autoRoom?.id, tickets],
+  )
+  const canCreateTicket = Boolean(selectedServiceType && autoRoom && priority)
 
-  useEffect(() => {
-    let active = true
-
-    setOptionsLoading(true)
+  const loadOptions = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setOptionsLoading(true)
+    }
     setError(null)
 
-    ticketService
-      .getTicketSettingsOptions()
-      .then((nextOptions) => {
-        if (!active) {
-          return
-        }
-
-        setOptions(nextOptions)
-      })
-      .catch((loadError) => {
-        console.error('Ticket create options load failed', loadError)
-
-        if (active) {
-          setOptions(emptyOptions)
-          setError('Не удалось загрузить услуги и кабинеты. Проверьте подключение к серверу.')
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setOptionsLoading(false)
-        }
-      })
-
-    return () => {
-      active = false
+    try {
+      setOptions(await ticketService.getTicketSettingsOptions())
+    } catch (loadError) {
+      console.error('Ticket create options load failed', loadError)
+      setOptions(emptyOptions)
+      setError(t.tickets.loadOptionsError)
+    } finally {
+      setOptionsLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void loadOptions()
+  }, [loadOptions])
+
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    void loadOptions(false)
+  }), [loadOptions])
 
   useEffect(() => {
     if (!serviceTypeId && serviceTypes[0]) {
@@ -88,32 +101,24 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
     }
   }, [serviceTypeId, serviceTypes])
 
-  useEffect(() => {
-    setRoomId((currentRoomId) => (
-      currentRoomId && rooms.some((room) => String(room.id) === currentRoomId)
-        ? currentRoomId
-        : ''
-    ))
-  }, [rooms])
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
 
     if (!selectedServiceType) {
-      setError('Выберите тип услуги.')
+      setError(t.tickets.selectService)
       return
     }
 
-    if (!roomId || !selectedRoomExists) {
-      setError('Выберите кабинет')
+    if (!autoRoom) {
+      setError(t.tickets.noServicePlace)
       return
     }
 
     await onSubmit({
       patientName: patientName.trim() || 'Пациент',
       priority,
-      roomId,
+      roomId: autoRoom.id,
       serviceType: selectedServiceType.code,
       serviceTypeId: selectedServiceType.id,
       notes: notes.trim() || undefined,
@@ -123,7 +128,6 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
     setNotes('')
     setPriority('normal')
     setServiceTypeId(String(serviceTypes[0]?.id ?? ''))
-    setRoomId('')
   }
 
   return (
@@ -144,7 +148,7 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
             disabled={loading || optionsLoading || serviceTypes.length === 0}
             onChange={(event) => {
               setServiceTypeId(event.target.value)
-              setRoomId('')
+              setError(null)
             }}
             value={serviceTypeId}
           >
@@ -154,29 +158,6 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
               </option>
             ))}
           </select>
-        </label>
-
-        <label className="field">
-          <span>Кабинет</span>
-          <select
-            disabled={loading || optionsLoading || rooms.length === 0}
-            onChange={(event) => setRoomId(event.target.value)}
-            value={roomId}
-          >
-            <option value="">Выберите кабинет</option>
-            {rooms.length > 0 ? (
-              rooms.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {formatRoomName(room)}
-                </option>
-              ))
-            ) : (
-              <option value="">Нет доступных кабинетов</option>
-            )}
-          </select>
-          {selectedServiceType && rooms.length === 0 ? (
-            <small className="field-hint">Нет доступных кабинетов для выбранной услуги</small>
-          ) : null}
         </label>
 
         <label className="field">
@@ -193,6 +174,15 @@ export function TicketCreateForm({ loading, onSubmit }: TicketCreateFormProps) {
           </select>
         </label>
       </div>
+
+      {selectedServiceType && autoRoom ? (
+        <div className="modal-info">
+          {t.tickets.autoPlaceSelected}: {formatRoomName(autoRoom)}. {formatPeopleAhead(peopleAhead)}.
+        </div>
+      ) : null}
+      {selectedServiceType && !autoRoom && !optionsLoading ? (
+        <div className="modal-error">{t.tickets.noServicePlace}</div>
+      ) : null}
 
       <label className="field">
         <span>{t.tickets.notes}</span>

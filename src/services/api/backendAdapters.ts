@@ -10,12 +10,15 @@ import type {
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
+import { isSmartQLanguage } from '@shared/locales/types'
 import {
   formatWaitingTime,
   getAverageWaitingMinutes,
   getWaitingMinutes,
 } from '@shared/utils/time'
 import { formatRoomName } from '@shared/utils/room'
+import { createRoomWorkTimeRecommendation } from '@shared/utils/workingHours'
+import { ticketLanguageService } from '@services/ticketLanguageService'
 import { planRoomLoads } from '@shared/utils/queuePlanning'
 import type {
   Room as ArchitectureRoom,
@@ -51,6 +54,9 @@ export type BackendRoom = {
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
   name?: string
+  number?: number | string
+  place_type?: string
+  placeType?: string
   room_id?: number | string
   room_name?: string
   roomId?: number | string
@@ -62,6 +68,12 @@ export type BackendRoom = {
   status?: string
   ticketIssueEnabled?: boolean
   title?: string
+  workEndTime?: string
+  workStartTime?: string
+  work_end_time?: string
+  work_start_time?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 export type BackendTicket = {
@@ -79,12 +91,23 @@ export type BackendTicket = {
   status?: BackendTicketStatus | string
   etaMinutes?: number | null
   waitMinutes?: number | null
+  peopleAhead?: number | string | null
+  people_ahead?: number | string | null
+  position?: number | string | null
+  queuePosition?: number | string | null
+  queue_position?: number | string | null
+  language?: unknown
   serviceTypeId?: number | string
   serviceTypeName?: string | null
   serviceName?: string | null
   room_id?: number | string | null
   room_name?: string | null
   roomId?: number | string | null
+  destinationRoomId?: number | string | null
+  newRoomId?: number | string | null
+  redirectedToRoomId?: number | string | null
+  targetRoomId?: number | string | null
+  toRoomId?: number | string | null
   createdAt?: string
   created_at?: string
   updatedAt?: string | null
@@ -301,12 +324,28 @@ function getBackendRoomName(room?: BackendRoom | null): string {
   return formatRoomName({
     id: room?.id ?? room?.roomId ?? room?.room_id ?? room?._id,
     name: room?.name,
+    number: room?.number,
+    placeType: room?.placeType ?? room?.place_type,
     roomName: room?.roomName ?? room?.room_name,
     title: room?.title,
   })
 }
 
 export function getBackendTicketRoomId(ticket: BackendTicket): string {
+  const redirectedRoomId = ticket.status?.trim().toLowerCase().replace(/-/g, '_') === 'redirected'
+    ? toId(
+        ticket.newRoomId
+        ?? ticket.targetRoomId
+        ?? ticket.destinationRoomId
+        ?? ticket.redirectedToRoomId
+        ?? ticket.toRoomId,
+      )
+    : ''
+
+  if (redirectedRoomId) {
+    return redirectedRoomId
+  }
+
   const roomId = toId(ticket.roomId ?? ticket.room_id)
 
   if (roomId) {
@@ -335,6 +374,8 @@ function getBackendTicketRoomName(ticket: BackendTicket): string {
     return formatRoomName({
       id: getBackendRoomId(ticket.room),
       name: nestedRoomName,
+      number: ticket.room?.number,
+      placeType: ticket.room?.placeType ?? ticket.room?.place_type,
     })
   }
 
@@ -365,6 +406,8 @@ function getBackendTicketRoomName(ticket: BackendTicket): string {
     return formatRoomName({
       id: getBackendRoomId(ticket.assignedRoom),
       name: assignedRoomName,
+      number: ticket.assignedRoom?.number,
+      placeType: ticket.assignedRoom?.placeType ?? ticket.assignedRoom?.place_type,
     })
   }
 
@@ -480,6 +523,10 @@ function getBackendTicketAssigneeId(ticket: BackendTicket): string {
   )
 }
 
+function toSharedLanguage(value: unknown): Ticket['language'] {
+  return isSmartQLanguage(value) ? value : undefined
+}
+
 export function toBackendServiceTypeId(serviceType: ServiceType): number {
   return backendIdByServiceType[serviceType]
 }
@@ -593,6 +640,9 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
   const roomId = getBackendTicketRoomId(ticket)
   const serviceTypeId = toId(ticket.serviceTypeId ?? ticket.serviceType?.id ?? ticket.service?.id)
   const assignedTo = getBackendTicketAssigneeId(ticket)
+  const ticketRecord = ticket as Record<string, unknown>
+  const peopleAhead = getRecordNumberOptional(ticketRecord, ['peopleAhead', 'people_ahead'])
+  const queuePosition = getRecordNumberOptional(ticketRecord, ['queuePosition', 'queue_position', 'position'])
 
   return {
     id: toId(ticket.id),
@@ -611,7 +661,10 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     roomId: roomId || undefined,
     roomName: getBackendTicketRoomName(ticket),
     assignedTo: assignedTo || undefined,
+    language: toSharedLanguage(ticket.language) ?? ticketLanguageService.getTicketLanguage(ticket.id),
     etaMinutes: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
+    peopleAhead,
+    queuePosition,
   }
 }
 
@@ -676,6 +729,7 @@ export function toArchitectureRooms(rooms: BackendRoom[]): ArchitectureRoom[] {
 }
 
 export function toBackendTicketCreateInput(input: TicketCreateInput): {
+  language?: TicketCreateInput['language']
   priority: number
   roomId?: number
   serviceTypeId: number | string
@@ -685,6 +739,7 @@ export function toBackendTicketCreateInput(input: TicketCreateInput): {
 
   return {
     priority: toBackendPriority(input.priority),
+    ...(input.language ? { language: input.language } : {}),
     ...(Number.isFinite(roomId) ? { roomId } : {}),
     serviceTypeId: Number.isFinite(serviceTypeId)
       ? serviceTypeId
@@ -741,6 +796,8 @@ export function toSharedRooms(
       isTicketIssueEnabled: room.isTicketIssueEnabled,
       kioskEnabled: room.kioskEnabled,
       name: getBackendRoomName(room),
+      number: room.number,
+      placeType: room.placeType ?? room.place_type,
       department: getBackendRoomName(room),
       serviceTypeId: room.serviceTypeId,
       serviceTypeIds: room.serviceTypeIds,
@@ -751,6 +808,10 @@ export function toSharedRooms(
       ticketIssueEnabled,
       loadPercent: 0,
       workload: 0,
+      workEndTime: room.workEndTime ?? room.workingEndTime ?? room.work_end_time,
+      workStartTime: room.workStartTime ?? room.workingStartTime ?? room.work_start_time,
+      workingEndTime: room.workingEndTime,
+      workingStartTime: room.workingStartTime,
     })
   })
 
@@ -777,6 +838,8 @@ export function toSharedRooms(
       isTicketIssueEnabled: existingRoom?.isTicketIssueEnabled,
       kioskEnabled: existingRoom?.kioskEnabled,
       name: existingRoom?.name ?? stat.roomName,
+      number: existingRoom?.number,
+      placeType: existingRoom?.placeType,
       department: existingRoom?.department ?? stat.roomName,
       serviceTypeId: existingRoom?.serviceTypeId,
       serviceTypeIds: existingRoom?.serviceTypeIds,
@@ -787,6 +850,10 @@ export function toSharedRooms(
       ticketIssueEnabled: existingRoom?.ticketIssueEnabled ?? true,
       loadPercent: workload,
       workload,
+      workEndTime: existingRoom?.workEndTime ?? existingRoom?.workingEndTime,
+      workStartTime: existingRoom?.workStartTime ?? existingRoom?.workingStartTime,
+      workingEndTime: existingRoom?.workingEndTime,
+      workingStartTime: existingRoom?.workingStartTime,
     })
   })
 
@@ -811,6 +878,8 @@ export function toSharedRooms(
       isTicketIssueEnabled: ticket.room?.isTicketIssueEnabled,
       kioskEnabled: ticket.room?.kioskEnabled,
       name: roomName,
+      number: ticket.room?.number,
+      placeType: ticket.room?.placeType ?? ticket.room?.place_type,
       department: serviceType,
       serviceTypeId: ticket.room?.serviceTypeId,
       serviceTypeIds: ticket.room?.serviceTypeIds,
@@ -821,6 +890,10 @@ export function toSharedRooms(
       ticketIssueEnabled: getBackendRoomTicketIssueEnabled(ticket.room),
       loadPercent: 0,
       workload: 0,
+      workEndTime: ticket.room?.workEndTime ?? ticket.room?.workingEndTime ?? ticket.room?.work_end_time,
+      workStartTime: ticket.room?.workStartTime ?? ticket.room?.workingStartTime ?? ticket.room?.work_start_time,
+      workingEndTime: ticket.room?.workingEndTime,
+      workingStartTime: ticket.room?.workingStartTime,
     })
   })
 
@@ -1028,7 +1101,9 @@ function getTicketRoomName(ticket?: Ticket, rooms: Room[] = []): string | undefi
     return undefined
   }
 
-  return rooms.find((room) => room.id === ticket.roomId)?.name ?? `Кабинет ${ticket.roomId}`
+  const room = rooms.find((item) => item.id === ticket.roomId)
+
+  return room ? formatRoomName(room) : formatRoomName({ id: ticket.roomId, name: ticket.roomName })
 }
 
 function findRecommendationTicket(
@@ -1141,6 +1216,13 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
       'avg_service_minutes',
       'average_service_minutes',
     ])
+    const noShow = getRecordNumberOptional(record, [
+      'noShow',
+      'noShowCount',
+      'no_show',
+      'no_show_count',
+      'noShowTickets',
+    ])
     const nextPoint: AnalyticsPoint = {
       label,
       waiting: getRecordNumber(record, [
@@ -1156,6 +1238,7 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
         'completed_count',
         'completedTickets',
       ], existing?.completed ?? 0),
+      noShow: noShow ?? existing?.noShow,
       avgWaitMinutes: getRecordNumber(record, [
         'avgWaitMinutes',
         'averageWaitMinutes',
@@ -1169,6 +1252,7 @@ export function toSharedAnalytics(points: BackendAnalyticsPoint[] = []): Analyti
       label,
       waiting: existing ? Math.max(existing.waiting, nextPoint.waiting) : nextPoint.waiting,
       completed: existing ? Math.max(existing.completed, nextPoint.completed) : nextPoint.completed,
+      noShow: nextPoint.noShow ?? existing?.noShow,
       avgWaitMinutes: nextPoint.avgWaitMinutes || existing?.avgWaitMinutes || 0,
       avgServiceMinutes: nextPoint.avgServiceMinutes ?? existing?.avgServiceMinutes,
     })
@@ -1279,6 +1363,7 @@ function createAnalyticsFromTickets(tickets: Ticket[], now = Date.now()): Analyt
         label,
         waiting: groupTickets.filter((ticket) => queueWaitingStatuses.has(ticket.status)).length,
         completed: groupTickets.filter((ticket) => ticket.status === 'completed').length,
+        noShow: groupTickets.filter((ticket) => ticket.status === 'no_show').length,
         avgWaitMinutes: getAverageMinutes(waitingMinutes),
         avgServiceMinutes: serviceMinutes.length > 0 ? getAverageMinutes(serviceMinutes) : undefined,
       }
@@ -1350,8 +1435,22 @@ export function toSharedRecommendations(
     .filter((room) => !existingRoomIds.has(toId(room.roomId)))
     .map(createOverloadRecommendation)
     .filter((recommendation) => !existingIds.has(recommendation.id))
+  const recommendationIds = new Set([
+    ...baseRecommendations,
+    ...highPriorityRecommendations,
+    ...overloadRecommendations,
+  ].map((recommendation) => recommendation.id))
+  const workTimeRecommendations = rooms
+    .map((room) => createRoomWorkTimeRecommendation(room, tickets))
+    .filter((recommendation): recommendation is QueueRecommendation => Boolean(recommendation))
+    .filter((recommendation) => !recommendationIds.has(recommendation.id))
 
-  return [...baseRecommendations, ...highPriorityRecommendations, ...overloadRecommendations]
+  return [
+    ...baseRecommendations,
+    ...highPriorityRecommendations,
+    ...overloadRecommendations,
+    ...workTimeRecommendations,
+  ]
 }
 
 export function toQueueSnapshot(
@@ -1397,15 +1496,16 @@ function getBoardTicketSortTime(ticket: Ticket): number {
   return Number.isFinite(timestamp) ? timestamp : 0
 }
 
+function isBoardCallTicket(ticket: Ticket): boolean {
+  return Boolean(ticket.calledAt)
+}
+
 export function toBoardQueueSnapshot(value: unknown): QueueSnapshot {
   const tickets = toBackendTickets(value)
   const rooms = toBackendRooms(value)
   const boardTickets = tickets
     .map(normalizeBoardTicket)
-    .filter((ticket) =>
-      ticket.calledAt &&
-      (ticket.status === 'called' || ticket.status === 'no_show'),
-    )
+    .filter(isBoardCallTicket)
     .sort((left, right) => getBoardTicketSortTime(right) - getBoardTicketSortTime(left))
 
   return {

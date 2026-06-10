@@ -140,10 +140,10 @@ export const ticketService = {
     }
   },
 
-  async returnTicket(id: string): Promise<Ticket> {
+  async returnTicket(id: string, roomId?: string | number): Promise<Ticket> {
     try {
       return await withOperationalRefresh(
-        () => ticketApi.returnTicket(id),
+        () => ticketApi.returnTicket(id, roomId),
         'Талон возвращён в очередь',
       )
     } catch (error) {

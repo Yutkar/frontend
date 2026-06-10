@@ -1,4 +1,5 @@
 import type { QueueSnapshot, RedirectTicketInput } from '@shared/types'
+import { formatRoomName, getRoomBoardId, isWithinWorkHours } from '@shared/utils'
 import type { QueueStats, Room, Ticket } from '../../../types'
 import {
   toArchitectureRooms,
@@ -10,6 +11,7 @@ import {
   toBackendAnalyticsPoints,
   toSharedAnalytics,
   toSharedTicket,
+  toSharedStatus,
   toBackendTicketCreateInput,
   toBackendRecommendations,
   toQueueKpi,
@@ -26,6 +28,7 @@ import type { QueueApi, QueueOverloadRoom } from '../types'
 import { requestTicketReturn } from './ticketReturnFallback'
 
 const activeRoomStatuses = ['waiting', 'called', 'in_service', 'redirected'] as const
+const serverDidNotReturnMessage = 'Сервер не вернул пациента в очередь'
 const analyticsPaths = [
   '/analytics/dashboard',
   '/analytics/rooms',
@@ -188,6 +191,25 @@ function isBackendRoomAcceptingTickets(room: BackendRoom): boolean {
     return false
   }
 
+  if (!isWithinWorkHours({
+    workEndTime: typeof record.workEndTime === 'string'
+      ? record.workEndTime
+      : typeof record.workingEndTime === 'string'
+        ? record.workingEndTime
+      : typeof record.work_end_time === 'string'
+        ? record.work_end_time
+        : undefined,
+    workStartTime: typeof record.workStartTime === 'string'
+      ? record.workStartTime
+      : typeof record.workingStartTime === 'string'
+        ? record.workingStartTime
+      : typeof record.work_start_time === 'string'
+        ? record.work_start_time
+        : undefined,
+  })) {
+    return false
+  }
+
   if (typeof record.isActive === 'boolean') {
     return record.isActive
   }
@@ -213,7 +235,7 @@ async function assertRoomAcceptsTickets(roomId?: string | number) {
   const room = rooms.find((item) => String(item.id ?? item.roomId ?? item._id) === String(roomId))
 
   if (!room || !isBackendRoomAcceptingTickets(room)) {
-    throw new Error('Ticket issuance is closed for this room.')
+    throw new Error('Выдача талонов в это место обслуживания закрыта.')
   }
 }
 
@@ -304,6 +326,14 @@ function isNoShowTicket(ticket: BackendTicket): boolean {
   const status = ticket.status?.trim().toLowerCase().replace(/-/g, '_')
 
   return status === 'no_show' || status === 'noshow'
+}
+
+function isReturnedToQueue(ticket: BackendTicket): boolean {
+  return toSharedStatus(ticket.status) === 'waiting'
+}
+
+function createServerDidNotReturnError(): Error {
+  return new Error(serverDidNotReturnMessage)
 }
 
 async function getBackendNoShowTicketsForRoom(roomId: string | number): Promise<BackendTicket[]> {
@@ -425,7 +455,7 @@ function ensureRoomSnapshotRoom(snapshot: QueueSnapshot, roomId: string | number
     return snapshot
   }
 
-  const roomName = roomTicket.roomName ?? `Кабинет ${roomIdValue}`
+  const roomName = formatRoomName({ id: roomIdValue, name: roomTicket.roomName })
 
   return {
     ...snapshot,
@@ -467,6 +497,128 @@ function toBackendRoomId(roomId: string | number): string | number {
   return Number.isFinite(numericRoomId) ? numericRoomId : roomId
 }
 
+function getRawBackendRoomId(room: BackendRoom): string {
+  const rawId = room.id ?? room.roomId ?? room.room_id ?? room._id
+
+  return rawId == null ? '' : String(rawId)
+}
+
+function getBackendRoomBoardId(room: BackendRoom): string {
+  return getRoomBoardId({
+    id: getRawBackendRoomId(room),
+    name: room.name,
+    number: room.number,
+    placeType: room.placeType ?? room.place_type,
+    roomId: room.roomId ?? room.room_id,
+    roomName: room.roomName ?? room.room_name,
+    title: room.title,
+  })
+}
+
+async function resolveBackendRoomIdForBoard(roomId: string | number): Promise<string> {
+  const boardRoomId = String(roomId)
+
+  try {
+    const response = await publicApiClient.get<unknown>('/rooms')
+    const room = toBackendRooms(response.data).find((item) => (
+      getBackendRoomBoardId(item) === boardRoomId ||
+      getRawBackendRoomId(item) === boardRoomId
+    ))
+    const backendRoomId = room ? getRawBackendRoomId(room) : ''
+
+    return backendRoomId || boardRoomId
+  } catch (error) {
+    console.warn('backendQueueApi: public GET /rooms failed for board room mapping', error)
+
+    return boardRoomId
+  }
+}
+
+function getBoardRoomFilterIds(
+  snapshot: QueueSnapshot,
+  boardRoomId: string,
+  backendRoomId: string,
+): Set<string> {
+  const ids = new Set([boardRoomId, backendRoomId].filter(Boolean))
+
+  snapshot.rooms
+    .filter((room) => (
+      String(room.id) === boardRoomId ||
+      String(room.id) === backendRoomId ||
+      getRoomBoardId(room) === boardRoomId
+    ))
+    .forEach((room) => ids.add(String(room.id)))
+
+  return ids
+}
+
+function filterBoardSnapshotByRoom(
+  snapshot: QueueSnapshot,
+  roomId: string | number,
+  backendRoomId: string,
+): QueueSnapshot {
+  const boardRoomId = String(roomId)
+  const roomIds = getBoardRoomFilterIds(snapshot, boardRoomId, backendRoomId)
+
+  return {
+    ...snapshot,
+    rooms: snapshot.rooms.filter((room) => (
+      roomIds.has(String(room.id)) ||
+      getRoomBoardId(room) === boardRoomId
+    )),
+    tickets: snapshot.tickets.filter((ticket) => (
+      (ticket.roomId !== undefined && roomIds.has(String(ticket.roomId))) ||
+      getRoomBoardId({ id: ticket.roomId, name: ticket.roomName }) === boardRoomId
+    )),
+  }
+}
+
+function getBoardHistorySortTime(ticket: QueueSnapshot['tickets'][number]): number {
+  const timestamp = Date.parse(ticket.calledAt ?? ticket.updatedAt ?? ticket.createdAt)
+
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function isBoardHistoryTicket(ticket: QueueSnapshot['tickets'][number]): boolean {
+  return Boolean(ticket.calledAt) || ticket.status === 'called' || ticket.status === 'in_service'
+}
+
+function mergeBoardSnapshots(primary: QueueSnapshot, fallback: QueueSnapshot): QueueSnapshot {
+  const ticketsById = new Map<string, QueueSnapshot['tickets'][number]>()
+
+  fallback.tickets.forEach((ticket) => {
+    ticketsById.set(String(ticket.id), ticket)
+  })
+  primary.tickets.forEach((ticket) => {
+    ticketsById.set(String(ticket.id), ticket)
+  })
+
+  const roomsById = new Map<string, QueueSnapshot['rooms'][number]>()
+
+  fallback.rooms.forEach((room) => roomsById.set(String(room.id), room))
+  primary.rooms.forEach((room) => roomsById.set(String(room.id), room))
+
+  return {
+    ...primary,
+    rooms: Array.from(roomsById.values()),
+    tickets: Array.from(ticketsById.values())
+      .filter(isBoardHistoryTicket)
+      .sort((left, right) => getBoardHistorySortTime(right) - getBoardHistorySortTime(left)),
+  }
+}
+
+async function getBoardHistoryFallbackSnapshot(): Promise<QueueSnapshot | null> {
+  try {
+    const response = await publicApiClient.get<unknown>('/queue/board-history')
+
+    return toBoardQueueSnapshot(response.data)
+  } catch (error) {
+    console.warn('backendQueueApi: public GET /queue/board-history fallback failed', error)
+
+    return null
+  }
+}
+
 function toRedirectBody(input: RedirectTicketInput, includeOptional = true): BackendRedirectBody {
   const note = input.note?.trim()
   const comment = input.comment?.trim() ?? input.reason?.trim()
@@ -485,22 +637,25 @@ export const backendQueueApi: QueueApi = {
   },
 
   async getBoardSnapshot(roomId?: string | number) {
-    const response = await publicApiClient.get<unknown>(
-      roomId ? `/queue/board/${roomId}` : '/queue/board',
-    )
-    const snapshot = toBoardQueueSnapshot(response.data)
+    const backendRoomId = roomId ? await resolveBackendRoomIdForBoard(roomId) : undefined
+    const response = roomId
+      ? await publicApiClient
+        .get<unknown>(`/queue/board/${encodeURIComponent(backendRoomId ?? String(roomId))}`)
+        .catch((error) => {
+          console.warn('backendQueueApi: public room board is not available, loading common board', error)
+
+          return publicApiClient.get<unknown>('/queue/board')
+        })
+      : await publicApiClient.get<unknown>('/queue/board')
+    const boardSnapshot = toBoardQueueSnapshot(response.data)
+    const fallbackSnapshot = await getBoardHistoryFallbackSnapshot()
+    const snapshot = fallbackSnapshot ? mergeBoardSnapshots(boardSnapshot, fallbackSnapshot) : boardSnapshot
 
     if (!roomId) {
       return snapshot
     }
 
-    const roomIdValue = String(roomId)
-
-    return {
-      ...snapshot,
-      rooms: snapshot.rooms.filter((room) => String(room.id) === roomIdValue),
-      tickets: snapshot.tickets.filter((ticket) => String(ticket.roomId) === roomIdValue),
-    }
+    return filterBoardSnapshotByRoom(snapshot, roomId, backendRoomId ?? String(roomId))
   },
 
   async getPeriodAnalytics(period) {
@@ -582,9 +737,23 @@ export const backendQueueApi: QueueApi = {
 
     try {
       const ticketResponse = await apiClient.get<BackendTicket>(`/tickets/${ticketId}`)
-      resolvedTicket = ticketResponse.data
+      if (isNoShowTicket(ticketResponse.data)) {
+        throw createServerDidNotReturnError()
+      }
+
+      if (isReturnedToQueue(ticketResponse.data)) {
+        resolvedTicket = ticketResponse.data
+      }
     } catch (error) {
+      if (error instanceof Error && error.message === serverDidNotReturnMessage) {
+        throw error
+      }
+
       console.warn('backendQueueApi.returnTicket: GET /tickets/:id failed after return', error)
+    }
+
+    if (!isReturnedToQueue(resolvedTicket)) {
+      throw createServerDidNotReturnError()
     }
 
     const resolvedRoomId = getBackendTicketRoomId(resolvedTicket)
@@ -592,23 +761,60 @@ export const backendQueueApi: QueueApi = {
       || (roomId !== undefined ? String(roomId) : undefined)
 
     if (resolvedRoomId) {
-      const noShowTickets = await getBackendNoShowTicketsForRoom(resolvedRoomId)
+      const noShowTickets = (await getBackendNoShowTicketsForRoom(resolvedRoomId))
+        .filter((ticket) => String(ticket.id) !== String(ticketId))
 
-      return loadRoomQueueSnapshot(resolvedRoomId, noShowTickets)
+      return loadRoomQueueSnapshot(resolvedRoomId, [resolvedTicket, ...noShowTickets])
     }
 
     return loadQueueSnapshot()
   },
 
   async redirectTicket(input) {
+    let redirectedTickets: BackendTicket[] = []
+
     try {
-      await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input))
+      const response = await apiClient.post<unknown>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input))
+      redirectedTickets = toBackendTickets(response.data)
     } catch (error) {
       console.warn('backendQueueApi.redirectTicket: extended payload failed, retrying with newRoomId only', error)
-      await apiClient.post<BackendTicket>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input, false))
+      const response = await apiClient.post<unknown>(`/tickets/${input.ticketId}/redirect`, toRedirectBody(input, false))
+      redirectedTickets = toBackendTickets(response.data)
     }
 
-    return loadQueueSnapshot()
+    const snapshot = await loadQueueSnapshot()
+    const redirectedRoomId = String(input.roomId)
+    const redirectedTicket = redirectedTickets.find((ticket) => String(ticket.id) === String(input.ticketId))
+    const redirectedSnapshotTicket = redirectedTicket
+      ? {
+          ...toSharedTicket(redirectedTicket),
+          roomId: getBackendTicketRoomId(redirectedTicket) || redirectedRoomId,
+          status: toSharedStatus(redirectedTicket.status) === 'no_show'
+            ? 'redirected'
+            : toSharedStatus(redirectedTicket.status),
+        }
+      : undefined
+    const snapshotHasTicket = snapshot.tickets.some((ticket) => ticket.id === input.ticketId)
+    const tickets = snapshotHasTicket
+      ? snapshot.tickets.map((ticket) => {
+          if (ticket.id !== input.ticketId) {
+            return ticket
+          }
+
+          return redirectedSnapshotTicket ?? {
+            ...ticket,
+            roomId: redirectedRoomId,
+            status: ticket.status === 'no_show' ? 'redirected' : ticket.status,
+          }
+        })
+      : redirectedSnapshotTicket
+        ? [...snapshot.tickets, redirectedSnapshotTicket]
+        : snapshot.tickets
+
+    return {
+      ...snapshot,
+      tickets,
+    }
   },
 
   async recalculateRoom(roomId: string | number) {

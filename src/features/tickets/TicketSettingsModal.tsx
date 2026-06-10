@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Settings, X } from 'lucide-react'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type {
   TicketSettingsOptions,
@@ -77,6 +78,21 @@ export function TicketSettingsModal({
   const [status, setStatus] = useState<TicketStatus>('waiting')
   const now = useCurrentTime()
 
+  const loadOptions = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setLoadingOptions(true)
+    }
+
+    try {
+      setOptions(await ticketService.getTicketSettingsOptions())
+    } catch (loadError) {
+      console.error('Ticket settings options load failed', loadError)
+      setOptions(emptyOptions)
+    } finally {
+      setLoadingOptions(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!open || !ticket) {
       return
@@ -97,32 +113,14 @@ export function TicketSettingsModal({
       return
     }
 
-    let active = true
+    void loadOptions()
+  }, [loadOptions, open])
 
-    setLoadingOptions(true)
-    ticketService
-      .getTicketSettingsOptions()
-      .then((nextOptions) => {
-        if (active) {
-          setOptions(nextOptions)
-        }
-      })
-      .catch((loadError) => {
-        console.error('Ticket settings options load failed', loadError)
-        if (active) {
-          setOptions(emptyOptions)
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoadingOptions(false)
-        }
-      })
-
-    return () => {
-      active = false
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    if (open) {
+      void loadOptions(false)
     }
-  }, [open])
+  }), [loadOptions, open])
 
   const serviceTypes = useMemo(() => {
     if (!ticket) {
@@ -283,7 +281,7 @@ export function TicketSettingsModal({
           </label>
 
           <label className="field">
-            <span>Кабинет</span>
+            <span>Место обслуживания</span>
             <select
               disabled={isBusy || rooms.length === 0}
               onChange={(event) => {
@@ -300,7 +298,7 @@ export function TicketSettingsModal({
               ))}
             </select>
             {selectedServiceType && rooms.length === 0 ? (
-              <small className="field-hint">Нет доступных кабинетов для выбранной услуги</small>
+              <small className="field-hint">Нет доступных мест обслуживания для выбранной услуги</small>
             ) : null}
           </label>
 

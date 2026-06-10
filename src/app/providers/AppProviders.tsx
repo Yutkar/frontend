@@ -1,4 +1,6 @@
-import { useEffect, type ReactNode } from 'react'
+import { Fragment, useEffect, type ReactNode } from 'react'
+import { appSettingsService, useAppSettings } from '@services/appSettingsService'
+import { useLanguage } from '@shared/locales/useLocale'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 
@@ -7,6 +9,8 @@ type AppProvidersProps = {
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
+  const appSettings = useAppSettings()
+  const language = useLanguage()
   const theme = useGlobalStore((state) => state.theme)
   const user = useGlobalStore((state) => state.user)
   const startRealtime = useQueueStore((state) => state.startRealtime)
@@ -16,6 +20,18 @@ export function AppProviders({ children }: AppProvidersProps) {
     document.documentElement.dataset.theme = theme
     window.localStorage.setItem('smartq-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    document.documentElement.lang = language
+  }, [language])
+
+  useEffect(() => {
+    document.title = appSettings.appName
+  }, [appSettings.appName])
+
+  useEffect(() => {
+    void appSettingsService.loadSettings()
+  }, [])
 
   useEffect(() => {
     if (!user) {
@@ -30,5 +46,5 @@ export function AppProviders({ children }: AppProvidersProps) {
     }
   }, [startRealtime, stopRealtime, user])
 
-  return <>{children}</>
+  return <Fragment key={language}>{children}</Fragment>
 }

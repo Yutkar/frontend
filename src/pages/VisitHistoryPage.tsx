@@ -60,7 +60,7 @@ export function VisitHistoryPage() {
       <PageHeader
         eyebrow="Кабинет специалиста"
         title="История посещений"
-        description="Пациенты, которые были вызваны, находятся на приёме или завершили посещение сегодня."
+        description="Завершённые, отменённые, неявившиеся и перенаправленные посещения за сегодня."
       />
       <ResourceBanner error={error} loading={loading} />
 
@@ -76,7 +76,7 @@ export function VisitHistoryPage() {
                   <th>Пациент</th>
                   <th>Талон</th>
                   <th>Услуга</th>
-                  <th>Кабинет</th>
+                  <th>Место обслуживания</th>
                   <th>Статус</th>
                   <th>Приоритет</th>
                 </tr>

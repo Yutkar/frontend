@@ -5,14 +5,20 @@ import type {
   TicketSettingsUserOption,
 } from '@services/api'
 import { fallbackServiceTypeOptions } from '@services/api/serviceTypeCatalog'
+import { getLocale, type SmartQLanguage } from '@shared/locales/useLocale'
 import type {
   Room,
+  Ticket,
   TicketPriority,
   TicketStatus,
 } from '@shared/types'
 import {
+  fallbackServiceDurationMinutes,
+  getAverageServiceDurationStats,
   getPriorityMeta,
+  getRoomWorkloadRisk,
   getTicketStatusMeta,
+  isWithinWorkHours,
 } from '@shared/utils'
 
 export const ticketPriorities: TicketPriority[] = [
@@ -36,13 +42,36 @@ export const ticketStatuses: TicketStatus[] = [
 export const fallbackServiceTypes = fallbackServiceTypeOptions
 export const activeQueueStatuses = new Set<TicketStatus>(['created', 'waiting', 'called', 'in_service', 'redirected'])
 const overloadLoadPercent = 75
+const fallbackServiceOptionKeys = new Map<string, keyof ReturnType<typeof getLocale>['serviceOptions']>([
+  ['Регистрация', 'registration'],
+  ['Консультация терапевта', 'therapistConsultation'],
+  ['Консультация педиатра', 'pediatricianConsultation'],
+  ['Консультация кардиолога', 'cardiologistConsultation'],
+  ['Консультация невролога', 'neurologistConsultation'],
+  ['Консультация хирурга', 'surgeonConsultation'],
+  ['Лабораторные анализы', 'labTests'],
+  ['Забор крови', 'bloodSampling'],
+  ['Рентген', 'xray'],
+  ['УЗИ', 'ultrasound'],
+  ['ЭКГ', 'ecg'],
+  ['МРТ', 'mri'],
+  ['КТ', 'ct'],
+  ['Оплата услуг', 'billingServices'],
+  ['Получение справки', 'certificate'],
+  ['Вакцинация', 'vaccination'],
+  ['Процедурный кабинет', 'procedureRoom'],
+  ['Приём документов', 'documentIntake'],
+  ['Другое', 'other'],
+])
 
-export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption): string {
+export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption, language?: SmartQLanguage): string {
   if (!option) {
-    return 'Услуга не выбрана'
+    return getLocale(language).tickets.unassigned
   }
 
-  return option.name
+  const fallbackKey = fallbackServiceOptionKeys.get(option.name)
+
+  return fallbackKey ? getLocale(language).serviceOptions[fallbackKey] : option.name
 }
 
 export function getPriorityLabel(priority: TicketPriority): string {
@@ -58,7 +87,9 @@ export function getStatusLabel(status: TicketStatus): string {
 }
 
 export function getServiceTypes(options: TicketSettingsOptions): TicketSettingsServiceTypeOption[] {
-  return options.serviceTypes.length > 0 ? options.serviceTypes : fallbackServiceTypes
+  const serviceTypes = options.serviceTypes.length > 0 ? options.serviceTypes : fallbackServiceTypes
+
+  return serviceTypes.filter((serviceType) => serviceType.active !== false)
 }
 
 function normalizeServiceId(value?: string | number | null): string {
@@ -119,6 +150,8 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
       isTicketIssueEnabled: room.isTicketIssueEnabled,
       kioskEnabled: room.kioskEnabled,
       name: room.name,
+      number: room.number,
+      placeType: room.placeType,
       roomId: room.roomId,
       roomName: room.roomName,
       serviceTypeId: room.serviceTypeId,
@@ -127,6 +160,10 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
       services: room.services,
       ticketIssueEnabled: room.ticketIssueEnabled,
       title: room.title,
+      workEndTime: room.workEndTime ?? room.workingEndTime,
+      workStartTime: room.workStartTime ?? room.workingStartTime,
+      workingEndTime: room.workingEndTime,
+      workingStartTime: room.workingStartTime,
     }))
 
   fallbackRooms
@@ -136,6 +173,8 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
         mergedRooms.push({
           id: room.id,
           name: room.name,
+          number: room.number,
+          placeType: room.placeType,
           serviceTypeId: room.serviceTypeId,
           serviceTypeIds: getFallbackRoomServiceIds(room),
           serviceTypes: room.serviceTypes,
@@ -143,6 +182,10 @@ export function getRooms(options: TicketSettingsOptions, fallbackRooms: Room[] =
           ticketIssueEnabled: room.ticketIssueEnabled,
           isTicketIssueEnabled: room.isTicketIssueEnabled,
           kioskEnabled: room.kioskEnabled,
+          workEndTime: room.workEndTime ?? room.workingEndTime,
+          workStartTime: room.workStartTime ?? room.workingStartTime,
+          workingEndTime: room.workingEndTime,
+          workingStartTime: room.workingStartTime,
         })
       }
     })
@@ -211,16 +254,50 @@ export function isRoomTicketIssueEnabled(room: TicketSettingsRoomOption, fallbac
   return issueEnabled !== false
 }
 
-export function isRoomAvailableForTicket(room: TicketSettingsRoomOption, fallbackRooms: Room[]): boolean {
+function getFallbackRoom(room: TicketSettingsRoomOption, fallbackRooms: Room[]): Room | undefined {
   const roomId = normalizeServiceId(room.id)
-  const fallbackRoom = fallbackRooms.find((item) => normalizeServiceId(item.id) === roomId)
+
+  return fallbackRooms.find((item) => normalizeServiceId(item.id) === roomId)
+}
+
+function mergeRoomWithFallback(room: TicketSettingsRoomOption, fallbackRooms: Room[]): TicketSettingsRoomOption {
+  const fallbackRoom = getFallbackRoom(room, fallbackRooms)
+
+  return {
+    ...fallbackRoom,
+    ...room,
+    workEndTime: room.workEndTime ?? room.workingEndTime ?? fallbackRoom?.workEndTime ?? fallbackRoom?.workingEndTime,
+    workStartTime: room.workStartTime ?? room.workingStartTime ?? fallbackRoom?.workStartTime ?? fallbackRoom?.workingStartTime,
+    workingEndTime: room.workingEndTime ?? fallbackRoom?.workingEndTime,
+    workingStartTime: room.workingStartTime ?? fallbackRoom?.workingStartTime,
+  }
+}
+
+export function isRoomAvailableForTicket(
+  room: TicketSettingsRoomOption,
+  fallbackRooms: Room[],
+  tickets: Ticket[] = [],
+  averageServiceMinutes = fallbackServiceDurationMinutes,
+  now: Date | number = new Date(),
+): boolean {
+  const fallbackRoom = getFallbackRoom(room, fallbackRooms)
+  const roomWithFallback = mergeRoomWithFallback(room, fallbackRooms)
   const isActive = room.isActive !== false &&
     room.active !== false &&
     fallbackRoom?.active !== false &&
     fallbackRoom?.isActive !== false &&
     fallbackRoom?.status !== 'paused'
+  const risk = getRoomWorkloadRisk(
+    { id: room.id, workEndTime: roomWithFallback.workEndTime, workStartTime: roomWithFallback.workStartTime },
+    tickets as Ticket[],
+    { averageServiceMinutes, includeNextTicket: true, now },
+  )
 
-  return isActive && isRoomTicketIssueEnabled(room, fallbackRooms) && getRoomLoadPercent(room, fallbackRooms) < overloadLoadPercent
+  return isActive &&
+    isRoomTicketIssueEnabled(room, fallbackRooms) &&
+    getRoomLoadPercent(room, fallbackRooms) < overloadLoadPercent &&
+    isWithinWorkHours(roomWithFallback, now) &&
+    !risk.isAtRisk
 }
 
 export function getRoomQueueCount(roomId: string | number, tickets: Array<{ roomId?: string | number; status: TicketStatus }>): number {
@@ -234,27 +311,18 @@ export function getRoomQueueCount(roomId: string | number, tickets: Array<{ room
 export function getAutoRoomForService(
   rooms: TicketSettingsRoomOption[],
   fallbackRooms: Room[],
-  tickets: Array<{ roomId?: string | number; status: TicketStatus }>,
+  tickets: Ticket[],
+  averageServiceMinutes = fallbackServiceDurationMinutes,
+  now: Date | number = new Date(),
 ): TicketSettingsRoomOption | undefined {
   return [...rooms]
-    .filter((room) => isRoomAvailableForTicket(room, fallbackRooms))
+    .filter((room) => isRoomAvailableForTicket(room, fallbackRooms, tickets, averageServiceMinutes, now))
+    .map((room, index) => ({ index, room }))
     .sort((left, right) => {
-      const leftId = normalizeServiceId(left.id)
-      const rightId = normalizeServiceId(right.id)
-      const queueDelta = getRoomQueueCount(leftId, tickets) - getRoomQueueCount(rightId, tickets)
+      const queueDelta = getRoomQueueCount(left.room.id, tickets) - getRoomQueueCount(right.room.id, tickets)
 
-      if (queueDelta !== 0) {
-        return queueDelta
-      }
-
-      const loadDelta = getRoomLoadPercent(left, fallbackRooms) - getRoomLoadPercent(right, fallbackRooms)
-
-      if (loadDelta !== 0) {
-        return loadDelta
-      }
-
-      return left.name.localeCompare(right.name, 'ru')
-    })[0]
+      return queueDelta || left.index - right.index
+    })[0]?.room
 }
 
 export function getAutoSpecialistForRoom(
@@ -271,11 +339,16 @@ export function getAutoSpecialistForRoom(
 export function getAvailableServiceTypes(
   options: TicketSettingsOptions,
   fallbackRooms: Room[],
-  tickets: Array<{ roomId?: string | number; status: TicketStatus }>,
+  tickets: Ticket[],
 ): TicketSettingsServiceTypeOption[] {
   return getServiceTypes(options).filter((serviceType) => {
     const serviceRooms = getRoomsForService(options, serviceType.id, fallbackRooms)
+    const averageServiceMinutes = getAverageServiceDurationStats(
+      tickets,
+      serviceType.id,
+      serviceType.code,
+    ).averageMinutes
 
-    return Boolean(getAutoRoomForService(serviceRooms, fallbackRooms, tickets))
+    return Boolean(getAutoRoomForService(serviceRooms, fallbackRooms, tickets, averageServiceMinutes))
   })
 }

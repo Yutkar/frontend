@@ -8,6 +8,9 @@ export type AdminRoomRecord = AdminRecord & {
   isTicketIssueEnabled?: boolean
   kioskEnabled?: boolean
   name?: string
+  number?: string | number
+  placeType?: string
+  place_type?: string
   roomName?: string
   roomId?: string | number
   services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
@@ -17,6 +20,12 @@ export type AdminRoomRecord = AdminRecord & {
   status?: string
   ticketIssueEnabled?: boolean
   title?: string
+  workEndTime?: string
+  workStartTime?: string
+  work_end_time?: string
+  work_start_time?: string
+  workingEndTime?: string
+  workingStartTime?: string
 }
 
 export const roleLabels: Record<Role, string> = {

@@ -3,7 +3,6 @@ import {
   History,
   LayoutDashboard,
   Monitor,
-  Settings,
   ShieldCheck,
   Stethoscope,
 } from 'lucide-react'
@@ -14,7 +13,6 @@ import { AnalyticsPage } from './AnalyticsPage'
 import { AdminPage } from './admin/AdminPage'
 import { DashboardPage } from './DashboardPage'
 import { KioskPage } from './KioskPage'
-import { SettingsPage } from './SettingsPage'
 import { SpecialistPanelPage } from './SpecialistPanelPage'
 import { TvBoardPage } from './TvBoardPage'
 import { VisitHistoryPage } from './VisitHistoryPage'
@@ -77,6 +75,20 @@ export const smartqBusinessRoutes: AppRoute[] = [
     element: <Navigate replace to="/admin" />,
   },
   {
+    path: '/admin/routing',
+    label: 'Администрирование',
+    allowedRoles: ['admin', 'manager'],
+    hideFromSidebar: true,
+    element: <Navigate replace to="/admin" />,
+  },
+  {
+    path: '/admin/queue-routing',
+    label: 'Администрирование',
+    allowedRoles: ['admin', 'manager'],
+    hideFromSidebar: true,
+    element: <Navigate replace to="/admin" />,
+  },
+  {
     path: '/admin/managers',
     label: 'Менеджеры',
     allowedRoles: ['admin', 'manager'],
@@ -114,12 +126,5 @@ export const smartqBusinessRoutes: AppRoute[] = [
     public: true,
     hideFromSidebar: true,
     element: <KioskPage />,
-  },
-  {
-    path: '/settings',
-    label: t.nav.settings,
-    icon: Settings,
-    allowedRoles: ['admin', 'manager'],
-    element: <SettingsPage />,
   },
 ]
