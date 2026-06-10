@@ -575,6 +575,10 @@ function getBoardHistorySortTime(ticket: QueueSnapshot['tickets'][number]): numb
   return Number.isFinite(timestamp) ? timestamp : 0
 }
 
+function isBoardHistoryTicket(ticket: QueueSnapshot['tickets'][number]): boolean {
+  return Boolean(ticket.calledAt) || ticket.status === 'called' || ticket.status === 'in_service'
+}
+
 function mergeBoardSnapshots(primary: QueueSnapshot, fallback: QueueSnapshot): QueueSnapshot {
   const ticketsById = new Map<string, QueueSnapshot['tickets'][number]>()
 
@@ -594,18 +598,18 @@ function mergeBoardSnapshots(primary: QueueSnapshot, fallback: QueueSnapshot): Q
     ...primary,
     rooms: Array.from(roomsById.values()),
     tickets: Array.from(ticketsById.values())
-      .filter((ticket) => Boolean(ticket.calledAt))
+      .filter(isBoardHistoryTicket)
       .sort((left, right) => getBoardHistorySortTime(right) - getBoardHistorySortTime(left)),
   }
 }
 
 async function getBoardHistoryFallbackSnapshot(): Promise<QueueSnapshot | null> {
   try {
-    const response = await publicApiClient.get<unknown>('/tickets')
+    const response = await publicApiClient.get<unknown>('/queue/board-history')
 
     return toBoardQueueSnapshot(response.data)
   } catch (error) {
-    console.warn('backendQueueApi: public GET /tickets board history fallback failed', error)
+    console.warn('backendQueueApi: public GET /queue/board-history fallback failed', error)
 
     return null
   }

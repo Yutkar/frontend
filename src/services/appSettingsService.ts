@@ -44,7 +44,20 @@ function readStoredSettings(): AppSettings {
 function saveStoredSettings(settings: AppSettings): AppSettings {
   const normalizedSettings = normalizeSettings(settings)
 
-  window.localStorage.setItem(appSettingsStorageKey, JSON.stringify(normalizedSettings))
+  try {
+    window.localStorage.setItem(appSettingsStorageKey, JSON.stringify(normalizedSettings))
+  } catch (error) {
+    console.warn('appSettingsService: localStorage quota exceeded, storing settings without logo', error)
+
+    try {
+      window.localStorage.setItem(appSettingsStorageKey, JSON.stringify({
+        ...normalizedSettings,
+        logoDataUrl: '',
+      }))
+    } catch {
+      window.localStorage.removeItem(appSettingsStorageKey)
+    }
+  }
 
   return normalizedSettings
 }

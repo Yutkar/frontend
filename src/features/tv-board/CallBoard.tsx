@@ -32,6 +32,19 @@ type CallBoardProps = {
 
 type BoardMultilingualLabelKey = 'currentCall' | 'recentCalls' | 'waiting'
 
+type TicketRoom = Room | {
+  id?: string
+  name?: string
+  number?: string | number
+  placeType?: string
+}
+
+type PendingAnnouncement = {
+  key: string
+  room?: TicketRoom
+  ticket: Ticket
+}
+
 function BoardMultilingualLabel({ labelKey }: { labelKey: BoardMultilingualLabelKey }) {
   return (
     <span className="tv-multilingual-label">
@@ -51,12 +64,7 @@ function getCallTimestamp(ticket: Ticket): number {
   return Number.isFinite(timestamp) ? timestamp : 0
 }
 
-function getTicketRoom(ticket: Ticket, rooms: Room[]): Room | {
-  id?: string
-  name?: string
-  number?: string | number
-  placeType?: string
-} {
+function getTicketRoom(ticket: Ticket, rooms: Room[]): TicketRoom {
   const room = rooms.find((item) => String(item.id) === String(ticket.roomId))
 
   if (ticket.roomName) {
@@ -77,11 +85,19 @@ function getRoomName(ticket: Ticket, rooms: Room[]): string {
 }
 
 function getCallKey(ticket?: Ticket): string {
-  return ticket ? `${ticket.id}:${ticket.calledAt ?? ticket.createdAt}` : ''
+  if (!ticket) return ''
+
+  return `${ticket.id}:${ticket.calledAt ?? ticket.status}`
+}
+
+function getCallAnnouncementKey(ticket?: Ticket): string {
+  if (!ticket) return ''
+
+  return `${ticket.id}:${ticket.calledAt ?? 'called'}`
 }
 
 function isBoardCallTicket(ticket: Ticket): boolean {
-  return Boolean(ticket.calledAt)
+  return Boolean(ticket.calledAt) || ticket.status === 'called' || ticket.status === 'in_service'
 }
 
 function getSpeechLanguage(language: SmartQLanguage): string {
@@ -91,22 +107,58 @@ function getSpeechLanguage(language: SmartQLanguage): string {
   return 'ru-RU'
 }
 
-function hasSpeechVoice(language: SmartQLanguage): boolean {
-  if (language !== 'kk' || typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return true
+function isKazakhSpeechVoice(voice: SpeechSynthesisVoice): boolean {
+  const lang = voice.lang.toLowerCase()
+  const name = voice.name.toLowerCase()
+
+  return lang.startsWith('kk') || name.includes('kazakh') || name.includes('қазақ')
+}
+
+function findSpeechVoice(language: SmartQLanguage, voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  if (language === 'kk') {
+    return voices.find(isKazakhSpeechVoice)
+  }
+
+  const speechLanguage = getSpeechLanguage(language).toLowerCase()
+  const speechLanguagePrefix = speechLanguage.split('-')[0]
+
+  return voices.find((voice) => voice.lang.toLowerCase() === speechLanguage)
+    ?? voices.find((voice) => voice.lang.toLowerCase().startsWith(speechLanguagePrefix))
+}
+
+function waitForSpeechVoices(timeoutMs = 800): Promise<SpeechSynthesisVoice[]> {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return Promise.resolve([])
   }
 
   const voices = window.speechSynthesis.getVoices()
 
-  return voices.length === 0 || voices.some((voice) => voice.lang.toLowerCase().startsWith('kk'))
+  if (voices.length > 0) {
+    return Promise.resolve(voices)
+  }
+
+  return new Promise((resolve) => {
+    let timeoutId = 0
+
+    const cleanup = () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged)
+      window.clearTimeout(timeoutId)
+    }
+
+    const handleVoicesChanged = () => {
+      cleanup()
+      resolve(window.speechSynthesis.getVoices())
+    }
+
+    window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged)
+    timeoutId = window.setTimeout(() => {
+      cleanup()
+      resolve(window.speechSynthesis.getVoices())
+    }, timeoutMs)
+  })
 }
 
-function getEnglishPlaceType(room?: Room | {
-  id?: string
-  name?: string
-  number?: string | number
-  placeType?: string
-}): string {
+function getEnglishPlaceType(room?: TicketRoom): string {
   const placeType = getRoomPlaceType(room)
 
   if (placeType === 'window') return 'window'
@@ -115,12 +167,7 @@ function getEnglishPlaceType(room?: Room | {
   return 'room'
 }
 
-function getKazakhPlaceTarget(room?: Room | {
-  id?: string
-  name?: string
-  number?: string | number
-  placeType?: string
-}): string {
+function getKazakhPlaceTarget(room?: TicketRoom): string {
   const placeType = getRoomPlaceType(room)
   const number = getRoomPlaceNumber(room)
   const fallbackId = room?.id ? String(room.id) : ''
@@ -132,12 +179,7 @@ function getKazakhPlaceTarget(room?: Room | {
   return `${placeNumber} кабинетке`
 }
 
-function getRussianPlaceTarget(room?: Room | {
-  id?: string
-  name?: string
-  number?: string | number
-  placeType?: string
-}): string {
+function getRussianPlaceTarget(room?: TicketRoom): string {
   const placeType = getRoomPlaceType(room)
   const number = getRoomPlaceNumber(room)
   const fallbackId = room?.id ? String(room.id) : ''
@@ -151,12 +193,7 @@ function getRussianPlaceTarget(room?: Room | {
 
 function buildVoicePhrase(
   ticketNumber: string,
-  room: Room | {
-    id?: string
-    name?: string
-    number?: string | number
-    placeType?: string
-  } | undefined,
+  room: TicketRoom | undefined,
   language: SmartQLanguage,
 ): string {
   const voiceSettings = voiceSettingsService.getSettings()
@@ -180,6 +217,19 @@ function buildVoicePhrase(
   const actionText = voiceSettings.action === 'enter' ? locale.voice.enter : locale.voice.approach
 
   return `${audienceText} ${ticketNumber}, ${actionText} ${getRussianPlaceTarget(room)}`
+}
+
+function normalizeKazakhPhraseForFallback(phrase: string): string {
+  return phrase
+    .replace(/[Әә]/g, 'а')
+    .replace(/[Ғғ]/g, 'г')
+    .replace(/[Ққ]/g, 'к')
+    .replace(/[Ңң]/g, 'н')
+    .replace(/[Өө]/g, 'о')
+    .replace(/[Ұұ]/g, 'у')
+    .replace(/[Үү]/g, 'у')
+    .replace(/[Іі]/g, 'и')
+    .replace(/[Һһ]/g, 'х')
 }
 
 function RecentCallsPanel({
@@ -234,6 +284,11 @@ export function CallBoard({
 }: CallBoardProps) {
   const [highlightedCallKey, setHighlightedCallKey] = useState('')
   const audioContextRef = useRef<AudioContext | null>(null)
+  const activeAnnouncementKeyRef = useRef('')
+  const announcedCallKeysRef = useRef<Set<string>>(new Set())
+  const pendingAnnouncementRef = useRef<PendingAnnouncement | null>(null)
+  const speechKeepAliveIntervalRef = useRef<number | null>(null)
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
   const hasRenderedRef = useRef(false)
   const previousCallKeyRef = useRef('')
 
@@ -289,33 +344,95 @@ export function CallBoard({
     oscillator.stop(audioContext.currentTime + 0.34)
   }
 
-  async function announceCall(ticket: Ticket, room?: Room | {
-    id?: string
-    name?: string
-    number?: string | number
-    placeType?: string
-  }) {
-    if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
-      window.speechSynthesis.cancel()
-      const language = ticket.language ?? 'ru'
+  function stopSpeechKeepAlive() {
+    if (speechKeepAliveIntervalRef.current !== null) {
+      window.clearInterval(speechKeepAliveIntervalRef.current)
+      speechKeepAliveIntervalRef.current = null
+    }
+  }
 
-      if (!hasSpeechVoice(language)) {
-        if (import.meta.env.DEV) {
-          console.warn('Голос kk-KZ недоступен, используется короткий звуковой сигнал')
-        }
-        await playBeep()
+  function startSpeechKeepAlive() {
+    stopSpeechKeepAlive()
+    speechKeepAliveIntervalRef.current = window.setInterval(() => {
+      if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+        window.speechSynthesis.resume()
+      }
+    }, 1_000)
+  }
+
+  function finishAnnouncement(announcementKey: string, utterance: SpeechSynthesisUtterance) {
+    if (activeAnnouncementKeyRef.current === announcementKey) {
+      activeAnnouncementKeyRef.current = ''
+    }
+    if (speechUtteranceRef.current === utterance) {
+      speechUtteranceRef.current = null
+    }
+    stopSpeechKeepAlive()
+
+    const pendingAnnouncement = pendingAnnouncementRef.current
+    pendingAnnouncementRef.current = null
+
+    if (pendingAnnouncement) {
+      void announceCall(
+        pendingAnnouncement.ticket,
+        pendingAnnouncement.room,
+        pendingAnnouncement.key,
+      ).catch(() => undefined)
+    }
+  }
+
+  async function announceCall(ticket: Ticket, room?: TicketRoom, announcementKey = getCallAnnouncementKey(ticket)) {
+    if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
+      if (activeAnnouncementKeyRef.current && activeAnnouncementKeyRef.current !== announcementKey) {
+        pendingAnnouncementRef.current = { key: announcementKey, room, ticket }
         return
       }
 
-      const utterance = new SpeechSynthesisUtterance(buildVoicePhrase(ticket.number, room, language))
-      utterance.lang = getSpeechLanguage(language)
+      if (activeAnnouncementKeyRef.current === announcementKey && window.speechSynthesis.speaking) {
+        return
+      }
+
+      activeAnnouncementKeyRef.current = announcementKey
+
+      const language = ticket.language ?? 'ru'
+      const voices = await waitForSpeechVoices()
+
+      if (activeAnnouncementKeyRef.current !== announcementKey) {
+        return
+      }
+
+      const voice = findSpeechVoice(language, voices)
+      const phrase = buildVoicePhrase(ticket.number, room, language)
+      const shouldUseKazakhFallback = language === 'kk' && !voice
+      const fallbackVoice = shouldUseKazakhFallback ? findSpeechVoice('ru', voices) : undefined
+
+      if (shouldUseKazakhFallback && import.meta.env.DEV) {
+        console.warn('Казахский голос kk-KZ недоступен в браузере или системе, используется русскоязычный fallback')
+      }
+
+      const utterance = new SpeechSynthesisUtterance(
+        shouldUseKazakhFallback ? normalizeKazakhPhraseForFallback(phrase) : phrase,
+      )
+      utterance.lang = shouldUseKazakhFallback ? getSpeechLanguage('ru') : getSpeechLanguage(language)
+      utterance.voice = voice ?? fallbackVoice ?? null
       utterance.rate = 0.92
+      utterance.onend = () => finishAnnouncement(announcementKey, utterance)
+      utterance.onerror = () => finishAnnouncement(announcementKey, utterance)
+      speechUtteranceRef.current = utterance
+      startSpeechKeepAlive()
       window.speechSynthesis.speak(utterance)
       return
     }
 
     await playBeep()
   }
+
+  useEffect(() => () => {
+    stopSpeechKeepAlive()
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
+  }, [])
 
   useEffect(() => {
     if (!currentCallKey) {
@@ -336,9 +453,11 @@ export function CallBoard({
 
     setHighlightedCallKey(currentCallKey)
     const highlightTimeout = window.setTimeout(() => setHighlightedCallKey(''), 2_000)
+    const announcementKey = getCallAnnouncementKey(currentCall)
 
-    if (voiceEnabled && currentCall) {
-      void announceCall(currentCall, currentCallRoom).catch(() => undefined)
+    if (voiceEnabled && currentCall && announcementKey && !announcedCallKeysRef.current.has(announcementKey)) {
+      announcedCallKeysRef.current.add(announcementKey)
+      void announceCall(currentCall, currentCallRoom, announcementKey).catch(() => undefined)
     }
 
     return () => window.clearTimeout(highlightTimeout)

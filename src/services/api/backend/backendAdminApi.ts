@@ -420,9 +420,23 @@ function toBoardSettings(value: unknown): BoardSettings {
         roomNames: normalizeRecordIdList(screen.roomNames).map(String),
       }))
     : []
+  const profiles = Array.isArray(record.profiles)
+    ? record.profiles.filter(isRecord).map((profile) => ({
+        boardType: (profile.boardType === 'individual' ? 'individual' : 'general') as BoardSettings['boardType'],
+        id: getText(profile.id) ?? `${profile.boardType === 'individual' ? 'individual' : 'general'}-${getText(profile.roomBoardId) ?? 'general'}`,
+        name: getText(profile.name) ?? (profile.boardType === 'individual' ? 'Индивидуальное табло' : 'Общее табло'),
+        recentCallsLimit: normalizeRecentCallsLimit(profile.recentCallsLimit),
+        roomBoardId: getText(profile.roomBoardId),
+        showRecentCalls: typeof profile.showRecentCalls === 'boolean' ? profile.showRecentCalls : true,
+        showTime: typeof profile.showTime === 'boolean' ? profile.showTime : true,
+        template: normalizeBoardTemplate(profile.template),
+        voiceEnabled: typeof profile.voiceEnabled === 'boolean' ? profile.voiceEnabled : true,
+      }))
+    : []
 
   return {
     boardType: record.boardType === 'individual' ? 'individual' : 'general',
+    profiles,
     recentCallsLimit: normalizeRecentCallsLimit(record.recentCallsLimit),
     roomBoardId: getText(record.roomBoardId),
     screens,
