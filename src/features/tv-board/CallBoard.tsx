@@ -28,6 +28,7 @@ type CallBoardProps = {
   template?: BoardTemplate
   tickets: Ticket[]
   voiceEnabled?: boolean
+  dataReady?: boolean
 }
 
 type BoardMultilingualLabelKey = 'currentCall' | 'recentCalls' | 'waiting'
@@ -91,9 +92,9 @@ function getCallKey(ticket?: Ticket): string {
 }
 
 function getCallAnnouncementKey(ticket?: Ticket): string {
-  if (!ticket) return ''
+  if (!ticket?.calledAt) return ''
 
-  return `${ticket.id}_${ticket.calledAt ?? 'called'}`
+  return `${ticket.id || ticket.number}_${ticket.calledAt}`
 }
 
 function isBoardCallTicket(ticket: Ticket): boolean {
@@ -281,11 +282,12 @@ export function CallBoard({
   template = 'classic',
   tickets,
   voiceEnabled = true,
+  dataReady = true,
 }: CallBoardProps) {
   const [highlightedCallKey, setHighlightedCallKey] = useState('')
   const audioContextRef = useRef<AudioContext | null>(null)
   const activeAnnouncementKeyRef = useRef('')
-  const announcedCallKeysRef = useRef<Set<string>>(new Set())
+  const knownCallKeysRef = useRef<Set<string>>(new Set())
   const announcementQueueRef = useRef<PendingAnnouncement[]>([])
   const highlightTimeoutRef = useRef<number | null>(null)
   const isAnnouncementPlayingRef = useRef(false)
@@ -473,12 +475,27 @@ export function CallBoard({
   useEffect(() => {
     const callsWithCalledAt = currentCalls.filter((ticket) => Boolean(ticket.calledAt))
 
+    if (!dataReady) {
+      hasRenderedRef.current = false
+      knownCallKeysRef.current = new Set()
+      announcementQueueRef.current = []
+      activeAnnouncementKeyRef.current = ''
+      isAnnouncementPlayingRef.current = false
+      clearHighlightTimeout()
+      setHighlightedCallKey('')
+      stopSpeechKeepAlive()
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+      }
+      return
+    }
+
     if (!hasRenderedRef.current) {
       callsWithCalledAt.forEach((ticket) => {
         const announcementKey = getCallAnnouncementKey(ticket)
 
         if (announcementKey) {
-          announcedCallKeysRef.current.add(announcementKey)
+          knownCallKeysRef.current.add(announcementKey)
         }
       })
       hasRenderedRef.current = true
@@ -493,7 +510,7 @@ export function CallBoard({
       .filter((ticket) => {
         const announcementKey = getCallAnnouncementKey(ticket)
 
-        return Boolean(announcementKey && !announcedCallKeysRef.current.has(announcementKey))
+        return Boolean(announcementKey && !knownCallKeysRef.current.has(announcementKey))
       })
       .sort((left, right) => getCallTimestamp(left) - getCallTimestamp(right))
       .forEach((ticket) => {
@@ -503,14 +520,14 @@ export function CallBoard({
           return
         }
 
-        announcedCallKeysRef.current.add(announcementKey)
+        knownCallKeysRef.current.add(announcementKey)
         enqueueAnnouncement({
           key: announcementKey,
           room: getTicketRoom(ticket, rooms),
           ticket,
         })
       })
-  }, [currentCalls, rooms, voiceEnabled])
+  }, [currentCalls, dataReady, rooms, voiceEnabled])
 
   if (template === 'minimal') {
     return (

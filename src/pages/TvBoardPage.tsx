@@ -72,6 +72,7 @@ export function TvBoardPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [roomName, setRoomName] = useState<string>('')
   const [now, setNow] = useState(new Date())
+  const [boardDataReady, setBoardDataReady] = useState(false)
 
   useEffect(() => {
     const clockInterval = window.setInterval(() => setNow(new Date()), 1000)
@@ -106,6 +107,8 @@ export function TvBoardPage() {
     let active = true
     let requestId = 0
 
+    setBoardDataReady(false)
+
     const load = async () => {
       const currentRequestId = requestId + 1
       requestId = currentRequestId
@@ -124,12 +127,14 @@ export function TvBoardPage() {
           ? formatRoomName(nextRooms[0] ?? { id: roomId })
           : '')
         setError(null)
+        setBoardDataReady(true)
       } catch (error) {
         console.error('Board load failed', error)
         if (!active || currentRequestId !== requestId) return
         setError(t.board.waiting)
         setTickets([])
         setRooms([])
+        setBoardDataReady(false)
       }
     }
 
@@ -173,6 +178,7 @@ export function TvBoardPage() {
       ) : (
         <CallBoard
           currentTime={currentTime}
+          dataReady={boardDataReady}
           recentCallsLimit={routeBoardSettings.recentCallsLimit}
           rooms={rooms}
           showRecentCalls={routeBoardSettings.showRecentCalls}
