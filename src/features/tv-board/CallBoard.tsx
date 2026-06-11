@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { voiceSettingsService } from '@services/voiceSettingsService'
 import type { BoardTemplate } from '@services/api'
 import {
+  buildKazakhCallAudioSequence,
+  playAudioSequence,
+} from './kazakhAudio'
+import {
   getLocale,
   type SmartQLanguage,
 } from '@shared/locales/useLocale'
@@ -102,24 +106,12 @@ function isBoardCallTicket(ticket: Ticket): boolean {
 }
 
 function getSpeechLanguage(language: SmartQLanguage): string {
-  if (language === 'kk') return 'kk-KZ'
   if (language === 'en') return 'en-US'
 
   return 'ru-RU'
 }
 
-function isKazakhSpeechVoice(voice: SpeechSynthesisVoice): boolean {
-  const lang = voice.lang.toLowerCase()
-  const name = voice.name.toLowerCase()
-
-  return lang.startsWith('kk') || name.includes('kazakh') || name.includes('қазақ')
-}
-
 function findSpeechVoice(language: SmartQLanguage, voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
-  if (language === 'kk') {
-    return voices.find(isKazakhSpeechVoice)
-  }
-
   const speechLanguage = getSpeechLanguage(language).toLowerCase()
   const speechLanguagePrefix = speechLanguage.split('-')[0]
 
@@ -168,18 +160,6 @@ function getEnglishPlaceType(room?: TicketRoom): string {
   return 'room'
 }
 
-function getKazakhPlaceTarget(room?: TicketRoom): string {
-  const placeType = getRoomPlaceType(room)
-  const number = getRoomPlaceNumber(room)
-  const fallbackId = room?.id ? String(room.id) : ''
-  const placeNumber = number || fallbackId
-
-  if (placeType === 'window') return `${placeNumber} терезеге`
-  if (placeType === 'desk') return `${placeNumber} үстелге`
-
-  return `${placeNumber} кабинетке`
-}
-
 function getRussianPlaceTarget(room?: TicketRoom): string {
   const placeType = getRoomPlaceType(room)
   const number = getRoomPlaceNumber(room)
@@ -201,12 +181,6 @@ function buildVoicePhrase(
   const audience = voiceSettings.audience
   const roomNumber = getRoomPlaceNumber(room) || (room?.id ? String(room.id) : '')
 
-  if (language === 'kk') {
-    const audienceText = audience === 'client' ? 'клиенті' : 'пациенті'
-
-    return `${ticketNumber} ${audienceText}, ${getKazakhPlaceTarget(room)} келіңіз`
-  }
-
   if (language === 'en') {
     const audienceText = audience === 'client' ? 'Client' : 'Patient'
 
@@ -218,19 +192,6 @@ function buildVoicePhrase(
   const actionText = voiceSettings.action === 'enter' ? locale.voice.enter : locale.voice.approach
 
   return `${audienceText} ${ticketNumber}, ${actionText} ${getRussianPlaceTarget(room)}`
-}
-
-function normalizeKazakhPhraseForFallback(phrase: string): string {
-  return phrase
-    .replace(/[Әә]/g, 'а')
-    .replace(/[Ғғ]/g, 'г')
-    .replace(/[Ққ]/g, 'к')
-    .replace(/[Ңң]/g, 'н')
-    .replace(/[Өө]/g, 'о')
-    .replace(/[Ұұ]/g, 'у')
-    .replace(/[Үү]/g, 'у')
-    .replace(/[Іі]/g, 'и')
-    .replace(/[Һһ]/g, 'х')
 }
 
 function RecentCallsPanel({
@@ -422,6 +383,18 @@ export function CallBoard({
   }
 
   async function announceCall(ticket: Ticket, room?: TicketRoom, announcementKey = getCallAnnouncementKey(ticket)) {
+    const language = ticket.language ?? 'ru'
+
+    if (language === 'kk') {
+      activeAnnouncementKeyRef.current = announcementKey
+      const voiceSettings = voiceSettingsService.getSettings()
+      const files = buildKazakhCallAudioSequence(ticket, room, voiceSettings)
+
+      await playAudioSequence(files)
+      finishAnnouncement(announcementKey)
+      return
+    }
+
     if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
       if (activeAnnouncementKeyRef.current === announcementKey && window.speechSynthesis.speaking) {
         return
@@ -429,7 +402,6 @@ export function CallBoard({
 
       activeAnnouncementKeyRef.current = announcementKey
 
-      const language = ticket.language ?? 'ru'
       const voices = await waitForSpeechVoices()
 
       if (activeAnnouncementKeyRef.current !== announcementKey) {
@@ -438,18 +410,9 @@ export function CallBoard({
 
       const voice = findSpeechVoice(language, voices)
       const phrase = buildVoicePhrase(ticket.number, room, language)
-      const shouldUseKazakhFallback = language === 'kk' && !voice
-      const fallbackVoice = shouldUseKazakhFallback ? findSpeechVoice('ru', voices) : undefined
-
-      if (shouldUseKazakhFallback && import.meta.env.DEV) {
-        console.warn('Казахский голос kk-KZ недоступен в браузере или системе, используется русскоязычный fallback')
-      }
-
-      const utterance = new SpeechSynthesisUtterance(
-        shouldUseKazakhFallback ? normalizeKazakhPhraseForFallback(phrase) : phrase,
-      )
-      utterance.lang = shouldUseKazakhFallback ? getSpeechLanguage('ru') : getSpeechLanguage(language)
-      utterance.voice = voice ?? fallbackVoice ?? null
+      const utterance = new SpeechSynthesisUtterance(phrase)
+      utterance.lang = getSpeechLanguage(language)
+      utterance.voice = voice ?? null
       utterance.rate = 0.92
       utterance.onend = () => finishAnnouncement(announcementKey, utterance)
       utterance.onerror = () => finishAnnouncement(announcementKey, utterance)
