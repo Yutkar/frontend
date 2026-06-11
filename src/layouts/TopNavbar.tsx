@@ -22,11 +22,6 @@ type TopNavbarProps = {
   routes: AppRoute[]
 }
 
-const severityLabel: Record<QueueRecommendation['severity'], string> = {
-  critical: 'Критично',
-  info: 'Информация',
-  warning: 'Внимание',
-}
 const notificationExitMs = 180
 
 function severityIcon(severity: QueueRecommendation['severity']) {
@@ -41,15 +36,36 @@ function severityIcon(severity: QueueRecommendation['severity']) {
   return <Info size={16} />
 }
 
-function getNotificationTitle(recommendation: QueueRecommendation, now: number): string {
+function getNotificationTitle(recommendation: QueueRecommendation, now: number, t: ReturnType<typeof useLocale>): string {
   if (!recommendation.ticket) {
-    return recommendation.message
+    return getRecommendationMessage(recommendation, t)
   }
 
   const priority = getPriorityMeta(recommendation.ticket.priority).label.toLowerCase()
   const waitingTime = formatWaitingTime(getWaitingMinutes(recommendation.ticket, now))
 
-  return `Талон ${recommendation.ticket.number} — ${priority} приоритет, ожидает ${waitingTime}`
+  return t.notifications.ticketWaiting
+    .replace('{{ticket}}', recommendation.ticket.number)
+    .replace('{{priority}}', priority)
+    .replace('{{waiting}}', waitingTime)
+}
+
+function getRecommendationMessage(recommendation: QueueRecommendation, t: ReturnType<typeof useLocale>): string {
+  if (recommendation.id === 'rec-queue-101') return t.notifications.mockQueueRiskMessage
+  if (recommendation.id === 'rec-lab-305') return t.notifications.mockLabCapacityMessage
+  if (recommendation.id === 'rec-flow') return t.notifications.mockFlowStableMessage
+  if (recommendation.id.includes('worktime-risk')) return t.notifications.worktimeRiskTitle
+
+  return recommendation.message || recommendation.title || t.notifications.newNotification
+}
+
+function getRecommendationDescription(recommendation: QueueRecommendation, t: ReturnType<typeof useLocale>): string {
+  if (recommendation.id === 'rec-queue-101') return t.notifications.mockQueueRiskDescription
+  if (recommendation.id === 'rec-lab-305') return t.notifications.mockLabCapacityDescription
+  if (recommendation.id === 'rec-flow') return t.notifications.mockFlowStableDescription
+  if (recommendation.id.includes('worktime-risk')) return t.notifications.worktimeRiskDescription
+
+  return recommendation.description
 }
 
 function waitForNotificationExit() {
@@ -207,7 +223,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
     setClosingRecommendationIds((ids) => ids.filter((id) => !recommendationIds.includes(id)))
 
     if (result.failedCount > 0) {
-      setNotificationError('Не удалось закрыть часть уведомлений')
+      setNotificationError(t.notifications.closeSomeError)
     }
   }
 
@@ -245,7 +261,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
         <div className="notification-menu" ref={notificationRef}>
           <button
             aria-expanded={notificationsOpen}
-            aria-label="Открыть уведомления"
+            aria-label={t.notifications.openNotifications}
             className="notification-button"
             onClick={() => setNotificationsOpen((value) => !value)}
             type="button"
@@ -258,8 +274,8 @@ export function TopNavbar({ routes }: TopNavbarProps) {
             <div className="notification-popover" role="dialog">
               <header className="notification-popover-header">
                 <div>
-                  <strong>Уведомления</strong>
-                  <span>{unreadCount} новых</span>
+                  <strong>{t.notifications.title}</strong>
+                  <span>{t.notifications.newCount.replace('{{count}}', String(unreadCount))}</span>
                 </div>
                 {visibleRecommendations.length > 0 ? (
                   <button
@@ -269,14 +285,14 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                     type="button"
                   >
                     <Trash2 size={14} />
-                    Закрыть все
+                    {t.notifications.closeAll}
                   </button>
                 ) : null}
               </header>
 
               {confirmCloseAllOpen ? (
                 <div className="notification-confirm" role="alertdialog">
-                  <strong>Вы точно хотите закрыть все уведомления?</strong>
+                  <strong>{t.notifications.closeAllConfirm}</strong>
                   <div>
                     <button
                       disabled={loading}
@@ -284,7 +300,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                       type="button"
                     >
                       <Check size={14} />
-                      Да, закрыть
+                      {t.notifications.yesClose}
                     </button>
                     <button
                       disabled={loading}
@@ -292,7 +308,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                       type="button"
                     >
                       <X size={14} />
-                      Отмена
+                      {t.common.cancel}
                     </button>
                   </div>
                 </div>
@@ -313,40 +329,40 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                         {severityIcon(recommendation.severity)}
                       </span>
                       <div>
-                        <strong>{getNotificationTitle(recommendation, now)}</strong>
-                        <p>{recommendation.description}</p>
+                        <strong>{getNotificationTitle(recommendation, now, t)}</strong>
+                        <p>{getRecommendationDescription(recommendation, t)}</p>
                         {recommendation.ticket ? (
                           <dl className="notification-details">
                             <div>
-                              <dt>Услуга</dt>
+                              <dt>{t.tickets.service}</dt>
                               <dd>{getServiceTypeLabel(recommendation.ticket.serviceType)}</dd>
                             </div>
                             <div>
-                              <dt>Кабинет</dt>
+                              <dt>{t.tickets.room}</dt>
                               <dd>{formatRoomName({
                                 id: recommendation.relatedRoomId,
                                 name: recommendation.relatedRoomName,
                               })}</dd>
                             </div>
                             <div>
-                              <dt>Приоритет</dt>
+                              <dt>{t.tickets.priority}</dt>
                               <dd>{getPriorityMeta(recommendation.ticket.priority).label}</dd>
                             </div>
                             <div>
-                              <dt>Ожидание</dt>
+                              <dt>{t.queue.eta}</dt>
                               <dd>
                                 {formatWaitingTime(getWaitingMinutes(recommendation.ticket, now))}
                               </dd>
                             </div>
                             <div>
-                              <dt>Статус</dt>
+                              <dt>{t.queue.status}</dt>
                               <dd>{getTicketStatusMeta(recommendation.ticket.status).label}</dd>
                             </div>
                           </dl>
                         ) : recommendation.relatedRoomName ? (
                           <dl className="notification-details">
                             <div>
-                              <dt>Кабинет</dt>
+                              <dt>{t.tickets.room}</dt>
                               <dd>{formatRoomName({
                                 id: recommendation.relatedRoomId,
                                 name: recommendation.relatedRoomName,
@@ -355,7 +371,7 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                           </dl>
                         ) : null}
                         <footer>
-                          <span>{severityLabel[recommendation.severity]}</span>
+                          <span>{t.notifications.severity[recommendation.severity]}</span>
                           <time>{formatTime(recommendation.createdAt)}</time>
                         </footer>
                       </div>
@@ -363,30 +379,30 @@ export function TopNavbar({ routes }: TopNavbarProps) {
                         {recommendation.ticketId ? (
                           <button onClick={() => handleOpenTicket(recommendation)} type="button">
                             <ExternalLink size={14} />
-                            Открыть талон
+                            {t.notifications.openTicket}
                           </button>
                         ) : null}
                         {recommendation.relatedRoomId ? (
                           <button onClick={handleOpenRoom} type="button">
                             <ExternalLink size={14} />
-                            Открыть кабинет
+                            {t.notifications.openRoom}
                           </button>
                         ) : null}
                         <button
-                          aria-label="Закрыть уведомление"
+                          aria-label={t.notifications.closeNotification}
                           disabled={loading || closingRecommendationIdSet.has(recommendation.id)}
                           onClick={() => void handleResolveRecommendation(recommendation)}
                           type="button"
                         >
                           <Check size={14} />
-                          Закрыть
+                          {t.notifications.close}
                         </button>
                       </div>
                     </article>
                   ))}
                 </div>
               ) : (
-                <div className="notification-empty">Новых уведомлений нет</div>
+                <div className="notification-empty">{t.notifications.empty}</div>
               )}
             </div>
           ) : null}
@@ -408,10 +424,10 @@ export function TopNavbar({ routes }: TopNavbarProps) {
         <button
           onClick={handleLogout}
           className="logout-button"
-          title="Выйти из системы"
+          title={t.auth.logout}
         >
           <LogOut size={18} strokeWidth={2.5} />
-          <span>Выйти</span>
+          <span>{t.auth.logout}</span>
         </button>
       </div>
     </header>

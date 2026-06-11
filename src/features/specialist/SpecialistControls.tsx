@@ -50,10 +50,10 @@ function normalizeId(value?: string | number | null): string {
 
 function formatWorkDuration(minutes?: number): string {
   if (minutes === undefined) {
-    return 'Весь день'
+    return t.specialist.allDay
   }
 
-  return minutes > 0 ? formatDuration(minutes) : '0 мин'
+  return minutes > 0 ? formatDuration(minutes) : t.specialist.zeroMinutes
 }
 
 function getRoomWorkTimeText(room: Room): string {
@@ -61,18 +61,20 @@ function getRoomWorkTimeText(room: Room): string {
   const workEndTime = normalizeWorkTime(room.workEndTime)
 
   if (workStartTime && workEndTime) {
-    return `работает с ${workStartTime} до ${workEndTime}`
+    return t.specialist.workTimeFromTo
+      .replace('{{start}}', workStartTime)
+      .replace('{{end}}', workEndTime)
   }
 
   if (workStartTime) {
-    return `работает с ${workStartTime}`
+    return t.specialist.workTimeFrom.replace('{{start}}', workStartTime)
   }
 
   if (workEndTime) {
-    return `работает до ${workEndTime}`
+    return t.specialist.workTimeTo.replace('{{end}}', workEndTime)
   }
 
-  return 'работает весь день'
+  return t.specialist.worksAllDay
 }
 
 function isCriticalTicket(ticket: Ticket): boolean {
@@ -133,7 +135,7 @@ function RedirectPatientModal({
       .catch((loadError) => {
         console.error('Redirect options load failed', loadError)
         if (active) {
-          setError('Не удалось загрузить услуги для перенаправления.')
+          setError(t.specialist.redirectOptionsLoadError)
           setOptions(emptyTicketSettingsOptions)
         }
       })
@@ -196,7 +198,7 @@ function RedirectPatientModal({
       await onRedirect({
         comment: trimmedNote || undefined,
         note: trimmedNote || undefined,
-        reason: trimmedNote || 'Перенаправление пациента',
+        reason: trimmedNote || t.specialist.redirectPatientReason,
         roomId: normalizeId(autoRoom.id),
         serviceTypeId: selectedServiceType.id,
         ticketId: ticket.id,
@@ -204,7 +206,7 @@ function RedirectPatientModal({
       onClose()
     } catch (redirectError) {
       console.error('Redirect patient failed', redirectError)
-      setError('Не удалось перенаправить пациента.')
+      setError(t.specialist.redirectPatientError)
     } finally {
       setSaving(false)
     }
@@ -217,12 +219,12 @@ function RedirectPatientModal({
           <div>
             <span className="eyebrow">
               <Shuffle size={14} />
-              Перенаправление
+              {t.specialist.redirect}
             </span>
-            <h2>Перенаправить пациента</h2>
+            <h2>{t.specialist.redirectPatient}</h2>
           </div>
           <button
-            aria-label="Отмена"
+            aria-label={t.common.cancel}
             className="modal-close"
             disabled={saving}
             onClick={onClose}
@@ -242,7 +244,7 @@ function RedirectPatientModal({
 
         <div className="settings-form-grid">
           <label className="field service-type-field">
-            <span>Новая услуга</span>
+            <span>{t.specialist.newService}</span>
             <select
               disabled={isBusy || serviceTypes.length === 0}
               onChange={(event) => {
@@ -272,10 +274,10 @@ function RedirectPatientModal({
 
         <footer className="modal-actions">
           <Button disabled={saving} onClick={onClose} variant="ghost">
-            Отмена
+            {t.common.cancel}
           </Button>
           <Button disabled={isBusy || !selectedServiceType || !autoRoom} type="submit" variant="primary">
-            {saving ? 'Перенаправляем...' : 'Перенаправить'}
+            {saving ? t.specialist.redirecting : t.specialist.redirect}
           </Button>
         </footer>
       </form>
@@ -395,10 +397,10 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
     queueDurationMinutes: queueCalculation.queueDurationMinutes,
   }), [now, queueCalculation.averageServiceMinutes, queueCalculation.queueDurationMinutes, room, tickets])
   const workTimeStatus = workTimeCalculation.isAtRisk
-    ? 'Не успевает обслужить очередь'
+    ? t.specialist.queueAtRisk
     : workTimeCalculation.isWorkingNow
-      ? 'Нагрузка в норме'
-      : 'Сейчас не работает'
+      ? t.analytics.loadNormal
+      : t.specialist.notWorkingNow
 
   const handleReturnTicket = async (ticketId: string) => {
     setReturnError(null)
@@ -409,7 +411,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
     } catch (error) {
       console.error('Specialist return ticket failed', error)
       setReturnError(
-        error instanceof Error ? error.message : 'Не удалось вернуть пациента в очередь',
+        error instanceof Error ? error.message : t.specialist.returnPatientError,
       )
     } finally {
       setReturningTicketId(null)
@@ -439,7 +441,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
       await loadQueue({ force: true, successMessage: 'Критический талон вызван вне очереди' })
     } catch (error) {
       console.error('Specialist urgent call failed', error)
-      setReturnError('Не удалось вызвать критический талон вне очереди')
+      setReturnError(t.specialist.urgentCallError)
     } finally {
       setCallingUrgentTicketId(null)
     }
@@ -508,29 +510,29 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         <section className="specialist-side-section queue-calculation">
           <div className="panel-header">
             <div>
-              <span className="eyebrow">Статистика места обслуживания</span>
-              <h2>Расчёт очереди</h2>
+              <span className="eyebrow">{t.specialist.servicePlaceStats}</span>
+              <h2>{t.specialist.queueCalculation}</h2>
             </div>
           </div>
           <dl className="queue-calculation-list">
             <div>
-              <dt>Пациентов в очереди</dt>
+              <dt>{t.specialist.patientsInQueue}</dt>
               <dd>{queueCalculation.activeWaitingCount}</dd>
             </div>
             <div>
-              <dt>Среднее обслуживание</dt>
+              <dt>{t.specialist.averageService}</dt>
               <dd>
                 {queueCalculation.hasDurationData
-                  ? `${queueCalculation.averageServiceMinutes} мин`
-                  : 'Нет данных'}
+                  ? `${queueCalculation.averageServiceMinutes} ${t.specialist.minutesShort}`
+                  : t.common.noData}
               </dd>
             </div>
             <div>
-              <dt>Очередь займёт примерно</dt>
+              <dt>{t.specialist.queueWillTakeApproximately}</dt>
               <dd>
                 {queueCalculation.queueDurationMinutes > 0
                   ? formatDuration(queueCalculation.queueDurationMinutes)
-                  : '0 мин'}
+                  : t.specialist.zeroMinutes}
               </dd>
             </div>
           </dl>
@@ -539,35 +541,35 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
         <section className="specialist-side-section working-hours-section">
           <div className="panel-header">
             <div>
-              <span className="eyebrow">График места обслуживания</span>
-              <h2>Рабочее время</h2>
+              <span className="eyebrow">{t.specialist.servicePlaceSchedule}</span>
+              <h2>{t.specialist.workingHours}</h2>
             </div>
           </div>
           <dl className="queue-calculation-list">
             <div>
-              <dt>График</dt>
+              <dt>{t.specialist.schedule}</dt>
               <dd>{getRoomWorkTimeText(room)}</dd>
             </div>
             <div>
-              <dt>Осталось до закрытия</dt>
+              <dt>{t.specialist.remainingUntilClose}</dt>
               <dd>{formatWorkDuration(workTimeCalculation.remainingWorkMinutes)}</dd>
             </div>
             <div>
-              <dt>Очередь займёт</dt>
+              <dt>{t.specialist.queueWillTake}</dt>
               <dd>{formatWorkDuration(workTimeCalculation.queueDurationMinutes)}</dd>
             </div>
             <div>
-              <dt>Статус</dt>
+              <dt>{t.queue.status}</dt>
               <dd>{workTimeStatus}</dd>
             </div>
           </dl>
           {workTimeCalculation.isAtRisk ? (
             <div className="modal-error">
-              Очередь не успевает обслужиться до конца рабочего времени. Рекомендуется закрыть выдачу талонов.
+              {t.specialist.queueAtRiskNotice}
             </div>
           ) : null}
           {!workTimeCalculation.isWorkingNow ? (
-            <div className="modal-info">Место обслуживания сейчас не работает.</div>
+            <div className="modal-info">{t.specialist.servicePlaceNotWorking}</div>
           ) : null}
         </section>
 
@@ -597,7 +599,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
                             onClick={() => void handleCallUrgentTicket(ticket)}
                             variant="primary"
                           >
-                            {callingUrgentTicketId === ticket.id ? 'Вызываем...' : 'Вызвать вне очереди'}
+                            {callingUrgentTicketId === ticket.id ? t.specialist.calling : t.specialist.callOutOfTurn}
                           </Button>
                         </div>
                       ) : null

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { PageHeader, ResourceBanner } from '@components'
 import { visitService, type Visit } from '@services/visitService'
+import { useLocale } from '@shared/locales/useLocale'
 import type { ServiceType } from '@shared/types'
 import { StatusBadge } from '@shared/ui/components'
 import { getServiceTypeLabel } from '@shared/utils'
@@ -41,6 +42,7 @@ function getUserRoomIds(user?: { assignedRoomId?: string; assignedRoomIds?: stri
 }
 
 export function VisitHistoryPage() {
+  const t = useLocale()
   const user = useGlobalStore((state) => state.user)
   const specialistRoomIds = useMemo(() => getUserRoomIds(user), [user])
   const loadVisits = useCallback(async (): Promise<Visit[]> => {
@@ -58,27 +60,27 @@ export function VisitHistoryPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Кабинет специалиста"
-        title="История посещений"
-        description="Завершённые, отменённые, неявившиеся и перенаправленные посещения за сегодня."
+        eyebrow={t.visitHistory.eyebrow}
+        title={t.visitHistory.title}
+        description={t.visitHistory.description}
       />
       <ResourceBanner error={error} loading={loading} />
 
       <section className="primary-panel">
         {visits.length === 0 && !loading ? (
-          <p className="muted-copy">Нет посещений за сегодня.</p>
+          <p className="muted-copy">{t.visitHistory.emptyToday}</p>
         ) : (
           <div className="table-shell">
             <table className="queue-table visit-history-table">
               <thead>
                 <tr>
-                  <th>Время</th>
-                  <th>Пациент</th>
-                  <th>Талон</th>
-                  <th>Услуга</th>
-                  <th>Место обслуживания</th>
-                  <th>Статус</th>
-                  <th>Приоритет</th>
+                  <th>{t.visitHistory.time}</th>
+                  <th>{t.visitHistory.patient}</th>
+                  <th>{t.visitHistory.ticket}</th>
+                  <th>{t.visitHistory.service}</th>
+                  <th>{t.visitHistory.servicePlace}</th>
+                  <th>{t.visitHistory.status}</th>
+                  <th>{t.visitHistory.priority}</th>
                 </tr>
               </thead>
               <tbody>
