@@ -60,6 +60,7 @@ type BackendServiceTypeOption = {
   name?: string
   priorityWeight?: number
   priority_weight?: number
+  translations?: TicketSettingsServiceTypeOption['translations']
   weight?: number
 }
 
@@ -368,6 +369,9 @@ function toSettingsOptions(
           ?? serviceType.priority_weight
           ?? serviceType.weight,
       ),
+      ...(serviceType.translations && typeof serviceType.translations === 'object'
+        ? { translations: serviceType.translations as TicketSettingsServiceTypeOption['translations'] }
+        : {}),
     })),
     specialists: users.map((user) => {
       const userRoomIds = getUserRoomIds(user)

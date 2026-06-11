@@ -32,6 +32,7 @@ export type TicketSettingsServiceTypeOption = {
   code: SharedServiceType
   name: string
   priorityWeight?: number
+  translations?: Partial<Record<SmartQLanguage, string>>
 }
 
 export type TicketSettingsUserOption = {
@@ -225,6 +226,7 @@ export type AdminServiceTypeInput = {
   code?: SharedServiceType
   name: string
   priorityWeight?: number
+  translations?: Partial<Record<SmartQLanguage, string>>
 }
 
 export type AdminUserInput = Partial<SharedUser> & {

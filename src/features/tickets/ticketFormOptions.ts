@@ -69,6 +69,12 @@ export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption, 
     return getLocale(language).tickets.unassigned
   }
 
+  const translatedName = language ? option.translations?.[language] : undefined
+
+  if (translatedName) {
+    return translatedName
+  }
+
   const fallbackKey = fallbackServiceOptionKeys.get(option.name)
 
   return fallbackKey ? getLocale(language).serviceOptions[fallbackKey] : option.name
@@ -80,7 +86,7 @@ export function getPriorityLabel(priority: TicketPriority): string {
 
 export function getStatusLabel(status: TicketStatus): string {
   if (status === 'in_service') {
-    return 'На обслуживании'
+    return getLocale().status.in_service
   }
 
   return getTicketStatusMeta(status).label

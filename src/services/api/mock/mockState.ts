@@ -397,6 +397,7 @@ export function createMockServiceType(input: AdminServiceTypeInput): TicketSetti
     id: `service-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
     name: input.name,
     priorityWeight: input.priorityWeight,
+    translations: input.translations,
   }
 
   serviceTypeOptions = [...serviceTypeOptions, serviceType]

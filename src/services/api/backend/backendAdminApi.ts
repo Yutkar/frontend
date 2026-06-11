@@ -241,6 +241,9 @@ function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOp
       ?? getText(option.code)
       ?? serviceLabelByCode[code],
     ...(priorityWeight === undefined ? {} : { priorityWeight }),
+    ...(option.translations && typeof option.translations === 'object'
+      ? { translations: option.translations as TicketSettingsServiceTypeOption['translations'] }
+      : {}),
   }
 }
 
