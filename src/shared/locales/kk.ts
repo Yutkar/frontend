@@ -81,6 +81,7 @@ export const kk: Locale = {
     queue: 'Кезек',
     doctor: 'Дәрігер',
     priority: 'Басымдық',
+    estimatedWait: 'Шамамен күту',
     date: 'Күні',
     time: 'Уақыты',
     peopleAhead: 'Сіздің алдыңызда {{count}} адам',

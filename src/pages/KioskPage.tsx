@@ -235,7 +235,9 @@ export function KioskPage() {
 
     return {
       date: new Date(createdTicket.createdAt),
+      estimatedWaitMinutes: createdTicket.etaMinutes,
       language: createdTicket.language ?? language,
+      organizationName: appSettings.appName,
       peopleAhead: getTicketPeopleAhead(createdTicket),
       priorityLabel: getLocale(createdTicket.language ?? language).priority[createdTicket.priority],
       roomName: formatRoomName(room ?? { id: createdTicket.roomId, name: createdTicket.roomName }),
@@ -244,7 +246,7 @@ export function KioskPage() {
         : getLocale(createdTicket.language ?? language).serviceType.consultation,
       ticketNumber: createdTicket.number,
     }
-  }, [createdTicket, rooms, selectedServiceType])
+  }, [appSettings.appName, createdTicket, language, rooms, selectedServiceType])
 
   function resetKiosk() {
     setCreatedTicket(null)
@@ -302,9 +304,13 @@ export function KioskPage() {
         status: 'waiting',
       })
       const resolvedPeopleAhead = getTicketPeopleAhead(ticket, peopleAhead)
+      const estimatedWaitMinutes = ticket.etaMinutes > 0
+        ? ticket.etaMinutes
+        : Math.max(0, Math.round(resolvedPeopleAhead * averageServiceMinutes))
 
       setCreatedTicket({
         ...ticket,
+        etaMinutes: estimatedWaitMinutes,
         peopleAhead: resolvedPeopleAhead,
         queuePosition: ticket.queuePosition ?? resolvedPeopleAhead + 1,
       })
@@ -321,18 +327,18 @@ export function KioskPage() {
     return (
       <main className="kiosk-page">
         <section className="kiosk-result">
-          <CheckCircle2 aria-hidden="true" size={72} />
-          <span className="kiosk-result-label">{t.kiosk.created}</span>
-          <div className="kiosk-ticket-number">
+          <CheckCircle2 aria-hidden="true" className="no-print" size={72} />
+          <span className="kiosk-result-label no-print">{t.kiosk.created}</span>
+          <div className="kiosk-ticket-number no-print">
             <span>{t.kiosk.ticketNumber}</span>
             <strong>{createdTicket.number}</strong>
           </div>
-          <div className="kiosk-queue-position">
+          <div className="kiosk-queue-position no-print">
             {formatPeopleAhead(getTicketPeopleAhead(createdTicket), createdTicket.language ?? language)}
           </div>
           <TicketPrintPreview data={printData} onPrint={resetKiosk} />
           <Button
-            className="kiosk-back-button"
+            className="kiosk-back-button no-print"
             icon={<ArrowLeft size={20} />}
             onClick={resetKiosk}
             size="lg"

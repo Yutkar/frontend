@@ -81,6 +81,7 @@ export const en: Locale = {
     queue: 'Queue',
     doctor: 'Doctor',
     priority: 'Priority',
+    estimatedWait: 'Estimated wait',
     date: 'Date',
     time: 'Time',
     peopleAhead: '{{count}} people ahead of you',

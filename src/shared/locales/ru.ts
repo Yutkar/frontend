@@ -74,6 +74,7 @@ export const ru = {
     queue: 'Очередь',
     doctor: 'Врач',
     priority: 'Приоритет',
+    estimatedWait: 'Примерное ожидание',
     date: 'Дата',
     time: 'Время',
     peopleAhead: 'Перед вами {{count}} человек',

@@ -1492,6 +1492,10 @@ h3 {
   padding-top: 16px;
 }
 
+.no-print {
+  print-color-adjust: exact;
+}
+
 .ticket-print-empty,
 .ticket-print-panel {
   background: var(--surface);
@@ -1502,6 +1506,10 @@ h3 {
   flex-direction: column;
   gap: 14px;
   padding: 16px;
+}
+
+.ticket-print-panel {
+  align-items: center;
 }
 
 .ticket-print-empty p {
@@ -1515,30 +1523,36 @@ h3 {
   color: #000000;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 24px;
+  gap: 4mm;
+  height: auto;
+  margin: 0 auto;
+  max-width: 100%;
+  min-height: auto;
+  overflow-wrap: anywhere;
+  padding: 5mm;
+  width: 80mm;
 }
 
 .ticket-print-brand {
   color: #000000;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
+  line-height: 1.15;
   text-align: center;
-  text-transform: uppercase;
 }
 
 .ticket-print-number {
   border-bottom: 2px solid #000000;
   border-top: 2px solid #000000;
-  padding: 16px 0;
+  padding: 4mm 0;
   text-align: center;
 }
 
 .ticket-print-number span {
   color: #000000;
   display: block;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -1546,45 +1560,51 @@ h3 {
 .ticket-print-number strong {
   color: #000000;
   display: block;
-  font-size: clamp(48px, 13vw, 76px);
+  font-size: 56px;
   font-weight: 950;
   line-height: 1;
-  margin-top: 6px;
+  margin-top: 2mm;
 }
 
 .ticket-print-preview dl {
   display: grid;
-  gap: 12px;
+  gap: 3mm;
   margin: 0;
 }
 
 .ticket-print-preview dl div {
   display: grid;
-  gap: 4px;
+  gap: 1mm;
 }
 
 .ticket-print-preview dt {
   color: #000000;
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
 .ticket-print-preview dd {
   color: #000000;
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 900;
+  line-height: 1.2;
   margin: 0;
 }
 
 .ticket-print-preview p {
   border-top: 2px solid #000000;
   color: #000000;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 950;
   margin: 0;
-  padding-top: 16px;
+  padding-top: 4mm;
   text-align: center;
+}
+
+.ticket-print {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .redirect-panel {
@@ -4230,41 +4250,86 @@ h3 {
   }
 }
 
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
 @media print {
+  html,
   body {
     background: #ffffff;
     color: #000000;
+    height: auto;
+    margin: 0;
+    min-height: auto;
+    padding: 0;
+    width: 80mm;
   }
 
+  body * {
+    visibility: hidden !important;
+  }
+
+  .ticket-print-panel,
+  .ticket-print-panel *,
+  .ticket-print,
+  .ticket-print * {
+    visibility: visible !important;
+  }
+
+  .no-print,
+  .no-print *,
+  .sidebar,
+  .top-navbar,
+  .modal-backdrop,
+  .modal-actions,
+  .kiosk-queue-position,
+  .ticket-print-button {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  #root,
   .kiosk-page,
   .kiosk-result,
   .ticket-print-panel {
     background: #ffffff;
     border: 0;
     box-shadow: none;
+    height: auto;
     min-height: auto;
+    overflow: visible;
     padding: 0;
+    width: 80mm;
   }
 
-  .kiosk-result > svg,
-  .kiosk-result-label,
-  .kiosk-ticket-number,
-  .kiosk-back-button,
-  .ticket-print-button {
-    display: none;
+  .ticket-print-panel {
+    display: block;
+    gap: 0;
+    left: 0;
+    margin: 0;
+    position: absolute;
+    top: 0;
   }
 
-  .ticket-print-preview {
+  .ticket-print {
     background: #ffffff;
     border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    break-inside: avoid;
     color: #000000;
-    margin: 0 auto;
-    max-width: 320px;
-    padding: 8mm 6mm;
-    width: 72mm;
+    height: auto;
+    margin: 0;
+    max-width: none;
+    min-height: auto;
+    page-break-inside: avoid;
+    padding: 5mm;
+    width: 80mm;
   }
 
   .ticket-print-number strong {
-    font-size: 54px;
+    font-size: 18mm;
   }
 }
