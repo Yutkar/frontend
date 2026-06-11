@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { PlusCircle, UsersRound } from 'lucide-react'
 import { adminService } from '@services/adminService'
+import { useLocale } from '@shared/locales/useLocale'
 import type { User } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import {
@@ -35,6 +36,7 @@ type StaffSectionProps = {
 }
 
 export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProps) {
+  const t = useLocale()
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<StaffFormState>(emptyForm)
@@ -185,7 +187,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                 <UsersRound size={14} />
                 Управление
               </span>
-              <h2>Персонал</h2>
+              <h2>{t.admin.staff}</h2>
               <p className="admin-section-description">
                 Создание врачей и назначение кабинетов.
               </p>
@@ -248,7 +250,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
           <form className="admin-form" onSubmit={handleSubmit}>
             <div className="panel-header">
               <div>
-                <span className="eyebrow">Персонал</span>
+                <span className="eyebrow">{t.admin.staff}</span>
                 <h2>{editingUserId ? 'Редактировать врача' : 'Добавить врача'}</h2>
               </div>
             </div>

@@ -626,13 +626,13 @@ export function BoardSettingsSection() {
           <div className="admin-form">
             <div className="panel-header">
               <div>
-                <span className="eyebrow">Табло</span>
-                <h2>Настройки озвучки</h2>
+                <span className="eyebrow">{t.nav.tvBoard}</span>
+                <h2>{t.admin.voiceSettings}</h2>
               </div>
             </div>
 
             <label className="field">
-              <span>Обращение</span>
+              <span>{t.admin.voiceAddress}</span>
               <select
                 onChange={(event) => updateVoiceSettings({ audience: event.target.value as VoiceAudience })}
                 value={voiceSettings.audience}
@@ -643,7 +643,7 @@ export function BoardSettingsSection() {
             </label>
 
             <label className="field">
-              <span>Действие</span>
+              <span>{t.admin.voiceAction}</span>
               <select
                 onChange={(event) => updateVoiceSettings({ action: event.target.value as VoiceAction })}
                 value={voiceSettings.action}

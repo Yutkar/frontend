@@ -1,9 +1,12 @@
 import { ru, type Locale } from './ru'
+import { localizeStaticTree } from './staticText'
+
+const base = localizeStaticTree(ru, 'en')
 
 export const en: Locale = {
-  ...ru,
+  ...base,
   nav: {
-    ...ru.nav,
+    ...base.nav,
     login: 'Sign in',
     dashboard: 'Dashboard',
     queue: 'Queue',
@@ -111,7 +114,7 @@ export const en: Locale = {
     default: 'Status',
   },
   queue: {
-    ...ru.queue,
+    ...base.queue,
     signalLog: 'Signal log',
     recentEvents: 'Recent events',
     noEvents: 'No events yet',
@@ -165,7 +168,7 @@ export const en: Locale = {
     other: 'Other',
   },
   specialist: {
-    ...ru.specialist,
+    ...base.specialist,
     panel: 'Specialist panel',
     currentSpecialist: 'Current specialist',
     fullName: 'Full name',
@@ -278,7 +281,7 @@ export const en: Locale = {
     },
   },
   tickets: {
-    ...ru.tickets,
+    ...base.tickets,
     createTicket: 'Create ticket',
     serviceType: 'Service type',
     priority: 'Priority',
@@ -301,7 +304,7 @@ export const en: Locale = {
     createError: 'Could not create a ticket.',
   },
   analytics: {
-    ...ru.analytics,
+    ...base.analytics,
     rooms: 'Rooms',
     loadPerRoom: 'Room workload',
     activeTickets: 'Active tickets',
@@ -322,6 +325,9 @@ export const en: Locale = {
     staff: 'Staff',
     managers: 'Managers',
     appSettings: 'App settings',
+    voiceSettings: 'Voice settings',
+    voiceAddress: 'Addressing',
+    voiceAction: 'Action',
     appName: 'Application name',
     appNamePlaceholder: 'SmartQ',
     appIcon: 'App icon / logo',
@@ -333,7 +339,7 @@ export const en: Locale = {
     settingsSaveError: 'Could not save application settings',
   },
   auth: {
-    ...ru.auth,
+    ...base.auth,
     authorization: 'Authorization',
     systemLogin: 'Sign in',
     login: 'Login',
@@ -347,7 +353,7 @@ export const en: Locale = {
     logout: 'Log out',
   },
   system: {
-    ...ru.system,
+    ...base.system,
     controlSystem: 'Management system',
     realtimeMonitoring: 'Realtime monitoring',
     toggleSidebar: 'Collapse menu',

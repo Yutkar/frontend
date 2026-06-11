@@ -1,9 +1,12 @@
 import { ru, type Locale } from './ru'
+import { localizeStaticTree } from './staticText'
+
+const base = localizeStaticTree(ru, 'kk')
 
 export const kk: Locale = {
-  ...ru,
+  ...base,
   nav: {
-    ...ru.nav,
+    ...base.nav,
     login: 'Кіру',
     dashboard: 'Басқару панелі',
     queue: 'Кезек',
@@ -16,7 +19,7 @@ export const kk: Locale = {
     appSettings: 'Қолданба баптаулары',
     admin: 'Әкімшілік',
     rooms: 'Кабинеттер',
-    staff: 'Персонал',
+    staff: 'Қызметкерлер',
     managers: 'Менеджерлер',
     visitHistory: 'Кіру тарихы',
     kiosk: 'Киоск',
@@ -111,7 +114,7 @@ export const kk: Locale = {
     default: 'Статус',
   },
   queue: {
-    ...ru.queue,
+    ...base.queue,
     signalLog: 'Сигналдар журналы',
     recentEvents: 'Соңғы оқиғалар',
     noEvents: 'Әзірге оқиға жоқ',
@@ -165,7 +168,7 @@ export const kk: Locale = {
     other: 'Басқа',
   },
   specialist: {
-    ...ru.specialist,
+    ...base.specialist,
     panel: 'Маман панелі',
     currentSpecialist: 'Ағымдағы маман',
     fullName: 'Аты-жөні',
@@ -278,7 +281,7 @@ export const kk: Locale = {
     },
   },
   tickets: {
-    ...ru.tickets,
+    ...base.tickets,
     createTicket: 'Талон жасау',
     serviceType: 'Қызмет түрі',
     priority: 'Басымдық',
@@ -301,7 +304,7 @@ export const kk: Locale = {
     createError: 'Талон жасау мүмкін болмады.',
   },
   analytics: {
-    ...ru.analytics,
+    ...base.analytics,
     rooms: 'Кабинеттер',
     loadPerRoom: 'Кабинеттер жүктемесі',
     activeTickets: 'Белсенді талондар',
@@ -319,23 +322,26 @@ export const kk: Locale = {
     serviceTypes: 'Қызмет түрлері',
     routing: 'Кезек баптаулары',
     terminals: 'Киоскілер',
-    staff: 'Персонал',
+    staff: 'Қызметкерлер',
     managers: 'Менеджерлер',
     appSettings: 'Қолданба баптаулары',
+    voiceSettings: 'Дыбыстау баптаулары',
+    voiceAddress: 'Қаратпа сөз',
+    voiceAction: 'Әрекет',
     appName: 'Қолданба атауы',
     appNamePlaceholder: 'SmartQ',
-    appIcon: 'Қолданба белгішесі / логотип',
-    logoPreview: 'Логотипті алдын ала көру',
-    removeLogo: 'Логотипті алып тастау',
+    appIcon: 'Қолданба белгішесі / логотипі',
+    logoPreview: 'Логотипті алдын ала қарау',
+    removeLogo: 'Логотипті жою',
     saveSettings: 'Баптауларды сақтау',
     settingsSaved: 'Қолданба баптаулары сақталды',
     settingsLoadError: 'Қолданба баптауларын жүктеу мүмкін болмады',
     settingsSaveError: 'Қолданба баптауларын сақтау мүмкін болмады',
   },
   auth: {
-    ...ru.auth,
-    authorization: 'Авторизация',
-    systemLogin: 'Жүйеге кіру',
+    ...base.auth,
+    authorization: 'Кіру',
+    systemLogin: 'Кіру',
     login: 'Логин',
     loginPlaceholder: 'Логинді енгізіңіз',
     password: 'Құпия сөз',
@@ -347,7 +353,7 @@ export const kk: Locale = {
     logout: 'Шығу',
   },
   system: {
-    ...ru.system,
+    ...base.system,
     controlSystem: 'Басқару жүйесі',
     realtimeMonitoring: 'Нақты уақыттағы бақылау',
     toggleSidebar: 'Мәзірді жинау',
