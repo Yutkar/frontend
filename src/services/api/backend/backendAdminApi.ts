@@ -209,6 +209,13 @@ function toServiceCode(option: UnknownRecord): ServiceType {
 
 function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOption {
   const code = toServiceCode(option)
+  const translations = {
+    ...(option.translations && typeof option.translations === 'object'
+      ? option.translations as TicketSettingsServiceTypeOption['translations']
+      : {}),
+    ...(getText(option.nameKk ?? option.name_kk) ? { kk: getText(option.nameKk ?? option.name_kk) } : {}),
+    ...(getText(option.nameEn ?? option.name_en) ? { en: getText(option.nameEn ?? option.name_en) } : {}),
+  }
   const averageDurationMinutes = getPositiveNumber(
     option.averageDurationMinutes
       ?? option.average_duration_minutes
@@ -241,9 +248,7 @@ function toServiceTypeOption(option: UnknownRecord): TicketSettingsServiceTypeOp
       ?? getText(option.code)
       ?? serviceLabelByCode[code],
     ...(priorityWeight === undefined ? {} : { priorityWeight }),
-    ...(option.translations && typeof option.translations === 'object'
-      ? { translations: option.translations as TicketSettingsServiceTypeOption['translations'] }
-      : {}),
+    ...(Object.keys(translations).length > 0 ? { translations } : {}),
   }
 }
 
@@ -284,9 +289,20 @@ function getPositiveNumber(value: unknown): number | undefined {
 }
 
 function toServiceTypePayload(input: Partial<AdminServiceTypeInput>) {
+  const kk = input.translations?.kk?.trim()
+  const en = input.translations?.en?.trim()
+
   return {
     ...(input.name !== undefined ? { name: input.name.trim() } : {}),
     ...(input.code !== undefined ? { code: input.code } : {}),
+    ...(input.translations !== undefined ? {
+      nameKk: kk || null,
+      nameEn: en || null,
+      translations: {
+        ...(kk ? { kk } : {}),
+        ...(en ? { en } : {}),
+      },
+    } : {}),
     ...(input.averageDurationMinutes !== undefined
       ? { averageDurationMinutes: Math.max(1, Math.round(input.averageDurationMinutes)) }
       : {}),

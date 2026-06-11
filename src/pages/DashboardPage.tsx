@@ -96,6 +96,21 @@ function isTicketCreatedToday(ticket: Ticket, now: number): boolean {
     createdAt.getDate() === today.getDate()
 }
 
+function getTicketServiceOptionLabel(ticket: Ticket, options: TicketSettingsOptions): string {
+  const serviceType = options.serviceTypes.find((item) => (
+    normalizeFilterValue(item.id) === normalizeFilterValue(ticket.serviceTypeId) ||
+    item.code === ticket.serviceType
+  ))
+
+  return serviceType
+    ? getServiceOptionLabel(serviceType)
+    : getServiceOptionLabel({
+      code: ticket.serviceType,
+      id: ticket.serviceTypeId ?? ticket.serviceType,
+      name: '',
+    })
+}
+
 export function DashboardPage() {
   useQueueBootstrap({ force: true })
 
@@ -510,6 +525,7 @@ export function DashboardPage() {
               )
             }}
             emptyTitle={hasActiveFilters ? 'По выбранным фильтрам талоны не найдены' : 'Сегодня талоны не найдены'}
+            getServiceLabel={(ticket) => getTicketServiceOptionLabel(ticket, filterOptions)}
             onSelectTicket={(ticket) => selectTicket(ticket.id)}
             now={now}
             rooms={rooms}
@@ -537,6 +553,7 @@ export function DashboardPage() {
               }
               room={rooms.find((room) => room.id === selectedTicket.roomId)}
               now={now}
+              serviceLabel={getTicketServiceOptionLabel(selectedTicket, filterOptions)}
               ticket={selectedTicket}
             />
           ) : null}

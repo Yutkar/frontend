@@ -3,6 +3,7 @@ import { Building2, PlusCircle } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
+import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import type { ServicePlaceType } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import { formatRoomName, getRoomBoardId, getRoomPlaceType, normalizeWorkTime } from '@shared/utils'
@@ -354,7 +355,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
                     onChange={() => toggleServiceType(String(serviceType.id))}
                     type="checkbox"
                   />
-                  <span>{serviceType.name}</span>
+                  <span>{getServiceOptionLabel(serviceType)}</span>
                 </label>
               ))}
             </fieldset>

@@ -3,6 +3,7 @@ import { Check, Copy, ExternalLink, PlusCircle, TabletSmartphone } from 'lucide-
 import { adminService } from '@services/adminService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { AdminTerminalRecord, TicketSettingsServiceTypeOption } from '@services/api'
+import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import { Button } from '@shared/ui/components'
 import {
   getAdminErrorMessage,
@@ -39,7 +40,11 @@ function getServiceNames(terminal: AdminTerminalRecord, serviceTypes: TicketSett
   }
 
   return terminal.serviceTypeIds
-    .map((id) => serviceTypes.find((serviceType) => String(serviceType.id) === String(id))?.name ?? String(id))
+    .map((id) => {
+      const serviceType = serviceTypes.find((item) => String(item.id) === String(id))
+
+      return serviceType ? getServiceOptionLabel(serviceType) : String(id)
+    })
     .join(', ')
 }
 
@@ -379,7 +384,7 @@ export function TerminalsSection() {
                     onChange={() => toggleServiceType(String(serviceType.id))}
                     type="checkbox"
                   />
-                  <span>{serviceType.name}</span>
+                  <span>{getServiceOptionLabel(serviceType)}</span>
                 </label>
               )) : <span className="admin-muted-text">Услуги не найдены</span>}
             </fieldset>

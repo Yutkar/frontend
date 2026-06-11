@@ -6,6 +6,7 @@ import {
   createFilteredAnalyticsFromTickets,
   getTicketsForAnalyticsFilters,
 } from '@features/analytics/periodAnalytics'
+import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import { adminService } from '@services/adminService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
@@ -265,7 +266,7 @@ export function AnalyticsPage() {
                 <option value="">{t.queue.allServices}</option>
                 {serviceTypes.map((serviceType) => (
                   <option key={String(serviceType.id)} value={String(serviceType.id)}>
-                    {serviceType.name}
+                    {getServiceOptionLabel(serviceType)}
                   </option>
                 ))}
               </select>

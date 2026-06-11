@@ -4,12 +4,15 @@ import { adminService, type AdminServiceTypePayload } from '@services/adminServi
 import type { ServiceType } from '@shared/types'
 import { Button, StatusBadge } from '@shared/ui/components'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
+import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import { getAdminErrorMessage } from './adminPageHelpers'
 
 type ServiceTypeFormState = {
   active: boolean
   code: ServiceType
   name: string
+  nameEn: string
+  nameKk: string
 }
 
 type ServiceTypesSectionProps = {
@@ -20,6 +23,8 @@ const emptyForm: ServiceTypeFormState = {
   active: true,
   code: 'consultation',
   name: '',
+  nameEn: '',
+  nameKk: '',
 }
 
 function toForm(serviceType: TicketSettingsServiceTypeOption): ServiceTypeFormState {
@@ -27,6 +32,8 @@ function toForm(serviceType: TicketSettingsServiceTypeOption): ServiceTypeFormSt
     active: serviceType.active !== false,
     code: serviceType.code,
     name: serviceType.name,
+    nameEn: serviceType.translations?.en ?? '',
+    nameKk: serviceType.translations?.kk ?? '',
   }
 }
 
@@ -36,6 +43,10 @@ function toPayload(form: ServiceTypeFormState): AdminServiceTypePayload {
     code: form.code,
     name: form.name.trim(),
     priorityWeight: 1,
+    translations: {
+      ...(form.nameKk.trim() ? { kk: form.nameKk.trim() } : {}),
+      ...(form.nameEn.trim() ? { en: form.nameEn.trim() } : {}),
+    },
   }
 }
 
@@ -171,7 +182,7 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
                 <tbody>
                   {serviceTypes.map((serviceType) => (
                     <tr key={String(serviceType.id)}>
-                      <td>{serviceType.name}</td>
+                      <td>{getServiceOptionLabel(serviceType)}</td>
                       <td>
                         <StatusBadge
                           label={serviceType.active === false ? 'Неактивна' : 'Активна'}
@@ -211,11 +222,29 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
             </div>
 
             <label className="field">
-              <span>Название услуги</span>
+              <span>Название услуги на русском</span>
               <input
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                 placeholder="Консультация терапевта"
                 value={form.name}
+              />
+            </label>
+
+            <label className="field">
+              <span>Название услуги на казахском</span>
+              <input
+                onChange={(event) => setForm((current) => ({ ...current, nameKk: event.target.value }))}
+                placeholder="Терапевт кеңесі"
+                value={form.nameKk}
+              />
+            </label>
+
+            <label className="field">
+              <span>Название услуги на английском</span>
+              <input
+                onChange={(event) => setForm((current) => ({ ...current, nameEn: event.target.value }))}
+                placeholder="Therapist consultation"
+                value={form.nameEn}
               />
             </label>
 

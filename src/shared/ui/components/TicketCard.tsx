@@ -18,10 +18,11 @@ type TicketCardProps = {
   room?: Room
   actionSlot?: ReactNode
   compact?: boolean
+  serviceLabel?: string
   now?: number
 }
 
-export function TicketCard({ actionSlot, compact = false, now, room, ticket }: TicketCardProps) {
+export function TicketCard({ actionSlot, compact = false, now, room, serviceLabel, ticket }: TicketCardProps) {
   return (
     <article className={`ticket-card ${compact ? 'ticket-card-compact' : ''}`}>
       <header>
@@ -35,7 +36,7 @@ export function TicketCard({ actionSlot, compact = false, now, room, ticket }: T
       <div className="ticket-card-grid">
         <span>
           <small>{t.tickets.service}</small>
-          {getServiceTypeLabel(ticket.serviceType)}
+          {serviceLabel ?? getServiceTypeLabel(ticket.serviceType)}
         </span>
         <span>
           <small>{t.tickets.priority}</small>

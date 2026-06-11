@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Route, Save } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
+import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import { Button } from '@shared/ui/components'
 import {
   getAdminErrorMessage,
@@ -152,7 +153,7 @@ export function QueueRoutingSection({ onRoutingChange }: QueueRoutingSectionProp
                 >
                   {serviceTypes.map((serviceType) => (
                     <option key={normalizeId(serviceType.id)} value={normalizeId(serviceType.id)}>
-                      {serviceType.name}
+                      {getServiceOptionLabel(serviceType)}
                     </option>
                   ))}
                 </select>

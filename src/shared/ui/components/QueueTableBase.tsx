@@ -9,6 +9,7 @@ type QueueTableBaseProps = {
   rooms: Room[]
   actionSlot?: (ticket: Ticket) => ReactNode
   emptyTitle?: string
+  getServiceLabel?: (ticket: Ticket) => string
   now?: number
   onSelectTicket?: (ticket: Ticket) => void
 }
@@ -16,6 +17,7 @@ type QueueTableBaseProps = {
 export function QueueTableBase({
   actionSlot,
   emptyTitle = t.queue.emptyTitle,
+  getServiceLabel,
   now,
   onSelectTicket,
   rooms,
@@ -59,7 +61,7 @@ export function QueueTableBase({
                 <td>
                   <strong>{ticket.number}</strong>
                 </td>
-                <td>{getServiceTypeLabel(ticket.serviceType)}</td>
+                <td>{getServiceLabel ? getServiceLabel(ticket) : getServiceTypeLabel(ticket.serviceType)}</td>
                 <td>
                   <StatusBadge priority={ticket.priority} />
                 </td>

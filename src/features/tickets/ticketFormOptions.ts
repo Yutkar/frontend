@@ -5,7 +5,7 @@ import type {
   TicketSettingsUserOption,
 } from '@services/api'
 import { fallbackServiceTypeOptions } from '@services/api/serviceTypeCatalog'
-import { getLocale, type SmartQLanguage } from '@shared/locales/useLocale'
+import { getCurrentLanguage, getLocale, type SmartQLanguage } from '@shared/locales/useLocale'
 import type {
   Room,
   Ticket,
@@ -65,11 +65,13 @@ const fallbackServiceOptionKeys = new Map<string, keyof ReturnType<typeof getLoc
 ])
 
 export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption, language?: SmartQLanguage): string {
+  const resolvedLanguage = language ?? getCurrentLanguage()
+
   if (!option) {
-    return getLocale(language).tickets.unassigned
+    return getLocale(resolvedLanguage).tickets.unassigned
   }
 
-  const translatedName = language ? option.translations?.[language] : undefined
+  const translatedName = option.translations?.[resolvedLanguage]
 
   if (translatedName) {
     return translatedName
@@ -77,7 +79,7 @@ export function getServiceOptionLabel(option?: TicketSettingsServiceTypeOption, 
 
   const fallbackKey = fallbackServiceOptionKeys.get(option.name)
 
-  return fallbackKey ? getLocale(language).serviceOptions[fallbackKey] : option.name
+  return fallbackKey ? getLocale(resolvedLanguage).serviceOptions[fallbackKey] : option.name
 }
 
 export function getPriorityLabel(priority: TicketPriority): string {

@@ -1,4 +1,5 @@
 import type { AdminRecord, TicketSettingsServiceTypeOption } from '@services/api'
+import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import type { Role, User } from '@shared/types'
 import { formatRoomName } from '@shared/utils'
 
@@ -83,7 +84,11 @@ export function getServiceTypeNames(
   }
 
   return selectedIds
-    .map((id) => serviceTypes.find((serviceType) => String(serviceType.id) === id)?.name ?? id)
+    .map((id) => {
+      const serviceType = serviceTypes.find((item) => String(item.id) === id)
+
+      return serviceType ? getServiceOptionLabel(serviceType) : id
+    })
     .join(', ')
 }
 

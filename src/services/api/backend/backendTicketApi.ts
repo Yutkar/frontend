@@ -58,6 +58,10 @@ type BackendServiceTypeOption = {
   id: string | number
   isActive?: boolean
   name?: string
+  nameEn?: string
+  name_en?: string
+  nameKk?: string
+  name_kk?: string
   priorityWeight?: number
   priority_weight?: number
   translations?: TicketSettingsServiceTypeOption['translations']
@@ -353,26 +357,34 @@ function toSettingsOptions(
       workingEndTime: room.workingEndTime,
       workingStartTime: room.workingStartTime,
     })),
-    serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => ({
-      active: serviceType.active ?? serviceType.isActive ?? serviceType.enabled,
-      averageDurationMinutes: getPositiveNumber(
-        serviceType.averageDurationMinutes
-          ?? serviceType.average_duration_minutes
-          ?? serviceType.avgServiceMinutes
-          ?? serviceType.durationMinutes,
-      ),
-      code: toServiceCode(serviceType),
-      id: serviceType.id,
-      name: serviceType.name ?? serviceType.code ?? `Услуга ${serviceType.id}`,
-      priorityWeight: getPositiveNumber(
-        serviceType.priorityWeight
-          ?? serviceType.priority_weight
-          ?? serviceType.weight,
-      ),
-      ...(serviceType.translations && typeof serviceType.translations === 'object'
-        ? { translations: serviceType.translations as TicketSettingsServiceTypeOption['translations'] }
-        : {}),
-    })),
+    serviceTypes: serviceTypes.map<TicketSettingsServiceTypeOption>((serviceType) => {
+      const translations = {
+        ...(serviceType.translations && typeof serviceType.translations === 'object'
+          ? serviceType.translations as TicketSettingsServiceTypeOption['translations']
+          : {}),
+        ...(serviceType.nameKk ?? serviceType.name_kk ? { kk: serviceType.nameKk ?? serviceType.name_kk } : {}),
+        ...(serviceType.nameEn ?? serviceType.name_en ? { en: serviceType.nameEn ?? serviceType.name_en } : {}),
+      }
+
+      return {
+        active: serviceType.active ?? serviceType.isActive ?? serviceType.enabled,
+        averageDurationMinutes: getPositiveNumber(
+          serviceType.averageDurationMinutes
+            ?? serviceType.average_duration_minutes
+            ?? serviceType.avgServiceMinutes
+            ?? serviceType.durationMinutes,
+        ),
+        code: toServiceCode(serviceType),
+        id: serviceType.id,
+        name: serviceType.name ?? serviceType.code ?? `Услуга ${serviceType.id}`,
+        priorityWeight: getPositiveNumber(
+          serviceType.priorityWeight
+            ?? serviceType.priority_weight
+            ?? serviceType.weight,
+        ),
+        ...(Object.keys(translations).length > 0 ? { translations } : {}),
+      }
+    }),
     specialists: users.map((user) => {
       const userRoomIds = getUserRoomIds(user)
 

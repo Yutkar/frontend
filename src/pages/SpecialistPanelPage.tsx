@@ -5,6 +5,7 @@ import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
 import { adminService } from '@services/adminService'
 import { ticketService } from '@services/ticketService'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
+import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import { t } from '@shared/locales/useLocale'
 import type { Room, User } from '@shared/types'
 import { Button, StatusBadge } from '@shared/ui/components'
@@ -17,7 +18,10 @@ function getRoomProcedureLabel(room?: Room, serviceTypes: TicketSettingsServiceT
     return '-'
   }
 
-  const serviceTypeById = new Map(serviceTypes.map((serviceType) => [String(serviceType.id), serviceType.name]))
+  const serviceTypeById = new Map(serviceTypes.map((serviceType) => [
+    String(serviceType.id),
+    getServiceOptionLabel(serviceType),
+  ]))
   const directServices = [...(room.serviceTypes ?? []), ...(room.services ?? [])]
     .map((service) => {
       if (typeof service === 'string' || typeof service === 'number') {
