@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { voiceSettingsService } from '@services/voiceSettingsService'
+import type { BoardPromoMedia } from '@services/boardPromoMediaService'
 import type { BoardTemplate } from '@services/api'
 import {
   buildKazakhCallAudioSequence,
@@ -12,9 +13,9 @@ import {
 import type { Room, Ticket } from '@shared/types'
 import {
   formatRoomName,
-  formatTime,
   getRoomPlaceNumber,
   getRoomPlaceType,
+  getRoomPlaceTypeLabel,
 } from '@shared/utils'
 
 type CallBoardProps = {
@@ -24,7 +25,7 @@ type CallBoardProps = {
     recentCalls: string
     waiting: string
   }
-  currentTime?: string
+  promoMedia?: BoardPromoMedia
   recentCallsLimit?: number
   rooms: Room[]
   showRecentCalls?: boolean
@@ -46,9 +47,12 @@ type TicketRoom = Room | {
 
 type PendingAnnouncement = {
   key: string
+  mode: 'notification' | 'voice'
   room?: TicketRoom
   ticket: Ticket
 }
+
+const notificationAudioPath = '/audio/notification.mp3'
 
 function BoardMultilingualLabel({ labelKey }: { labelKey: BoardMultilingualLabelKey }) {
   return (
@@ -87,6 +91,18 @@ function getRoomName(ticket: Ticket, rooms: Room[]): string {
   const room = getTicketRoom(ticket, rooms)
 
   return formatRoomName(room ?? { id: ticket.roomId })
+}
+
+function getRoomDisplayNumber(room?: TicketRoom): string {
+  return getRoomPlaceNumber(room) || (room?.id ? String(room.id) : '')
+}
+
+function getRoomDisplayValue(room?: TicketRoom): string {
+  return getRoomDisplayNumber(room) || formatRoomName(room)
+}
+
+function getRoomPlaceLabel(room?: TicketRoom): string {
+  return getRoomPlaceTypeLabel(getRoomPlaceType(room))
 }
 
 function getCallKey(ticket?: Ticket): string {
@@ -196,22 +212,15 @@ function buildVoicePhrase(
 
 function RecentCallsPanel({
   highlightedCallKey,
-  labels,
   recentCalls,
   rooms,
-  showTime,
 }: {
   highlightedCallKey?: string
-  labels: NonNullable<CallBoardProps['labels']>
   recentCalls: Ticket[]
   rooms: Room[]
-  showTime: boolean
 }) {
   return (
     <section className="tv-recent tv-recent-embedded">
-      <span className="tv-section-label">
-        <BoardMultilingualLabel labelKey="recentCalls" />
-      </span>
       {recentCalls.length > 0 ? (
         recentCalls.map((ticket) => (
           <div
@@ -220,8 +229,6 @@ function RecentCallsPanel({
           >
             <strong>{ticket.number}</strong>
             <span>{getRoomName(ticket, rooms)}</span>
-            {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
-            {ticket.status === 'no_show' ? <em>{labels.noShow}</em> : null}
           </div>
         ))
       ) : (
@@ -233,13 +240,97 @@ function RecentCallsPanel({
   )
 }
 
+function HistoryCallsTable({
+  highlightedCallKey,
+  labels,
+  recentCalls,
+  rooms,
+}: {
+  highlightedCallKey?: string
+  labels: NonNullable<CallBoardProps['labels']>
+  recentCalls: Ticket[]
+  rooms: Room[]
+}) {
+  return (
+    <table className="tv-call-history-table">
+      <thead>
+        <tr>
+          <th>Талон</th>
+          <th>Кабинет / Окно / Стол</th>
+        </tr>
+      </thead>
+      <tbody>
+        {recentCalls.length > 0 ? recentCalls.map((ticket) => {
+          const room = getTicketRoom(ticket, rooms)
+
+          return (
+            <tr
+              className={highlightedCallKey === getCallKey(ticket) ? 'tv-call-animated' : ''}
+              key={ticket.id}
+            >
+              <td>{ticket.number}</td>
+              <td>{getRoomDisplayValue(room)}</td>
+            </tr>
+          )
+        }) : (
+          <tr>
+            <td colSpan={2}>{labels.waiting}</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  )
+}
+
+function PromoMediaPanel({ media }: { media?: BoardPromoMedia }) {
+  const [videoFailed, setVideoFailed] = useState(false)
+  const [imageFailed, setImageFailed] = useState(false)
+
+  useEffect(() => {
+    setVideoFailed(false)
+    setImageFailed(false)
+  }, [media?.videoUrl, media?.imageUrl])
+
+  if (media?.videoUrl && !videoFailed) {
+    return (
+      <section className="tv-promo-panel">
+        <video
+          autoPlay
+          loop
+          muted
+          onError={() => setVideoFailed(true)}
+          playsInline
+          src={media.videoUrl}
+        />
+      </section>
+    )
+  }
+
+  if (media?.imageUrl && !imageFailed) {
+    return (
+      <section className="tv-promo-panel">
+        <img
+          alt=""
+          onError={() => setImageFailed(true)}
+          src={media.imageUrl}
+        />
+      </section>
+    )
+  }
+
+  return (
+    <section className="tv-promo-panel tv-promo-empty" aria-hidden="true">
+      <strong>SmartQ</strong>
+    </section>
+  )
+}
+
 export function CallBoard({
-  currentTime,
   labels = getLocale().board,
+  promoMedia,
   recentCallsLimit = 10,
   rooms,
   showRecentCalls = true,
-  showTime = true,
   template = 'classic',
   tickets,
   voiceEnabled = true,
@@ -306,6 +397,45 @@ export function CallBoard({
     gain.connect(audioContext.destination)
     oscillator.start()
     oscillator.stop(audioContext.currentTime + 0.34)
+
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 380)
+    })
+  }
+
+  function playNotificationFile(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const audio = new Audio(notificationAudioPath)
+      let settled = false
+      let timeoutId = 0
+
+      const finish = (played: boolean, stopAudio = false) => {
+        if (settled) return
+
+        settled = true
+        window.clearTimeout(timeoutId)
+        audio.onended = null
+        audio.onerror = null
+        if (!played || stopAudio) {
+          audio.pause()
+        }
+        resolve(played)
+      }
+
+      audio.preload = 'auto'
+      audio.onended = () => finish(true)
+      audio.onerror = () => finish(false)
+      timeoutId = window.setTimeout(() => finish(true, true), 1_200)
+      audio.play().catch(() => finish(false))
+    })
+  }
+
+  async function playNotificationSound() {
+    const played = await playNotificationFile()
+
+    if (!played) {
+      await playBeep().catch(() => undefined)
+    }
   }
 
   function stopSpeechKeepAlive() {
@@ -350,11 +480,11 @@ export function CallBoard({
 
     isAnnouncementPlayingRef.current = true
     highlightCall(nextAnnouncement.ticket)
-    void announceCall(
-      nextAnnouncement.ticket,
-      nextAnnouncement.room,
-      nextAnnouncement.key,
-    ).catch(() => {
+    const playAnnouncement = nextAnnouncement.mode === 'voice'
+      ? announceCall(nextAnnouncement.ticket, nextAnnouncement.room, nextAnnouncement.key)
+      : playNotificationAnnouncement(nextAnnouncement.key)
+
+    void playAnnouncement.catch(() => {
       finishAnnouncement(nextAnnouncement.key)
     })
   }
@@ -382,11 +512,18 @@ export function CallBoard({
     processNextAnnouncement()
   }
 
+  async function playNotificationAnnouncement(announcementKey: string) {
+    activeAnnouncementKeyRef.current = announcementKey
+    await playNotificationSound()
+    finishAnnouncement(announcementKey)
+  }
+
   async function announceCall(ticket: Ticket, room?: TicketRoom, announcementKey = getCallAnnouncementKey(ticket)) {
     const language = ticket.language ?? 'ru'
 
+    activeAnnouncementKeyRef.current = announcementKey
+
     if (language === 'kk') {
-      activeAnnouncementKeyRef.current = announcementKey
       const voiceSettings = voiceSettingsService.getSettings()
       const files = buildKazakhCallAudioSequence(ticket, room, voiceSettings)
 
@@ -396,12 +533,6 @@ export function CallBoard({
     }
 
     if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
-      if (activeAnnouncementKeyRef.current === announcementKey && window.speechSynthesis.speaking) {
-        return
-      }
-
-      activeAnnouncementKeyRef.current = announcementKey
-
       const voices = await waitForSpeechVoices()
 
       if (activeAnnouncementKeyRef.current !== announcementKey) {
@@ -465,7 +596,7 @@ export function CallBoard({
       return
     }
 
-    if (!voiceEnabled || callsWithCalledAt.length === 0) {
+    if (callsWithCalledAt.length === 0) {
       return
     }
 
@@ -486,39 +617,111 @@ export function CallBoard({
         knownCallKeysRef.current.add(announcementKey)
         enqueueAnnouncement({
           key: announcementKey,
+          mode: voiceEnabled ? 'voice' : 'notification',
           room: getTicketRoom(ticket, rooms),
           ticket,
         })
       })
   }, [currentCalls, dataReady, rooms, voiceEnabled])
 
-  if (template === 'minimal') {
+  const currentCallPlaceValue = currentCall ? getRoomDisplayValue(currentCallRoom) : ''
+  const currentCallPlaceLabel = currentCall ? getRoomPlaceLabel(currentCallRoom) : ''
+  const currentCallHighlightClass = currentCall && highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''
+  const cardCalls = currentCall
+    ? [
+      currentCall,
+      ...(showRecentCalls ? historyCalls.slice(0, Math.max(recentCallsLimit - 1, 0)) : []),
+    ]
+    : visibleCalls
+
+  if (template === 'video_queue') {
     return (
-      <div className={showRecentCalls ? 'tv-minimal-stack' : 'tv-layout tv-layout-minimal'}>
-        <div className="tv-layout tv-layout-minimal">
+      <div className="tv-video-layout">
+        <section
+          className={`tv-video-current ${currentCallHighlightClass}`}
+        >
           {currentCall ? (
-            <article
-              className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
-            >
-              <strong>{currentCall.number}</strong>
-              <span>{currentCallRoomName}</span>
-              {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
-            </article>
+            <>
+              <div className="tv-route-call">
+                <strong>{currentCall.number}</strong>
+                <span aria-hidden="true">→</span>
+                <strong>{currentCallPlaceValue}</strong>
+              </div>
+              <div className="tv-route-place-label">{currentCallPlaceLabel}</div>
+            </>
           ) : (
             <div className="tv-empty-call">
               <BoardMultilingualLabel labelKey="waiting" />
             </div>
           )}
-        </div>
+        </section>
+
+        <section className="tv-video-history">
+          <span className="tv-video-section-title">Последние вызовы</span>
+          <HistoryCallsTable
+            highlightedCallKey={highlightedCallKey}
+            labels={labels}
+            recentCalls={historyCalls}
+            rooms={rooms}
+          />
+        </section>
+
+        <PromoMediaPanel media={promoMedia} />
+      </div>
+    )
+  }
+
+  if (template === 'big_board') {
+    return (
+      <div className="tv-big-board">
+        <section
+          className={`tv-big-current ${currentCallHighlightClass}`}
+        >
+          {currentCall ? (
+            <>
+              <div className="tv-big-route">
+                <strong>{currentCall.number}</strong>
+                <span aria-hidden="true">→</span>
+                <strong>{currentCallPlaceValue}</strong>
+              </div>
+              <div className="tv-big-place">{currentCallPlaceLabel}</div>
+            </>
+          ) : (
+            <div className="tv-empty-call">
+              <BoardMultilingualLabel labelKey="waiting" />
+            </div>
+          )}
+        </section>
+
         {showRecentCalls ? (
-            <RecentCallsPanel
+          <section className="tv-big-history">
+            <HistoryCallsTable
               highlightedCallKey={highlightedCallKey}
               labels={labels}
-              recentCalls={historyCalls}
+              recentCalls={historyCalls.slice(0, 5)}
               rooms={rooms}
-              showTime={showTime}
             />
+          </section>
         ) : null}
+      </div>
+    )
+  }
+
+  if (template === 'minimal') {
+    return (
+      <div className="tv-layout tv-layout-minimal">
+        {currentCall ? (
+          <article
+            className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
+          >
+            <strong>{currentCall.number}</strong>
+            <span>{currentCallRoomName}</span>
+          </article>
+        ) : (
+          <div className="tv-empty-call">
+            <BoardMultilingualLabel labelKey="waiting" />
+          </div>
+        )}
       </div>
     )
   }
@@ -533,7 +736,26 @@ export function CallBoard({
           >
             <strong>{ticket.number}</strong>
             <span>{getRoomName(ticket, rooms)}</span>
-            {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
+          </article>
+        )) : (
+          <div className="tv-empty-call">
+            <BoardMultilingualLabel labelKey="waiting" />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (template === 'cards') {
+    return (
+      <div className="tv-layout tv-layout-cards">
+        {cardCalls.length > 0 ? cardCalls.map((ticket, index) => (
+          <article
+            className={`tv-call-card ${index === 0 ? 'tv-call-featured' : ''} ${highlightedCallKey === getCallKey(ticket) ? 'tv-call-animated' : ''}`}
+            key={ticket.id}
+          >
+            <strong>{ticket.number}</strong>
+            <span>{getRoomName(ticket, rooms)}</span>
           </article>
         )) : (
           <div className="tv-empty-call">
@@ -554,7 +776,6 @@ export function CallBoard({
           >
             <strong>{ticket.number}</strong>
             <span>{getRoomName(ticket, rooms)}</span>
-            {showTime ? <time>{formatTime(getCallTime(ticket))}</time> : null}
             {ticket.status === 'no_show' ? <em>{labels.noShow}</em> : null}
           </div>
         )) : (
@@ -571,10 +792,8 @@ export function CallBoard({
       {showRecentCalls ? (
         <RecentCallsPanel
           highlightedCallKey={highlightedCallKey}
-          labels={labels}
           recentCalls={historyCalls}
           rooms={rooms}
-          showTime={showTime}
         />
       ) : null}
 
@@ -583,18 +802,14 @@ export function CallBoard({
           <span className="tv-section-label">
             <BoardMultilingualLabel labelKey="currentCall" />
           </span>
-          {showTime && currentTime ? <time>{currentTime}</time> : null}
         </div>
         {currentCall ? (
-          <>
-            <article
-              className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
-            >
-              <strong>{currentCall.number}</strong>
-              <span>{currentCallRoomName}</span>
-              {showTime ? <time>{formatTime(getCallTime(currentCall))}</time> : null}
-            </article>
-          </>
+          <article
+            className={`tv-call-card tv-call-featured ${highlightedCallKey === currentCallKey ? 'tv-call-animated' : ''}`}
+          >
+            <strong>{currentCall.number}</strong>
+            <span>{currentCallRoomName}</span>
+          </article>
         ) : (
           <div className="tv-empty-call">
             <BoardMultilingualLabel labelKey="waiting" />

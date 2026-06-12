@@ -1,6 +1,27 @@
-import { useEffect, useState } from 'react'
-import { Monitor, Copy, Check, ExternalLink, Plus, Trash2, Edit3, Save, X } from 'lucide-react'
+import { useEffect, useState, type ChangeEvent } from 'react'
+import {
+  Monitor,
+  Copy,
+  Check,
+  ExternalLink,
+  Plus,
+  Trash2,
+  Edit3,
+  Save,
+  X,
+  Image as ImageIcon,
+  Upload,
+  Video,
+} from 'lucide-react'
 import { adminService } from '@services/adminService'
+import {
+  boardPromoMediaService,
+  type BoardPromoMedia,
+} from '@services/boardPromoMediaService'
+import {
+  boardTemplateOptions,
+  defaultBoardTemplate,
+} from '@services/boardTemplateService'
 import {
   getVoiceActionLabel,
   getVoiceAudienceLabel,
@@ -27,16 +48,40 @@ const defaultBoardSettings: BoardSettings = {
   voiceEnabled: true,
 }
 
-const boardTemplates: Array<{
-  description: string
-  label: string
-  value: BoardTemplate
-}> = [
-  { description: 'Крупный текущий талон и последние вызовы', label: 'Классический', value: 'classic' },
-  { description: 'Несколько крупных карточек вызовов', label: 'Сетка', value: 'grid' },
-  { description: 'Компактный список время, талон, место', label: 'Список', value: 'list' },
-  { description: 'Только текущий талон и место', label: 'Минималистичный', value: 'minimal' },
-]
+function getEditableMediaUrl(url?: string, name?: string): string {
+  return name === 'URL' ? url ?? '' : ''
+}
+
+function BoardTemplateSelector({
+  onSelect,
+  selectedTemplate,
+}: {
+  onSelect: (template: BoardTemplate) => void
+  selectedTemplate: BoardTemplate
+}) {
+  return (
+    <div className="board-template-grid">
+      {boardTemplateOptions.map((template) => (
+        <button
+          className={selectedTemplate === template.value
+            ? 'board-template-card active'
+            : 'board-template-card'}
+          key={template.value}
+          onClick={() => onSelect(template.value)}
+          type="button"
+        >
+          <span className={`board-template-preview ${template.value}`} aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <strong>{template.label}</strong>
+          <small>{template.description}</small>
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export function BoardSettingsSection() {
   const t = useLocale()
@@ -49,6 +94,11 @@ export function BoardSettingsSection() {
   const [draftProfile, setDraftProfile] = useState<BoardSettingsProfile | null>(null)
   const [newScreenName, setNewScreenName] = useState('')
   const [newScreenRooms, setNewScreenRooms] = useState<string[]>([])
+  const [newScreenTemplate, setNewScreenTemplate] = useState<BoardTemplate>(defaultBoardTemplate)
+  const [promoMedia, setPromoMedia] = useState<BoardPromoMedia>({})
+  const [promoVideoUrl, setPromoVideoUrl] = useState('')
+  const [promoImageUrl, setPromoImageUrl] = useState('')
+  const [promoMediaError, setPromoMediaError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -63,6 +113,23 @@ export function BoardSettingsSection() {
       .catch((loadError) => setError(getAdminErrorMessage(loadError, 'Не удалось загрузить настройки табло')))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!draftProfile) {
+      setPromoMedia({})
+      setPromoVideoUrl('')
+      setPromoImageUrl('')
+      setPromoMediaError(null)
+      return
+    }
+
+    const nextPromoMedia = boardPromoMediaService.getMedia(draftProfile.id)
+
+    setPromoMedia(nextPromoMedia)
+    setPromoVideoUrl(getEditableMediaUrl(nextPromoMedia.videoUrl, nextPromoMedia.videoName))
+    setPromoImageUrl(getEditableMediaUrl(nextPromoMedia.imageUrl, nextPromoMedia.imageName))
+    setPromoMediaError(null)
+  }, [draftProfile?.id])
 
   function toggleRoom(name: string) {
     setNewScreenRooms((current) =>
@@ -218,13 +285,32 @@ export function BoardSettingsSection() {
       .filter((room) => newScreenRooms.includes(getRoomName(room)))
       .map(getRoomBoardId)
       .filter(Boolean)
+    const screenId = String(Date.now())
+    const screenProfileId = `screen-${screenId}`
+    const screenBoardType = roomIds.length === 1 ? 'individual' : 'general'
     const newScreens = [
       ...boardSettings.screens,
-      { id: String(Date.now()), name: newScreenName.trim(), roomIds, roomNames: newScreenRooms },
+      { id: screenId, name: newScreenName.trim(), roomIds, roomNames: newScreenRooms },
     ]
-    await updateBoardSettings({ screens: newScreens })
+    const newProfile: BoardSettingsProfile = {
+      boardType: screenBoardType,
+      id: screenProfileId,
+      name: newScreenName.trim(),
+      recentCallsLimit: boardSettings.recentCallsLimit,
+      roomBoardId: screenBoardType === 'individual' ? roomIds[0] : '',
+      showRecentCalls: boardSettings.showRecentCalls,
+      showTime: boardSettings.showTime,
+      template: newScreenTemplate,
+      voiceEnabled: boardSettings.voiceEnabled,
+    }
+
+    await updateBoardSettings({
+      profiles: [...(boardSettings.profiles ?? []), newProfile],
+      screens: newScreens,
+    })
     setNewScreenName('')
     setNewScreenRooms([])
+    setNewScreenTemplate(defaultBoardTemplate)
   }
 
   async function deleteScreen(id: string) {
@@ -235,6 +321,98 @@ export function BoardSettingsSection() {
 
   function updateVoiceSettings(nextSettings: Partial<VoiceSettings>) {
     setVoiceSettings((current) => voiceSettingsService.saveSettings({ ...current, ...nextSettings }))
+  }
+
+  function getPromoMediaErrorMessage(promoError: unknown): string {
+    return promoError instanceof Error
+      ? promoError.message
+      : 'Не удалось сохранить промо-медиа'
+  }
+
+  function savePromoImageUrl() {
+    if (!draftProfile) return
+
+    try {
+      const nextPromoMedia = boardPromoMediaService.saveImageUrl(draftProfile.id, promoImageUrl)
+
+      setPromoMedia(nextPromoMedia)
+      setPromoImageUrl(nextPromoMedia.imageUrl ?? '')
+      setPromoMediaError(null)
+    } catch (promoError) {
+      setPromoMediaError(getPromoMediaErrorMessage(promoError))
+    }
+  }
+
+  function savePromoVideoUrl() {
+    if (!draftProfile) return
+
+    try {
+      const nextPromoMedia = boardPromoMediaService.saveVideoUrl(draftProfile.id, promoVideoUrl)
+
+      setPromoMedia(nextPromoMedia)
+      setPromoVideoUrl(getEditableMediaUrl(nextPromoMedia.videoUrl, nextPromoMedia.videoName))
+      setPromoMediaError(null)
+    } catch (promoError) {
+      setPromoMediaError(getPromoMediaErrorMessage(promoError))
+    }
+  }
+
+  async function uploadPromoImage(event: ChangeEvent<HTMLInputElement>) {
+    if (!draftProfile) return
+
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) return
+
+    try {
+      const nextPromoMedia = await boardPromoMediaService.uploadImageFile(draftProfile.id, file)
+
+      setPromoMedia(nextPromoMedia)
+      setPromoImageUrl(getEditableMediaUrl(nextPromoMedia.imageUrl, nextPromoMedia.imageName))
+      setPromoMediaError(null)
+    } catch (promoError) {
+      setPromoMediaError(getPromoMediaErrorMessage(promoError))
+    }
+  }
+
+  async function uploadPromoVideo(event: ChangeEvent<HTMLInputElement>) {
+    if (!draftProfile) return
+
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) return
+
+    try {
+      const nextPromoMedia = await boardPromoMediaService.uploadVideoFile(draftProfile.id, file)
+
+      setPromoMedia(nextPromoMedia)
+      setPromoVideoUrl(getEditableMediaUrl(nextPromoMedia.videoUrl, nextPromoMedia.videoName))
+      setPromoMediaError(null)
+    } catch (promoError) {
+      setPromoMediaError(getPromoMediaErrorMessage(promoError))
+    }
+  }
+
+  function removePromoImage() {
+    if (!draftProfile) return
+
+    const nextPromoMedia = boardPromoMediaService.removeImage(draftProfile.id)
+
+    setPromoMedia(nextPromoMedia)
+    setPromoImageUrl('')
+    setPromoMediaError(null)
+  }
+
+  function removePromoVideo() {
+    if (!draftProfile) return
+
+    const nextPromoMedia = boardPromoMediaService.removeVideo(draftProfile.id)
+
+    setPromoMedia(nextPromoMedia)
+    setPromoVideoUrl('')
+    setPromoMediaError(null)
   }
 
   const activeRooms = rooms.filter(getRoomActive)
@@ -493,27 +671,104 @@ export function BoardSettingsSection() {
 
             <fieldset className="admin-checkbox-group">
               <legend>Вид табло</legend>
-              <div className="board-template-grid">
-                {boardTemplates.map((template) => (
-                  <button
-                    className={draftProfile.template === template.value
-                      ? 'board-template-card active'
-                      : 'board-template-card'}
-                    key={template.value}
-                    onClick={() => updateDraftProfile({ template: template.value })}
-                    type="button"
-                  >
-                    <span className={`board-template-preview ${template.value}`} aria-hidden="true">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                    <strong>{template.label}</strong>
-                    <small>{template.description}</small>
-                  </button>
-                ))}
-              </div>
+              <BoardTemplateSelector
+                onSelect={(template) => updateDraftProfile({ template })}
+                selectedTemplate={draftProfile.template}
+              />
             </fieldset>
+
+            {draftProfile.template === 'video_queue' ? (
+              <fieldset className="admin-checkbox-group promo-media-settings">
+                <legend>Промо-видео</legend>
+
+                {promoMediaError ? <div className="modal-error">{promoMediaError}</div> : null}
+
+                <label className="field">
+                  <span>URL на видео</span>
+                  <input
+                    onChange={(event) => setPromoVideoUrl(event.target.value)}
+                    placeholder="https://example.com/promo.mp4"
+                    value={promoVideoUrl}
+                  />
+                </label>
+
+                <div className="button-row">
+                  <Button
+                    icon={<Video size={14} />}
+                    onClick={savePromoVideoUrl}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Сохранить URL
+                  </Button>
+                  <label className="button button-secondary button-sm promo-upload-button">
+                    <span className="button-icon"><Upload size={14} /></span>
+                    <span>Загрузить mp4</span>
+                    <input
+                      accept="video/mp4"
+                      onChange={(event) => void uploadPromoVideo(event)}
+                      type="file"
+                    />
+                  </label>
+                  <Button
+                    disabled={!promoMedia.videoUrl}
+                    icon={<Trash2 size={14} />}
+                    onClick={removePromoVideo}
+                    size="sm"
+                    variant="danger"
+                  >
+                    Удалить видео
+                  </Button>
+                </div>
+
+                {promoMedia.videoUrl ? (
+                  <div className="promo-media-preview">
+                    <video controls muted src={promoMedia.videoUrl} />
+                    <small>{promoMedia.videoName ?? 'Промо-видео'}</small>
+                  </div>
+                ) : (
+                  <div className="promo-media-empty">Видео не задано</div>
+                )}
+
+                <label className="field">
+                  <span>Промо-изображение fallback</span>
+                  <input
+                    onChange={(event) => setPromoImageUrl(event.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    value={promoImageUrl}
+                  />
+                </label>
+
+                <div className="button-row">
+                  <Button
+                    icon={<ImageIcon size={14} />}
+                    onClick={savePromoImageUrl}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Сохранить изображение
+                  </Button>
+                  <label className="button button-secondary button-sm promo-upload-button">
+                    <span className="button-icon"><Upload size={14} /></span>
+                    <span>Загрузить изображение</span>
+                    <input
+                      accept="image/*"
+                      onChange={(event) => void uploadPromoImage(event)}
+                      type="file"
+                    />
+                  </label>
+                  <Button
+                    disabled={!promoMedia.imageUrl}
+                    icon={<Trash2 size={14} />}
+                    onClick={removePromoImage}
+                    size="sm"
+                    variant="danger"
+                  >
+                    Удалить изображение
+                  </Button>
+                </div>
+              </fieldset>
+            ) : null}
 
             <label className="admin-toggle-row">
               <input
@@ -546,15 +801,6 @@ export function BoardSettingsSection() {
                 <option value={10}>10</option>
                 <option value={15}>15</option>
               </select>
-            </label>
-
-            <label className="admin-toggle-row">
-              <input
-                checked={draftProfile.showTime}
-                onChange={(event) => updateDraftProfile({ showTime: event.target.checked })}
-                type="checkbox"
-              />
-              <span>Показывать время</span>
             </label>
 
             <div className="modal-actions">
@@ -610,6 +856,14 @@ export function BoardSettingsSection() {
                   </label>
                 )
               })}
+            </fieldset>
+
+            <fieldset className="admin-checkbox-group">
+              <legend>Вид табло</legend>
+              <BoardTemplateSelector
+                onSelect={setNewScreenTemplate}
+                selectedTemplate={newScreenTemplate}
+              />
             </fieldset>
 
             <div className="modal-actions">

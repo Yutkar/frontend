@@ -187,7 +187,7 @@ export type AdminTerminalInput = {
   serviceTypeIds?: Array<string | number>
 }
 
-export type BoardTemplate = 'classic' | 'grid' | 'list' | 'minimal'
+export type BoardTemplate = 'classic' | 'grid' | 'list' | 'minimal' | 'cards' | 'video_queue' | 'big_board'
 
 export type BoardScreen = {
   id: string

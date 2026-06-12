@@ -13,6 +13,7 @@ import {
 import { refreshOperationalData, withOperationalRefresh } from './syncService'
 import { notifyServiceTypesChanged } from './serviceTypeSync'
 import type { User } from '@shared/types'
+import type { BoardTemplate } from './api'
 
 export type AdminRoomPayload = {
   active?: boolean
@@ -92,6 +93,17 @@ function normalizeIdList(values?: Array<string | number>): Array<string | number
   return (values ?? []).map(normalizeId)
 }
 
+function normalizeBoardTemplate(template?: BoardTemplate): BoardTemplate {
+  return template === 'grid'
+    || template === 'list'
+    || template === 'minimal'
+    || template === 'cards'
+    || template === 'video_queue'
+    || template === 'big_board'
+    ? template
+    : defaultBoardSettings.template
+}
+
 function normalizeTerminal(record: AdminTerminalRecord | AdminTerminalInput & { id?: string | number }): AdminTerminalRecord {
   return {
     active: record.active ?? true,
@@ -115,9 +127,7 @@ function normalizeBoardSettings(settings: Partial<AdminBoardSettings> = {}): Adm
   const recentCallsLimit = settings.recentCallsLimit === 5 || settings.recentCallsLimit === 15
     ? settings.recentCallsLimit
     : defaultBoardSettings.recentCallsLimit
-  const template = settings.template === 'grid' || settings.template === 'list' || settings.template === 'minimal'
-    ? settings.template
-    : defaultBoardSettings.template
+  const template = normalizeBoardTemplate(settings.template)
 
   const profiles = (settings.profiles ?? [])
     .map((profile) => normalizeBoardSettings({

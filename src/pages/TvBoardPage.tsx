@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CallBoard } from '@features/tv-board/CallBoard'
 import { adminService } from '@services/adminService'
+import { boardPromoMediaService, type BoardPromoMedia } from '@services/boardPromoMediaService'
 import { queueService } from '@services/queueService'
 import type { BoardSettings } from '@services/api'
 import { useLocale } from '@shared/locales/useLocale'
@@ -19,7 +20,21 @@ const defaultBoardSettings: BoardSettings = {
   voiceEnabled: true,
 }
 
-function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, profileId?: string): BoardSettings {
+type RouteBoardSettings = BoardSettings & {
+  resolvedProfileId: string
+}
+
+function getFallbackProfileId(settings: BoardSettings, roomId?: string): string {
+  if (roomId) {
+    return settings.profiles?.find((item) => (
+      item.boardType === 'individual' && String(item.roomBoardId ?? '') === String(roomId)
+    ))?.id ?? `room-${roomId}`
+  }
+
+  return settings.profiles?.find((item) => item.boardType === 'general')?.id ?? 'general'
+}
+
+function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, profileId?: string): RouteBoardSettings {
   const profileById = profileId
     ? settings.profiles?.find((item) => String(item.id) === String(profileId))
     : undefined
@@ -30,19 +45,21 @@ function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, prof
     : settings.profiles?.find((item) => item.boardType === 'general'))
 
   if (!profile) {
+    const resolvedProfileId = getFallbackProfileId(settings, roomId)
+
     if (
       roomId &&
       settings.boardType === 'individual' &&
       String(settings.roomBoardId ?? '') === String(roomId)
     ) {
-      return settings
+      return { ...settings, resolvedProfileId }
     }
 
     if (!roomId && settings.boardType === 'general') {
-      return settings
+      return { ...settings, resolvedProfileId }
     }
 
-    return defaultBoardSettings
+    return { ...defaultBoardSettings, resolvedProfileId }
   }
 
   return {
@@ -54,6 +71,7 @@ function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, prof
     showTime: profile.showTime,
     template: profile.template,
     voiceEnabled: profile.voiceEnabled,
+    resolvedProfileId: profile.id,
   }
 }
 
@@ -71,13 +89,8 @@ export function TvBoardPage() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [roomName, setRoomName] = useState<string>('')
-  const [now, setNow] = useState(new Date())
   const [boardDataReady, setBoardDataReady] = useState(false)
-
-  useEffect(() => {
-    const clockInterval = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(clockInterval)
-  }, [])
+  const [promoMedia, setPromoMedia] = useState<BoardPromoMedia>({})
 
   useEffect(() => {
     let active = true
@@ -147,17 +160,23 @@ export function TvBoardPage() {
     }
   }, [roomId, t.board.waiting])
 
-  const currentTime = new Intl.DateTimeFormat('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(now)
   const routeBoardSettings = getBoardSettingsForRoute(boardSettings, roomId, profileId)
   const boardRoom = roomId
     ? rooms.find((room) => getRoomBoardId(room) === roomId || String(room.id) === roomId) ?? rooms[0]
     : undefined
   const roomClosed = Boolean(roomId) && isRoomClosed(boardRoom)
   const roomHeaderName = roomClosed && roomName && tickets.length > 0 ? `${roomName} — закрыт` : roomName
+
+  useEffect(() => {
+    const loadPromoMedia = () => {
+      setPromoMedia(boardPromoMediaService.getMedia(routeBoardSettings.resolvedProfileId))
+    }
+    loadPromoMedia()
+
+    const interval = window.setInterval(loadPromoMedia, 5_000)
+
+    return () => window.clearInterval(interval)
+  }, [routeBoardSettings.resolvedProfileId])
 
   return (
     <main className="tv-board">
@@ -177,12 +196,11 @@ export function TvBoardPage() {
         </section>
       ) : (
         <CallBoard
-          currentTime={currentTime}
           dataReady={boardDataReady}
+          promoMedia={promoMedia}
           recentCallsLimit={routeBoardSettings.recentCallsLimit}
           rooms={rooms}
           showRecentCalls={routeBoardSettings.showRecentCalls}
-          showTime={routeBoardSettings.showTime}
           template={routeBoardSettings.template}
           tickets={tickets}
           voiceEnabled={routeBoardSettings.voiceEnabled}

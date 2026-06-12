@@ -14,7 +14,7 @@ export function Board() {
     <main className="board-shell">
       <header>
         <span>SmartQ Табло</span>
-        <time>Будущие вызовы пациентов</time>
+        <span className="board-header-note">Будущие вызовы пациентов</span>
       </header>
 
       <BoardQueue tickets={tickets} />

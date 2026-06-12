@@ -428,7 +428,14 @@ function toTerminalPayload(input: AdminTerminalInput | Partial<AdminTerminalInpu
 }
 
 function normalizeBoardTemplate(value: unknown): BoardSettings['template'] {
-  return value === 'grid' || value === 'list' || value === 'minimal' ? value : 'classic'
+  return value === 'grid'
+    || value === 'list'
+    || value === 'minimal'
+    || value === 'cards'
+    || value === 'video_queue'
+    || value === 'big_board'
+    ? value
+    : 'classic'
 }
 
 function normalizeRecentCallsLimit(value: unknown): BoardSettings['recentCallsLimit'] {
