@@ -606,6 +606,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
                     }
                     compact
                     now={now}
+                    room={room}
                     ticket={ticket}
                   />
                 </div>
@@ -648,6 +649,7 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
                   compact
                   key={ticket.id}
                   now={now}
+                  room={room}
                   ticket={ticket}
                 />
               ))}

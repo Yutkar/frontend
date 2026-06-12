@@ -5,6 +5,7 @@ import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { AdminTerminalRecord, TicketSettingsServiceTypeOption } from '@services/api'
 import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import { Button } from '@shared/ui/components'
+import { copyTextToClipboard } from '@shared/utils/clipboard'
 import {
   getAdminErrorMessage,
   getRoomActive,
@@ -237,7 +238,7 @@ export function TerminalsSection() {
   }
 
   async function copyUrl(url: string) {
-    await navigator.clipboard.writeText(url)
+    await copyTextToClipboard(url)
     setCopiedUrl(url)
     window.setTimeout(() => setCopiedUrl(null), 2000)
   }

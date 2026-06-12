@@ -97,10 +97,20 @@ function isTicketCreatedToday(ticket: Ticket, now: number): boolean {
 }
 
 function getTicketServiceOptionLabel(ticket: Ticket, options: TicketSettingsOptions): string {
-  const serviceType = options.serviceTypes.find((item) => (
-    normalizeFilterValue(item.id) === normalizeFilterValue(ticket.serviceTypeId) ||
-    item.code === ticket.serviceType
-  ))
+  const ticketServiceTypeId = normalizeFilterValue(ticket.serviceTypeId)
+  const serviceTypeById = ticketServiceTypeId
+    ? options.serviceTypes.find((item) => normalizeFilterValue(item.id) === ticketServiceTypeId)
+    : undefined
+
+  if (serviceTypeById) {
+    return getServiceOptionLabel(serviceTypeById)
+  }
+
+  if (ticket.serviceTypeName?.trim()) {
+    return ticket.serviceTypeName
+  }
+
+  const serviceType = options.serviceTypes.find((item) => item.code === ticket.serviceType)
 
   return serviceType
     ? getServiceOptionLabel(serviceType)

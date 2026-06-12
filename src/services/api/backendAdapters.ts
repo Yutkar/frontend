@@ -42,6 +42,10 @@ export type BackendServiceType = {
   id: number | string
   code?: string
   name: string
+  nameEn?: string | null
+  nameKk?: string | null
+  name_en?: string | null
+  name_kk?: string | null
   averageDurationMinutes?: number
   priorityWeight?: number
 }
@@ -472,6 +476,14 @@ function getBackendServiceName(ticket: BackendTicket): string {
     ?? ''
 }
 
+function getBackendServiceDisplayName(ticket: BackendTicket): string {
+  return ticket.serviceType?.name?.trim()
+    ?? ticket.service?.name?.trim()
+    ?? ticket.serviceTypeName?.trim()
+    ?? ticket.serviceName?.trim()
+    ?? ''
+}
+
 function getBackendTicketNumber(ticket: BackendTicket): string {
   return ticket.number ?? ticket.ticketNumber ?? `Талон ${toId(ticket.id)}`
 }
@@ -650,6 +662,7 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     patientName: `Пациент ${getBackendTicketNumber(ticket)}`,
     serviceType,
     serviceTypeId: serviceTypeId || undefined,
+    serviceTypeName: getBackendServiceDisplayName(ticket) || undefined,
     priority: toSharedPriority(ticket.priority),
     status: toSharedStatus(ticket.status),
     createdAt: getBackendCreatedAt(ticket),

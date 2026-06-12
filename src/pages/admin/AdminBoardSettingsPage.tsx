@@ -12,6 +12,7 @@ import {
 import type { BoardScreen, BoardSettings, BoardSettingsProfile, BoardTemplate } from '@services/api'
 import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
+import { copyTextToClipboard } from '@shared/utils/clipboard'
 import { getRoomBoardId } from '@shared/utils'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
 
@@ -193,7 +194,7 @@ export function BoardSettingsSection() {
   }
 
   async function copyUrl(url: string) {
-    await navigator.clipboard.writeText(url)
+    await copyTextToClipboard(url)
     setCopied(url)
     setTimeout(() => setCopied(null), 2000)
   }
