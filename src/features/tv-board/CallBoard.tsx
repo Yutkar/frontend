@@ -407,30 +407,26 @@ export function CallBoard({
     return new Promise((resolve) => {
       const audio = new Audio(notificationAudioPath)
       let settled = false
-      let timeoutId = 0
 
-      const finish = (played: boolean, stopAudio = false) => {
+      const finish = (played: boolean) => {
         if (settled) return
 
         settled = true
-        window.clearTimeout(timeoutId)
         audio.onended = null
         audio.onerror = null
-        if (!played || stopAudio) {
-          audio.pause()
-        }
+        audio.onabort = null
         resolve(played)
       }
 
       audio.preload = 'auto'
       audio.onended = () => finish(true)
       audio.onerror = () => finish(false)
-      timeoutId = window.setTimeout(() => finish(true, true), 1_200)
+      audio.onabort = () => finish(false)
       audio.play().catch(() => finish(false))
     })
   }
 
-  async function playNotificationSound() {
+  async function playNotificationSound(): Promise<void> {
     const played = await playNotificationFile()
 
     if (!played) {

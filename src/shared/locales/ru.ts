@@ -408,7 +408,7 @@ export const ru = {
   system: {
     smartq: 'SmartQ',
     controlSystem: 'Система управления',
-    realtimeMonitoring: 'Каркас интерфейса',
+    realtimeMonitoring: 'Мониторинг очереди',
     accessControl: 'Контроль доступа',
     rolePermissionRequired: 'Требуется доступ по роли',
     cannotOpenWorkspace: 'Текущая роль не может открыть этот раздел SmartQ.',

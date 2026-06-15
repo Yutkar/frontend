@@ -6,13 +6,19 @@ import {
   type QueueOverloadRoom,
 } from './api'
 import type { AnalyticsPeriod, AnalyticsPoint, QueueSnapshot } from '@shared/types'
+import { isTicketCreatedToday } from '@shared/utils'
 import { withOperationalRefresh } from './syncService'
 import type { QueueStats, Room, Ticket } from '../types'
 
 export const queueService = {
   async getBoardSnapshot(roomId?: string | number): Promise<QueueSnapshot> {
     try {
-      return await queueApi.getBoardSnapshot(roomId)
+      const snapshot = await queueApi.getBoardSnapshot(roomId)
+
+      return {
+        ...snapshot,
+        tickets: snapshot.tickets.filter((ticket) => isTicketCreatedToday(ticket)),
+      }
     } catch (error) {
       console.error('queueService.getBoardSnapshot failed', error)
       throw toServiceError(error, 'Не удалось получить данные табло')

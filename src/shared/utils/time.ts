@@ -20,6 +20,32 @@ function parseTimestamp(value?: string | null): number | undefined {
   return Number.isFinite(timestamp) ? timestamp : undefined
 }
 
+export function isTicketCreatedToday(
+  ticket: Pick<TicketWaitingSource, 'createdAt' | 'hasActualCreatedAt'>,
+  now: number | Date = Date.now(),
+): boolean {
+  if (ticket.hasActualCreatedAt === false) {
+    return false
+  }
+
+  const createdAt = parseTimestamp(ticket.createdAt)
+
+  if (createdAt === undefined) {
+    return false
+  }
+
+  const createdDate = new Date(createdAt)
+  const currentDate = typeof now === 'number' ? new Date(now) : now
+
+  if (!Number.isFinite(currentDate.getTime())) {
+    return false
+  }
+
+  return createdDate.getFullYear() === currentDate.getFullYear()
+    && createdDate.getMonth() === currentDate.getMonth()
+    && createdDate.getDate() === currentDate.getDate()
+}
+
 export function getWaitingMinutes(
   ticket: TicketWaitingSource,
   now: number | Date = Date.now(),

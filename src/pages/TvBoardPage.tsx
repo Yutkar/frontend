@@ -166,6 +166,7 @@ export function TvBoardPage() {
     : undefined
   const roomClosed = Boolean(roomId) && isRoomClosed(boardRoom)
   const roomHeaderName = roomClosed && roomName && tickets.length > 0 ? `${roomName} — закрыт` : roomName
+  const boardClassName = `tv-board tv-board-${routeBoardSettings.template}`
 
   useEffect(() => {
     const loadPromoMedia = () => {
@@ -179,7 +180,7 @@ export function TvBoardPage() {
   }, [routeBoardSettings.resolvedProfileId])
 
   return (
-    <main className="tv-board">
+    <main className={boardClassName}>
       {roomHeaderName ? (
         <header className="tv-header">
           <strong>{roomHeaderName}</strong>

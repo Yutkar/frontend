@@ -338,7 +338,6 @@ const staticTextTranslations: Record<string, StaticTextTranslation> = {
   'Кабинет готов принять следующий вызов.': { kk: 'Кабинет келесі шақыруды қабылдауға дайын.', en: 'Room is ready for the next call.' },
   'Кабинет закрыт': { kk: 'Кабинет жабық', en: 'Room closed' },
   'Кабинет не назначен': { kk: 'Кабинет тағайындалмаған', en: 'Room is not assigned' },
-  'Каркас интерфейса': { kk: 'Интерфейс қаңқасы', en: 'Interface scaffold' },
   'Киоски не настроены': { kk: 'Киоскілер бапталмаған', en: 'Kiosks are not configured' },
   'Классический': { kk: 'Классикалық', en: 'Classic' },
   'Клинический или операционный контекст': { kk: 'Клиникалық немесе операциялық контекст', en: 'Clinical or operational context' },

@@ -19,6 +19,7 @@ export {
   formatWaitingTime,
   getAverageWaitingMinutes,
   getWaitingMinutes,
+  isTicketCreatedToday,
 } from './time'
 export { useCurrentTime } from './useCurrentTime'
 export {

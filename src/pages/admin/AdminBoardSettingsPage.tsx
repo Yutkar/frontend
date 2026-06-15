@@ -16,6 +16,7 @@ import {
 import { adminService } from '@services/adminService'
 import {
   boardPromoMediaService,
+  getBoardPromoUrlInputValue,
   type BoardPromoMedia,
 } from '@services/boardPromoMediaService'
 import {
@@ -46,10 +47,6 @@ const defaultBoardSettings: BoardSettings = {
   showTime: true,
   template: 'classic',
   voiceEnabled: true,
-}
-
-function getEditableMediaUrl(url?: string, name?: string): string {
-  return name === 'URL' ? url ?? '' : ''
 }
 
 function BoardTemplateSelector({
@@ -99,6 +96,8 @@ export function BoardSettingsSection() {
   const [promoVideoUrl, setPromoVideoUrl] = useState('')
   const [promoImageUrl, setPromoImageUrl] = useState('')
   const [promoMediaError, setPromoMediaError] = useState<string | null>(null)
+  const [videoPreviewFailed, setVideoPreviewFailed] = useState(false)
+  const [imagePreviewFailed, setImagePreviewFailed] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -120,15 +119,19 @@ export function BoardSettingsSection() {
       setPromoVideoUrl('')
       setPromoImageUrl('')
       setPromoMediaError(null)
+      setVideoPreviewFailed(false)
+      setImagePreviewFailed(false)
       return
     }
 
     const nextPromoMedia = boardPromoMediaService.getMedia(draftProfile.id)
 
     setPromoMedia(nextPromoMedia)
-    setPromoVideoUrl(getEditableMediaUrl(nextPromoMedia.videoUrl, nextPromoMedia.videoName))
-    setPromoImageUrl(getEditableMediaUrl(nextPromoMedia.imageUrl, nextPromoMedia.imageName))
+    setPromoVideoUrl(getBoardPromoUrlInputValue(nextPromoMedia.videoUrl))
+    setPromoImageUrl(getBoardPromoUrlInputValue(nextPromoMedia.imageUrl))
     setPromoMediaError(null)
+    setVideoPreviewFailed(false)
+    setImagePreviewFailed(false)
   }, [draftProfile?.id])
 
   function toggleRoom(name: string) {
@@ -255,8 +258,19 @@ export function BoardSettingsSection() {
       template: draftProfile.template,
       voiceEnabled: draftProfile.voiceEnabled,
     })
+    let nextPromoMedia = boardPromoMediaService.getMedia(draftProfile.id)
+    const savedVideoUrl = getBoardPromoUrlInputValue(nextPromoMedia.videoUrl)
+    const savedImageUrl = getBoardPromoUrlInputValue(nextPromoMedia.imageUrl)
+
+    if (promoVideoUrl.trim() !== savedVideoUrl) {
+      nextPromoMedia = boardPromoMediaService.saveVideoUrl(draftProfile.id, promoVideoUrl)
+    }
+    if (promoImageUrl.trim() !== savedImageUrl) {
+      nextPromoMedia = boardPromoMediaService.saveImageUrl(draftProfile.id, promoImageUrl)
+    }
 
     setBoardSettings(savedSettings)
+    setPromoMedia(nextPromoMedia)
     cancelEditProfile()
   }
 
@@ -336,8 +350,9 @@ export function BoardSettingsSection() {
       const nextPromoMedia = boardPromoMediaService.saveImageUrl(draftProfile.id, promoImageUrl)
 
       setPromoMedia(nextPromoMedia)
-      setPromoImageUrl(nextPromoMedia.imageUrl ?? '')
+      setPromoImageUrl(getBoardPromoUrlInputValue(nextPromoMedia.imageUrl))
       setPromoMediaError(null)
+      setImagePreviewFailed(false)
     } catch (promoError) {
       setPromoMediaError(getPromoMediaErrorMessage(promoError))
     }
@@ -350,8 +365,9 @@ export function BoardSettingsSection() {
       const nextPromoMedia = boardPromoMediaService.saveVideoUrl(draftProfile.id, promoVideoUrl)
 
       setPromoMedia(nextPromoMedia)
-      setPromoVideoUrl(getEditableMediaUrl(nextPromoMedia.videoUrl, nextPromoMedia.videoName))
+      setPromoVideoUrl(getBoardPromoUrlInputValue(nextPromoMedia.videoUrl))
       setPromoMediaError(null)
+      setVideoPreviewFailed(false)
     } catch (promoError) {
       setPromoMediaError(getPromoMediaErrorMessage(promoError))
     }
@@ -369,8 +385,9 @@ export function BoardSettingsSection() {
       const nextPromoMedia = await boardPromoMediaService.uploadImageFile(draftProfile.id, file)
 
       setPromoMedia(nextPromoMedia)
-      setPromoImageUrl(getEditableMediaUrl(nextPromoMedia.imageUrl, nextPromoMedia.imageName))
+      setPromoImageUrl(getBoardPromoUrlInputValue(nextPromoMedia.imageUrl))
       setPromoMediaError(null)
+      setImagePreviewFailed(false)
     } catch (promoError) {
       setPromoMediaError(getPromoMediaErrorMessage(promoError))
     }
@@ -388,8 +405,9 @@ export function BoardSettingsSection() {
       const nextPromoMedia = await boardPromoMediaService.uploadVideoFile(draftProfile.id, file)
 
       setPromoMedia(nextPromoMedia)
-      setPromoVideoUrl(getEditableMediaUrl(nextPromoMedia.videoUrl, nextPromoMedia.videoName))
+      setPromoVideoUrl(getBoardPromoUrlInputValue(nextPromoMedia.videoUrl))
       setPromoMediaError(null)
+      setVideoPreviewFailed(false)
     } catch (promoError) {
       setPromoMediaError(getPromoMediaErrorMessage(promoError))
     }
@@ -403,6 +421,7 @@ export function BoardSettingsSection() {
     setPromoMedia(nextPromoMedia)
     setPromoImageUrl('')
     setPromoMediaError(null)
+    setImagePreviewFailed(false)
   }
 
   function removePromoVideo() {
@@ -413,6 +432,7 @@ export function BoardSettingsSection() {
     setPromoMedia(nextPromoMedia)
     setPromoVideoUrl('')
     setPromoMediaError(null)
+    setVideoPreviewFailed(false)
   }
 
   const activeRooms = rooms.filter(getRoomActive)
@@ -721,11 +741,19 @@ export function BoardSettingsSection() {
                   </Button>
                 </div>
 
-                {promoMedia.videoUrl ? (
+                {promoMedia.videoUrl && !videoPreviewFailed ? (
                   <div className="promo-media-preview">
-                    <video controls muted src={promoMedia.videoUrl} />
+                    <video
+                      controls
+                      muted
+                      onError={() => setVideoPreviewFailed(true)}
+                      playsInline
+                      src={promoMedia.videoUrl}
+                    />
                     <small>{promoMedia.videoName ?? 'Промо-видео'}</small>
                   </div>
+                ) : promoMedia.videoUrl ? (
+                  <div className="promo-media-empty">Не удалось загрузить превью видео</div>
                 ) : (
                   <div className="promo-media-empty">Видео не задано</div>
                 )}
@@ -767,6 +795,21 @@ export function BoardSettingsSection() {
                     Удалить изображение
                   </Button>
                 </div>
+
+                {promoMedia.imageUrl && !imagePreviewFailed ? (
+                  <div className="promo-media-preview">
+                    <img
+                      alt="Превью промо-изображения"
+                      onError={() => setImagePreviewFailed(true)}
+                      src={promoMedia.imageUrl}
+                    />
+                    <small>{promoMedia.imageName ?? 'Промо-изображение'}</small>
+                  </div>
+                ) : promoMedia.imageUrl ? (
+                  <div className="promo-media-empty">Не удалось загрузить превью изображения</div>
+                ) : (
+                  <div className="promo-media-empty">Изображение не задано</div>
+                )}
               </fieldset>
             ) : null}
 

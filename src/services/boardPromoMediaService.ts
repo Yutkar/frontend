@@ -11,6 +11,14 @@ const defaultProfileId = 'general'
 
 type PromoMediaStorage = Record<string, BoardPromoMedia>
 
+export function getBoardPromoUrlInputValue(url?: string): string {
+  const normalizedUrl = String(url ?? '').trim()
+
+  return normalizedUrl && !normalizedUrl.toLowerCase().startsWith('data:')
+    ? normalizedUrl
+    : ''
+}
+
 function normalizeProfileId(profileId?: string | null): string {
   const normalizedProfileId = String(profileId ?? '').trim()
 
