@@ -210,27 +210,41 @@ function buildVoicePhrase(
   return `${audienceText} ${ticketNumber}, ${actionText} ${getRussianPlaceTarget(room)}`
 }
 
-function RecentCallsPanel({
+function getClassicHistoryDensityClass(rowCount: number): string {
+  if (rowCount > 20) return 'tv-classic-history-ultra'
+  if (rowCount > 12) return 'tv-classic-history-dense'
+  if (rowCount > 7) return 'tv-classic-history-compact'
+
+  return ''
+}
+
+function ClassicHistoryPanel({
   highlightedCallKey,
+  historyLimit,
   recentCalls,
   rooms,
 }: {
   highlightedCallKey?: string
+  historyLimit: number
   recentCalls: Ticket[]
   rooms: Room[]
 }) {
   return (
-    <section className="tv-recent tv-recent-embedded">
+    <section className={`tv-recent tv-classic-history ${getClassicHistoryDensityClass(historyLimit)}`}>
       {recentCalls.length > 0 ? (
-        recentCalls.map((ticket) => (
-          <div
-            className={`tv-recent-row ${highlightedCallKey === getCallKey(ticket) ? 'tv-call-animated' : ''}`}
-            key={ticket.id}
-          >
-            <strong>{ticket.number}</strong>
-            <span>{getRoomName(ticket, rooms)}</span>
-          </div>
-        ))
+        <table>
+          <tbody>
+            {recentCalls.map((ticket) => (
+              <tr
+                className={highlightedCallKey === getCallKey(ticket) ? 'tv-call-animated' : ''}
+                key={ticket.id}
+              >
+                <td>{ticket.number}</td>
+                <td>{getRoomName(ticket, rooms)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : (
         <div className="tv-empty-recent">
           <BoardMultilingualLabel labelKey="waiting" />
@@ -283,36 +297,43 @@ function HistoryCallsTable({
 }
 
 function PromoMediaPanel({ media }: { media?: BoardPromoMedia }) {
-  const [videoFailed, setVideoFailed] = useState(false)
-  const [imageFailed, setImageFailed] = useState(false)
+  const [failedVideoUrl, setFailedVideoUrl] = useState('')
+  const [failedImageUrl, setFailedImageUrl] = useState('')
+  const videoUrl = media?.videoUrl
+  const imageUrl = media?.imageUrl
 
-  useEffect(() => {
-    setVideoFailed(false)
-    setImageFailed(false)
-  }, [media?.videoUrl, media?.imageUrl])
-
-  if (media?.videoUrl && !videoFailed) {
+  if (videoUrl && failedVideoUrl !== videoUrl) {
     return (
       <section className="tv-promo-panel">
         <video
           autoPlay
           loop
           muted
-          onError={() => setVideoFailed(true)}
+          onError={() => setFailedVideoUrl(videoUrl)}
+          onLoadedData={() => setFailedVideoUrl('')}
           playsInline
-          src={media.videoUrl}
+          src={videoUrl}
         />
       </section>
     )
   }
 
-  if (media?.imageUrl && !imageFailed) {
+  if (videoUrl) {
+    return (
+      <section className="tv-promo-panel tv-promo-empty tv-promo-unavailable" role="status">
+        <strong>Видео недоступно</strong>
+      </section>
+    )
+  }
+
+  if (imageUrl && failedImageUrl !== imageUrl) {
     return (
       <section className="tv-promo-panel">
         <img
           alt=""
-          onError={() => setImageFailed(true)}
-          src={media.imageUrl}
+          onError={() => setFailedImageUrl(imageUrl)}
+          onLoad={() => setFailedImageUrl('')}
+          src={imageUrl}
         />
       </section>
     )
@@ -357,18 +378,16 @@ export function CallBoard({
   const currentCallKey = getCallKey(currentCall)
   const currentCallRoom = currentCall ? getTicketRoom(currentCall, rooms) : undefined
   const currentCallRoomName = currentCall ? formatRoomName(currentCallRoom) : ''
-
-  const recentCalls = tickets
-    .filter(isBoardCallTicket)
-    .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
-    .slice(0, recentCallsLimit)
+  const historyLimit = Math.min(30, Math.max(0, Math.trunc(recentCallsLimit)))
   const historyCalls = currentCall
-    ? tickets
-      .filter((ticket) => isBoardCallTicket(ticket) && getCallKey(ticket) !== currentCallKey)
-      .sort((left, right) => getCallTimestamp(right) - getCallTimestamp(left))
-      .slice(0, recentCallsLimit)
-    : recentCalls
-  const visibleCalls = showRecentCalls ? recentCalls : currentCall ? [currentCall] : []
+    ? currentCalls
+      .filter((ticket) => getCallKey(ticket) !== currentCallKey)
+      .slice(0, historyLimit)
+    : []
+  const historyVisible = showRecentCalls && historyLimit > 0
+  const visibleCalls = currentCall
+    ? [currentCall, ...(historyVisible ? historyCalls : [])]
+    : []
 
   async function playBeep() {
     const AudioContextConstructor = window.AudioContext
@@ -626,13 +645,13 @@ export function CallBoard({
   const cardCalls = currentCall
     ? [
       currentCall,
-      ...(showRecentCalls ? historyCalls.slice(0, Math.max(recentCallsLimit - 1, 0)) : []),
+      ...(historyVisible ? historyCalls : []),
     ]
     : visibleCalls
 
   if (template === 'video_queue') {
     return (
-      <div className="tv-video-layout">
+      <div className={`tv-video-layout ${historyVisible ? '' : 'tv-video-layout-no-history'}`}>
         <section
           className={`tv-video-current ${currentCallHighlightClass}`}
         >
@@ -652,17 +671,22 @@ export function CallBoard({
           )}
         </section>
 
-        <section className="tv-video-history">
-          <span className="tv-video-section-title">Последние вызовы</span>
-          <HistoryCallsTable
-            highlightedCallKey={highlightedCallKey}
-            labels={labels}
-            recentCalls={historyCalls}
-            rooms={rooms}
-          />
-        </section>
+        {historyVisible ? (
+          <section className="tv-video-history">
+            <span className="tv-video-section-title">Последние вызовы</span>
+            <HistoryCallsTable
+              highlightedCallKey={highlightedCallKey}
+              labels={labels}
+              recentCalls={historyCalls}
+              rooms={rooms}
+            />
+          </section>
+        ) : null}
 
-        <PromoMediaPanel media={promoMedia} />
+        <PromoMediaPanel
+          key={`${promoMedia?.videoUrl ?? ''}|${promoMedia?.imageUrl ?? ''}`}
+          media={promoMedia}
+        />
       </div>
     )
   }
@@ -689,12 +713,12 @@ export function CallBoard({
           )}
         </section>
 
-        {showRecentCalls ? (
+        {historyVisible ? (
           <section className="tv-big-history">
             <HistoryCallsTable
               highlightedCallKey={highlightedCallKey}
               labels={labels}
-              recentCalls={historyCalls.slice(0, 5)}
+              recentCalls={historyCalls}
               rooms={rooms}
             />
           </section>
@@ -784,10 +808,11 @@ export function CallBoard({
   }
 
   return (
-    <div className={`tv-grid ${showRecentCalls ? '' : 'tv-grid-single'}`}>
-      {showRecentCalls ? (
-        <RecentCallsPanel
+    <div className={`tv-grid ${historyVisible ? '' : 'tv-grid-single'}`}>
+      {historyVisible ? (
+        <ClassicHistoryPanel
           highlightedCallKey={highlightedCallKey}
+          historyLimit={historyLimit}
           recentCalls={historyCalls}
           rooms={rooms}
         />

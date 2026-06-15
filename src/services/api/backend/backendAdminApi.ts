@@ -439,7 +439,11 @@ function normalizeBoardTemplate(value: unknown): BoardSettings['template'] {
 }
 
 function normalizeRecentCallsLimit(value: unknown): BoardSettings['recentCallsLimit'] {
-  return value === 5 || value === 15 ? value : 10
+  const numericValue = Number(value)
+
+  return Number.isFinite(numericValue)
+    ? Math.min(30, Math.max(0, Math.trunc(numericValue)))
+    : 10
 }
 
 function toBoardSettings(value: unknown): BoardSettings {

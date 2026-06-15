@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CallBoard } from '@features/tv-board/CallBoard'
 import { adminService } from '@services/adminService'
 import { boardPromoMediaService, type BoardPromoMedia } from '@services/boardPromoMediaService'
+import {
+  boardStyleSettingsService,
+  defaultBoardStyleSettings,
+  getBoardFontStack,
+  type BoardStyleSettings,
+} from '@services/boardStyleSettingsService'
 import { queueService } from '@services/queueService'
 import type { BoardSettings } from '@services/api'
 import { useLocale } from '@shared/locales/useLocale'
@@ -91,6 +97,7 @@ export function TvBoardPage() {
   const [roomName, setRoomName] = useState<string>('')
   const [boardDataReady, setBoardDataReady] = useState(false)
   const [promoMedia, setPromoMedia] = useState<BoardPromoMedia>({})
+  const [boardStyleSettings, setBoardStyleSettings] = useState<BoardStyleSettings>(defaultBoardStyleSettings)
 
   useEffect(() => {
     let active = true
@@ -169,18 +176,31 @@ export function TvBoardPage() {
   const boardClassName = `tv-board tv-board-${routeBoardSettings.template}`
 
   useEffect(() => {
-    const loadPromoMedia = () => {
+    const loadLocalBoardSettings = () => {
       setPromoMedia(boardPromoMediaService.getMedia(routeBoardSettings.resolvedProfileId))
+      setBoardStyleSettings(boardStyleSettingsService.getSettings(routeBoardSettings.resolvedProfileId))
     }
-    loadPromoMedia()
+    loadLocalBoardSettings()
 
-    const interval = window.setInterval(loadPromoMedia, 5_000)
+    const interval = window.setInterval(loadLocalBoardSettings, 5_000)
 
     return () => window.clearInterval(interval)
   }, [routeBoardSettings.resolvedProfileId])
 
+  const boardStyle = {
+    '--board-accent-color': boardStyleSettings.accentColor,
+    '--board-background': boardStyleSettings.boardBackground,
+    '--board-border-color': boardStyleSettings.borderColor,
+    '--board-current-background': boardStyleSettings.currentCallBackground,
+    '--board-current-text': boardStyleSettings.currentCallText,
+    '--board-history-background': boardStyleSettings.historyBackground,
+    '--board-history-text': boardStyleSettings.historyText,
+    background: boardStyleSettings.boardBackground,
+    fontFamily: getBoardFontStack(boardStyleSettings.fontFamily),
+  } as CSSProperties
+
   return (
-    <main className={boardClassName}>
+    <main className={boardClassName} style={boardStyle}>
       {roomHeaderName ? (
         <header className="tv-header">
           <strong>{roomHeaderName}</strong>

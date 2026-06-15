@@ -17,8 +17,16 @@ import { adminService } from '@services/adminService'
 import {
   boardPromoMediaService,
   getBoardPromoUrlInputValue,
+  validateBoardVideoUrl,
   type BoardPromoMedia,
 } from '@services/boardPromoMediaService'
+import {
+  boardFontOptions,
+  boardStyleSettingsService,
+  defaultBoardStyleSettings,
+  type BoardFontFamily,
+  type BoardStyleSettings,
+} from '@services/boardStyleSettingsService'
 import {
   boardTemplateOptions,
   defaultBoardTemplate,
@@ -48,6 +56,18 @@ const defaultBoardSettings: BoardSettings = {
   template: 'classic',
   voiceEnabled: true,
 }
+
+type BoardColorSettingKey = Exclude<keyof BoardStyleSettings, 'fontFamily'>
+
+const boardColorFields: Array<{ key: BoardColorSettingKey; label: string }> = [
+  { key: 'boardBackground', label: 'Цвет фона табло' },
+  { key: 'currentCallBackground', label: 'Цвет фона текущего вызова' },
+  { key: 'currentCallText', label: 'Цвет текста текущего вызова' },
+  { key: 'historyBackground', label: 'Цвет фона истории' },
+  { key: 'historyText', label: 'Цвет текста истории' },
+  { key: 'borderColor', label: 'Цвет рамок/разделителей' },
+  { key: 'accentColor', label: 'Цвет акцента' },
+]
 
 function BoardTemplateSelector({
   onSelect,
@@ -92,7 +112,10 @@ export function BoardSettingsSection() {
   const [newScreenName, setNewScreenName] = useState('')
   const [newScreenRooms, setNewScreenRooms] = useState<string[]>([])
   const [newScreenTemplate, setNewScreenTemplate] = useState<BoardTemplate>(defaultBoardTemplate)
+  const [newScreenVideoUrl, setNewScreenVideoUrl] = useState('')
+  const [newScreenVideoPreviewFailed, setNewScreenVideoPreviewFailed] = useState(false)
   const [promoMedia, setPromoMedia] = useState<BoardPromoMedia>({})
+  const [boardStyleSettings, setBoardStyleSettings] = useState<BoardStyleSettings>(defaultBoardStyleSettings)
   const [promoVideoUrl, setPromoVideoUrl] = useState('')
   const [promoImageUrl, setPromoImageUrl] = useState('')
   const [promoMediaError, setPromoMediaError] = useState<string | null>(null)
@@ -116,6 +139,7 @@ export function BoardSettingsSection() {
   useEffect(() => {
     if (!draftProfile) {
       setPromoMedia({})
+      setBoardStyleSettings(defaultBoardStyleSettings)
       setPromoVideoUrl('')
       setPromoImageUrl('')
       setPromoMediaError(null)
@@ -127,6 +151,7 @@ export function BoardSettingsSection() {
     const nextPromoMedia = boardPromoMediaService.getMedia(draftProfile.id)
 
     setPromoMedia(nextPromoMedia)
+    setBoardStyleSettings(boardStyleSettingsService.getSettings(draftProfile.id))
     setPromoVideoUrl(getBoardPromoUrlInputValue(nextPromoMedia.videoUrl))
     setPromoImageUrl(getBoardPromoUrlInputValue(nextPromoMedia.imageUrl))
     setPromoMediaError(null)
@@ -215,12 +240,22 @@ export function BoardSettingsSection() {
     setDraftProfile((current: BoardSettingsProfile | null) => current ? { ...current, ...nextProfile } : current)
   }
 
+  function updateBoardStyleSettings(nextSettings: Partial<BoardStyleSettings>) {
+    setBoardStyleSettings((current) => ({ ...current, ...nextSettings }))
+  }
+
   function cancelEditProfile() {
     setDraftProfile(null)
   }
 
   async function saveDraftProfile() {
     if (!draftProfile) return
+
+    const videoUrlValidation = validateBoardVideoUrl(promoVideoUrl)
+
+    if (draftProfile.template === 'video_queue' && !videoUrlValidation.valid) {
+      return
+    }
 
     const profiles = boardSettings.profiles ?? []
     const nextScreens = draftProfile.id.startsWith('screen-')
@@ -271,6 +306,7 @@ export function BoardSettingsSection() {
 
     setBoardSettings(savedSettings)
     setPromoMedia(nextPromoMedia)
+    setBoardStyleSettings(boardStyleSettingsService.saveSettings(draftProfile.id, boardStyleSettings))
     cancelEditProfile()
   }
 
@@ -295,6 +331,13 @@ export function BoardSettingsSection() {
 
   async function addScreen() {
     if (!newScreenName.trim() || newScreenRooms.length === 0) return
+
+    const videoUrlValidation = validateBoardVideoUrl(newScreenVideoUrl)
+
+    if (newScreenTemplate === 'video_queue' && !videoUrlValidation.valid) {
+      return
+    }
+
     const roomIds = activeRooms
       .filter((room) => newScreenRooms.includes(getRoomName(room)))
       .map(getRoomBoardId)
@@ -322,9 +365,14 @@ export function BoardSettingsSection() {
       profiles: [...(boardSettings.profiles ?? []), newProfile],
       screens: newScreens,
     })
+    if (newScreenTemplate === 'video_queue' && videoUrlValidation.normalizedUrl) {
+      boardPromoMediaService.saveVideoUrl(screenProfileId, videoUrlValidation.normalizedUrl)
+    }
     setNewScreenName('')
     setNewScreenRooms([])
     setNewScreenTemplate(defaultBoardTemplate)
+    setNewScreenVideoUrl('')
+    setNewScreenVideoPreviewFailed(false)
   }
 
   async function deleteScreen(id: string) {
@@ -436,6 +484,17 @@ export function BoardSettingsSection() {
   }
 
   const activeRooms = rooms.filter(getRoomActive)
+  const promoVideoUrlValidation = validateBoardVideoUrl(promoVideoUrl)
+  const newScreenVideoUrlValidation = validateBoardVideoUrl(newScreenVideoUrl)
+  const storedVideoUploadUrl = promoMedia.videoUrl && !getBoardPromoUrlInputValue(promoMedia.videoUrl)
+    ? promoMedia.videoUrl
+    : ''
+  const promoVideoPreviewUrl = promoVideoUrlValidation.valid
+    ? promoVideoUrlValidation.normalizedUrl || storedVideoUploadUrl
+    : ''
+  const newScreenVideoPreviewUrl = newScreenVideoUrlValidation.valid
+    ? newScreenVideoUrlValidation.normalizedUrl
+    : ''
   const generalUrl = `${window.location.origin}/board`
   const generalProfile = getBoardProfile('general', 'Общее табло', 'general')
   const roomProfiles = rooms.map((room) => {
@@ -697,6 +756,43 @@ export function BoardSettingsSection() {
               />
             </fieldset>
 
+            <fieldset className="admin-checkbox-group board-style-settings">
+              <legend>Внешний вид табло</legend>
+
+              <label className="field">
+                <span>Шрифт табло</span>
+                <select
+                  onChange={(event) => updateBoardStyleSettings({
+                    fontFamily: event.target.value as BoardFontFamily,
+                  })}
+                  value={boardStyleSettings.fontFamily}
+                >
+                  {boardFontOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="board-color-settings-grid">
+                {boardColorFields.map((field) => (
+                  <label className="board-color-field" key={field.key}>
+                    <span>{field.label}</span>
+                    <div>
+                      <input
+                        aria-label={field.label}
+                        onChange={(event) => updateBoardStyleSettings({
+                          [field.key]: event.target.value,
+                        })}
+                        type="color"
+                        value={boardStyleSettings[field.key]}
+                      />
+                      <code>{boardStyleSettings[field.key]}</code>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             {draftProfile.template === 'video_queue' ? (
               <fieldset className="admin-checkbox-group promo-media-settings">
                 <legend>Промо-видео</legend>
@@ -704,16 +800,27 @@ export function BoardSettingsSection() {
                 {promoMediaError ? <div className="modal-error">{promoMediaError}</div> : null}
 
                 <label className="field">
-                  <span>URL на видео</span>
+                  <span>Ссылка на видео</span>
                   <input
-                    onChange={(event) => setPromoVideoUrl(event.target.value)}
-                    placeholder="https://example.com/promo.mp4"
+                    aria-invalid={!promoVideoUrlValidation.valid}
+                    onChange={(event) => {
+                      setPromoVideoUrl(event.target.value)
+                      setPromoMediaError(null)
+                      setVideoPreviewFailed(false)
+                    }}
+                    placeholder="https://example.com/video.mp4"
+                    type="url"
                     value={promoVideoUrl}
                   />
+                  <small className="field-help">Поддерживаются прямые ссылки на mp4/webm/ogg</small>
+                  {!promoVideoUrlValidation.valid ? (
+                    <small className="field-error">{promoVideoUrlValidation.error}</small>
+                  ) : null}
                 </label>
 
                 <div className="button-row">
                   <Button
+                    disabled={!promoVideoUrlValidation.valid}
                     icon={<Video size={14} />}
                     onClick={savePromoVideoUrl}
                     size="sm"
@@ -731,29 +838,30 @@ export function BoardSettingsSection() {
                     />
                   </label>
                   <Button
-                    disabled={!promoMedia.videoUrl}
-                    icon={<Trash2 size={14} />}
+                    disabled={!promoVideoUrl.trim() && !promoMedia.videoUrl}
+                    icon={<X size={14} />}
                     onClick={removePromoVideo}
                     size="sm"
-                    variant="danger"
+                    variant="secondary"
                   >
-                    Удалить видео
+                    Очистить ссылку
                   </Button>
                 </div>
 
-                {promoMedia.videoUrl && !videoPreviewFailed ? (
+                {promoVideoPreviewUrl && !videoPreviewFailed ? (
                   <div className="promo-media-preview">
                     <video
                       controls
                       muted
                       onError={() => setVideoPreviewFailed(true)}
+                      onLoadedData={() => setVideoPreviewFailed(false)}
                       playsInline
-                      src={promoMedia.videoUrl}
+                      src={promoVideoPreviewUrl}
                     />
                     <small>{promoMedia.videoName ?? 'Промо-видео'}</small>
                   </div>
-                ) : promoMedia.videoUrl ? (
-                  <div className="promo-media-empty">Не удалось загрузить превью видео</div>
+                ) : promoVideoPreviewUrl ? (
+                  <div className="promo-media-empty">Видео не удалось загрузить</div>
                 ) : (
                   <div className="promo-media-empty">Видео не задано</div>
                 )}
@@ -832,18 +940,19 @@ export function BoardSettingsSection() {
             </label>
 
             <label className="field">
-              <span>Количество последних вызовов</span>
-              <select
+              <span>Количество строк истории</span>
+              <input
                 disabled={!draftProfile.showRecentCalls}
                 onChange={(event) => updateDraftProfile({
-                  recentCallsLimit: Number(event.target.value) as BoardSettings['recentCallsLimit'],
+                  recentCallsLimit: Math.min(30, Math.max(0, Number(event.target.value))),
                 })}
+                max={30}
+                min={0}
+                step={1}
+                type="number"
                 value={draftProfile.recentCallsLimit}
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={15}>15</option>
-              </select>
+              />
+              <small className="field-help">От 0 до 30. При значении 0 история скрыта.</small>
             </label>
 
             <div className="modal-actions">
@@ -855,7 +964,11 @@ export function BoardSettingsSection() {
                 Отмена
               </Button>
               <Button
-                disabled={!draftProfile.name.trim() || (draftProfile.boardType === 'individual' && !draftProfile.roomBoardId)}
+                disabled={
+                  !draftProfile.name.trim()
+                  || (draftProfile.boardType === 'individual' && !draftProfile.roomBoardId)
+                  || (draftProfile.template === 'video_queue' && !promoVideoUrlValidation.valid)
+                }
                 icon={<Save size={16} />}
                 onClick={() => void saveDraftProfile()}
                 variant="primary"
@@ -904,14 +1017,78 @@ export function BoardSettingsSection() {
             <fieldset className="admin-checkbox-group">
               <legend>Вид табло</legend>
               <BoardTemplateSelector
-                onSelect={setNewScreenTemplate}
+                onSelect={(template) => {
+                  setNewScreenTemplate(template)
+                  setNewScreenVideoPreviewFailed(false)
+                }}
                 selectedTemplate={newScreenTemplate}
               />
             </fieldset>
 
+            {newScreenTemplate === 'video_queue' ? (
+              <fieldset className="admin-checkbox-group promo-media-settings">
+                <legend>Промо-видео</legend>
+
+                <label className="field">
+                  <span>Ссылка на видео</span>
+                  <input
+                    aria-invalid={!newScreenVideoUrlValidation.valid}
+                    onChange={(event) => {
+                      setNewScreenVideoUrl(event.target.value)
+                      setNewScreenVideoPreviewFailed(false)
+                    }}
+                    placeholder="https://example.com/video.mp4"
+                    type="url"
+                    value={newScreenVideoUrl}
+                  />
+                  <small className="field-help">Поддерживаются прямые ссылки на mp4/webm/ogg</small>
+                  {!newScreenVideoUrlValidation.valid ? (
+                    <small className="field-error">{newScreenVideoUrlValidation.error}</small>
+                  ) : null}
+                </label>
+
+                <div className="button-row">
+                  <Button
+                    disabled={!newScreenVideoUrl}
+                    icon={<X size={14} />}
+                    onClick={() => {
+                      setNewScreenVideoUrl('')
+                      setNewScreenVideoPreviewFailed(false)
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Очистить ссылку
+                  </Button>
+                </div>
+
+                {newScreenVideoPreviewUrl && !newScreenVideoPreviewFailed ? (
+                  <div className="promo-media-preview">
+                    <video
+                      controls
+                      muted
+                      onError={() => setNewScreenVideoPreviewFailed(true)}
+                      onLoadedData={() => setNewScreenVideoPreviewFailed(false)}
+                      playsInline
+                      src={newScreenVideoPreviewUrl}
+                    />
+                    <small>Предпросмотр видео</small>
+                  </div>
+                ) : newScreenVideoPreviewUrl ? (
+                  <div className="promo-media-empty">Видео не удалось загрузить</div>
+                ) : (
+                  <div className="promo-media-empty">Видео не задано</div>
+                )}
+              </fieldset>
+            ) : null}
+
             <div className="modal-actions">
               <Button
-                disabled={!newScreenName.trim() || newScreenRooms.length === 0}
+                disabled={
+                  !newScreenName.trim()
+                  || newScreenRooms.length === 0
+                  || (newScreenTemplate === 'video_queue' && !newScreenVideoUrlValidation.valid)
+                }
                 icon={<Plus size={16} />}
                 onClick={() => void addScreen()}
                 variant="primary"

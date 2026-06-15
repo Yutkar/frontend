@@ -200,7 +200,7 @@ export type BoardSettingsProfile = {
   boardType: 'general' | 'individual'
   id: string
   name: string
-  recentCallsLimit: 5 | 10 | 15
+  recentCallsLimit: number
   roomBoardId?: string
   showRecentCalls: boolean
   showTime: boolean
@@ -211,7 +211,7 @@ export type BoardSettingsProfile = {
 export type BoardSettings = {
   boardType: 'general' | 'individual'
   profiles?: BoardSettingsProfile[]
-  recentCallsLimit: 5 | 10 | 15
+  recentCallsLimit: number
   roomBoardId?: string
   screens: BoardScreen[]
   showRecentCalls: boolean

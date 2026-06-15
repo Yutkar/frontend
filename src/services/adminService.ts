@@ -124,8 +124,9 @@ function writeStoredTerminals(terminals: AdminTerminalRecord[]): AdminTerminalRe
 }
 
 function normalizeBoardSettings(settings: Partial<AdminBoardSettings> = {}): AdminBoardSettings {
-  const recentCallsLimit = settings.recentCallsLimit === 5 || settings.recentCallsLimit === 15
-    ? settings.recentCallsLimit
+  const recentCallsLimitValue = Number(settings.recentCallsLimit)
+  const recentCallsLimit = Number.isFinite(recentCallsLimitValue)
+    ? Math.min(30, Math.max(0, Math.trunc(recentCallsLimitValue)))
     : defaultBoardSettings.recentCallsLimit
   const template = normalizeBoardTemplate(settings.template)
 

@@ -6,8 +6,16 @@ export type BoardPromoMedia = {
   videoUrl?: string
 }
 
+export type BoardVideoUrlValidation = {
+  error?: string
+  normalizedUrl: string
+  valid: boolean
+}
+
 const boardPromoMediaStorageKey = 'smartq_board_promo_media'
 const defaultProfileId = 'general'
+export const invalidBoardVideoUrlMessage = 'Введите корректную ссылку на видео'
+export const directBoardVideoUrlMessage = 'Для табло нужна прямая ссылка на видеофайл mp4/webm/ogg'
 
 type PromoMediaStorage = Record<string, BoardPromoMedia>
 
@@ -17,6 +25,53 @@ export function getBoardPromoUrlInputValue(url?: string): string {
   return normalizedUrl && !normalizedUrl.toLowerCase().startsWith('data:')
     ? normalizedUrl
     : ''
+}
+
+function isYouTubeUrl(url: URL): boolean {
+  const hostname = url.hostname.toLowerCase()
+
+  return hostname === 'youtu.be'
+    || hostname.endsWith('.youtu.be')
+    || hostname === 'youtube.com'
+    || hostname.endsWith('.youtube.com')
+}
+
+export function validateBoardVideoUrl(videoUrl: string): BoardVideoUrlValidation {
+  const normalizedUrl = videoUrl.trim()
+
+  if (!normalizedUrl) {
+    return { normalizedUrl: '', valid: true }
+  }
+
+  let parsedUrl: URL
+
+  try {
+    parsedUrl = new URL(normalizedUrl)
+  } catch {
+    return {
+      error: invalidBoardVideoUrlMessage,
+      normalizedUrl,
+      valid: false,
+    }
+  }
+
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    return {
+      error: invalidBoardVideoUrlMessage,
+      normalizedUrl,
+      valid: false,
+    }
+  }
+
+  if (isYouTubeUrl(parsedUrl) || !/\.(mp4|webm|ogg)$/i.test(parsedUrl.pathname)) {
+    return {
+      error: directBoardVideoUrlMessage,
+      normalizedUrl,
+      valid: false,
+    }
+  }
+
+  return { normalizedUrl, valid: true }
 }
 
 function normalizeProfileId(profileId?: string | null): string {
@@ -138,12 +193,16 @@ export const boardPromoMediaService = {
 
   saveVideoUrl(profileId: string | undefined | null, videoUrl: string): BoardPromoMedia {
     const currentMedia = this.getMedia(profileId)
-    const normalizedVideoUrl = videoUrl.trim()
+    const validation = validateBoardVideoUrl(videoUrl)
+
+    if (!validation.valid) {
+      throw new Error(validation.error)
+    }
 
     return saveMedia(profileId, {
       ...currentMedia,
-      videoName: normalizedVideoUrl ? 'URL' : undefined,
-      videoUrl: normalizedVideoUrl || undefined,
+      videoName: validation.normalizedUrl ? 'URL' : undefined,
+      videoUrl: validation.normalizedUrl || undefined,
     })
   },
 
