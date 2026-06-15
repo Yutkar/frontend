@@ -48,12 +48,13 @@ const statusOrder: Record<TicketStatus, number> = {
   called: 2,
   in_service: 3,
   redirected: 4,
-  completed: 5,
-  cancelled: 6,
-  no_show: 7,
+  postponed: 5,
+  completed: 6,
+  cancelled: 7,
+  no_show: 8,
 }
 
-const closedTicketStatuses: TicketStatus[] = ['completed', 'cancelled', 'no_show']
+const closedTicketStatuses: TicketStatus[] = ['completed', 'cancelled', 'no_show', 'postponed']
 const noShowStatuses: TicketStatus[] = ['waiting', 'called', 'redirected']
 
 type TicketFilterState = {

@@ -1065,6 +1065,11 @@ h3 {
   color: #8a5a00;
 }
 
+.ticket-status-postponed {
+  background: #fff1d6;
+  color: #8a5a00;
+}
+
 .ticket-status-redirected {
   background: #fff1d6;
   color: #8a5a00;

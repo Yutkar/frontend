@@ -8,6 +8,7 @@ const statuses: TicketStatus[] = [
   'in_service',
   'completed',
   'redirected',
+  'postponed',
   'cancelled',
   'no_show',
 ]

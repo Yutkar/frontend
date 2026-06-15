@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { CheckCircle2, FastForward, Play, RotateCcw, Shuffle, UserX, X } from 'lucide-react'
+import { CheckCircle2, FastForward, PauseCircle, Play, RotateCcw, Shuffle, UserX, X } from 'lucide-react'
 import { ticketService } from '@services/ticketService'
 import type { TicketSettingsOptions } from '@services/api'
 import type { RedirectTicketInput, Room, Ticket, TicketPriority } from '@shared/types'
@@ -288,6 +288,7 @@ function RedirectPatientModal({
 export function SpecialistControls({ room }: SpecialistControlsProps) {
   const [returnError, setReturnError] = useState<string | null>(null)
   const [returningTicketId, setReturningTicketId] = useState<string | null>(null)
+  const [postponingTicketId, setPostponingTicketId] = useState<string | null>(null)
   const [redirectTicketItem, setRedirectTicketItem] = useState<Ticket | null>(null)
   const [callingUrgentTicketId, setCallingUrgentTicketId] = useState<string | null>(null)
   const callNextTicket = useQueueStore((state) => state.callNextTicket)
@@ -296,6 +297,8 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
   const loadQueue = useQueueStore((state) => state.loadQueue)
   const loading = useQueueStore((state) => state.loading)
   const noShowTickets = useQueueStore((state) => state.noShowTickets)
+  const postponeTicket = useQueueStore((state) => state.postponeTicket)
+  const postponedTickets = useQueueStore((state) => state.postponedTickets)
   const redirectTicket = useQueueStore((state) => state.redirectTicket)
   const returnTicket = useQueueStore((state) => state.returnTicket)
   const rooms = useQueueStore((state) => state.rooms)
@@ -351,6 +354,19 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           return new Date(rightDate).getTime() - new Date(leftDate).getTime()
         }),
     [noShowTickets, room.id],
+  )
+  const roomPostponedTickets = useMemo(
+    () =>
+      postponedTickets
+        .filter((ticket) => String(ticket.roomId) === String(room.id))
+        .filter((ticket) => ticket.status === 'postponed')
+        .sort((left, right) => {
+          const leftDate = left.updatedAt ?? left.calledAt ?? left.createdAt
+          const rightDate = right.updatedAt ?? right.calledAt ?? right.createdAt
+
+          return new Date(rightDate).getTime() - new Date(leftDate).getTime()
+        }),
+    [postponedTickets, room.id],
   )
   const roomCompletedStats = useMemo(() => {
     const roomCompletedMinutes = tickets
@@ -418,6 +434,20 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
     }
   }
 
+  const handlePostponeTicket = async (ticketId: string) => {
+    setReturnError(null)
+    setPostponingTicketId(ticketId)
+
+    try {
+      await postponeTicket(ticketId)
+    } catch (error) {
+      console.error('Specialist postpone ticket failed', error)
+      setReturnError(t.specialist.postponePatientError)
+    } finally {
+      setPostponingTicketId(null)
+    }
+  }
+
   const handleRedirectTicket = async (input: RedirectTicketInput) => {
     await redirectTicket(input)
     await loadQueue({ force: true, successMessage: 'Пациент перенаправлен' })
@@ -477,6 +507,14 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
                     <Button disabled={loading} icon={<UserX size={17} />} onClick={() => void skipTicket(currentTicket.id)} variant="danger">
                       {t.specialist.noShow}
                     </Button>
+                    <Button
+                      disabled={loading || postponingTicketId === currentTicket.id}
+                      icon={<PauseCircle size={17} />}
+                      onClick={() => void handlePostponeTicket(currentTicket.id)}
+                      variant="secondary"
+                    >
+                      {postponingTicketId === currentTicket.id ? t.specialist.postponingTicket : t.specialist.postponeTicket}
+                    </Button>
                     <Button disabled={loading} icon={<Shuffle size={17} />} onClick={() => openRedirectModal(currentTicket)} variant="secondary">
                       {t.specialist.redirectPatient}
                     </Button>
@@ -486,6 +524,14 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
                   <>
                     <Button disabled={loading} icon={<CheckCircle2 size={17} />} onClick={() => void completeService(currentTicket.id)} variant="primary">
                       {t.specialist.complete}
+                    </Button>
+                    <Button
+                      disabled={loading || postponingTicketId === currentTicket.id}
+                      icon={<PauseCircle size={17} />}
+                      onClick={() => void handlePostponeTicket(currentTicket.id)}
+                      variant="secondary"
+                    >
+                      {postponingTicketId === currentTicket.id ? t.specialist.postponingTicket : t.specialist.postponeTicket}
                     </Button>
                     <Button disabled={loading} icon={<Shuffle size={17} />} onClick={() => openRedirectModal(currentTicket)} variant="secondary">
                       {t.specialist.redirectPatient}
@@ -657,6 +703,46 @@ export function SpecialistControls({ room }: SpecialistControlsProps) {
           ) : (
             <div className="empty-state compact-empty">
               <h2>{t.specialist.noShowListEmpty}</h2>
+            </div>
+          )}
+        </section>
+
+        <section className="specialist-side-section">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">{t.specialist.postponedPatientQueue}</span>
+              <h2>{t.specialist.postponedPatients}</h2>
+            </div>
+            <strong className="waiting-count">{roomPostponedTickets.length}</strong>
+          </div>
+
+          {roomPostponedTickets.length > 0 ? (
+            <div className="specialist-waiting-list">
+              {roomPostponedTickets.map((ticket) => (
+                <TicketCard
+                  actionSlot={
+                    <div className="button-row">
+                      <Button
+                        disabled={loading || returningTicketId === ticket.id}
+                        icon={<RotateCcw size={17} />}
+                        onClick={() => void handleReturnTicket(ticket.id)}
+                        variant="secondary"
+                      >
+                        {t.specialist.returnPatient}
+                      </Button>
+                    </div>
+                  }
+                  compact
+                  key={ticket.id}
+                  now={now}
+                  room={room}
+                  ticket={ticket}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state compact-empty">
+              <h2>{t.specialist.postponedListEmpty}</h2>
             </div>
           )}
         </section>

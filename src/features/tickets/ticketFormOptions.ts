@@ -35,6 +35,7 @@ export const ticketStatuses: TicketStatus[] = [
   'in_service',
   'completed',
   'no_show',
+  'postponed',
   'redirected',
   'cancelled',
 ]

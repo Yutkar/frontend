@@ -20,6 +20,7 @@ const statusTones: Record<TicketStatus, Tone> = {
   created: 'neutral',
   in_service: 'success',
   no_show: 'danger',
+  postponed: 'warning',
   redirected: 'warning',
   waiting: 'neutral',
 }
@@ -39,6 +40,7 @@ export const ticketStatusMeta: Record<TicketStatus, Meta> = {
   created: { label: getLocale().status.created, tone: statusTones.created },
   in_service: { label: getLocale().status.in_service, tone: statusTones.in_service },
   no_show: { label: getLocale().status.no_show, tone: statusTones.no_show },
+  postponed: { label: getLocale().status.postponed, tone: statusTones.postponed },
   redirected: { label: getLocale().status.redirected, tone: statusTones.redirected },
   waiting: { label: getLocale().status.waiting, tone: statusTones.waiting },
 }

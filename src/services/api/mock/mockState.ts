@@ -467,7 +467,7 @@ export function updateSharedTicketStatus(
     ticket.startedAt = now
   }
 
-  if (['cancelled', 'completed', 'no_show'].includes(status)) {
+  if (['cancelled', 'completed', 'no_show', 'postponed'].includes(status)) {
     ticket.completedAt = now
   }
 

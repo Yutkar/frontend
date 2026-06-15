@@ -328,6 +328,10 @@ function isNoShowTicket(ticket: BackendTicket): boolean {
   return status === 'no_show' || status === 'noshow'
 }
 
+function isPostponedTicket(ticket: BackendTicket): boolean {
+  return toSharedStatus(ticket.status) === 'postponed'
+}
+
 function isReturnedToQueue(ticket: BackendTicket): boolean {
   return toSharedStatus(ticket.status) === 'waiting'
 }
@@ -356,6 +360,28 @@ async function getBackendNoShowTicketsForRoom(roomId: string | number): Promise<
   return allTickets
     .filter((ticket) => getBackendTicketRoomId(ticket) === roomIdValue)
     .filter(isNoShowTicket)
+}
+
+async function getBackendPostponedTicketsForRoom(roomId: string | number): Promise<BackendTicket[]> {
+  const roomIdValue = String(roomId)
+
+  try {
+    const response = await apiClient.get<unknown>(
+      `/tickets?roomId=${encodeURIComponent(roomIdValue)}&status=postponed`,
+    )
+
+    return toBackendTickets(response.data)
+      .filter((ticket) => getBackendTicketRoomId(ticket) === roomIdValue)
+      .filter(isPostponedTicket)
+  } catch (error) {
+    console.warn('backendQueueApi: GET /tickets?roomId=:roomId&status=postponed failed, using /tickets fallback', error)
+  }
+
+  const allTickets = await getAllBackendTicketsForRoomFallback()
+
+  return allTickets
+    .filter((ticket) => getBackendTicketRoomId(ticket) === roomIdValue)
+    .filter(isPostponedTicket)
 }
 
 function withImplicitRoomId(ticket: BackendTicket, roomId: string | number): BackendTicket {
@@ -678,6 +704,16 @@ export const backendQueueApi: QueueApi = {
     }))
   },
 
+  async getRoomPostponedTickets(roomId: string | number) {
+    const tickets = await getBackendPostponedTicketsForRoom(roomId)
+
+    return tickets.map((ticket) => ({
+      ...toSharedTicket(ticket),
+      roomId: getBackendTicketRoomId(ticket) || String(roomId),
+      status: 'postponed',
+    }))
+  },
+
   async createTicket(input) {
     await assertRoomAcceptsTickets(input.roomId)
 
@@ -721,6 +757,12 @@ export const backendQueueApi: QueueApi = {
 
   async completeService(ticketId: string) {
     await apiClient.post<BackendTicket>(`/tickets/${ticketId}/complete`)
+
+    return loadQueueSnapshot()
+  },
+
+  async postponeTicket(ticketId: string) {
+    await apiClient.post<BackendTicket>(`/tickets/${ticketId}/postpone`)
 
     return loadQueueSnapshot()
   },

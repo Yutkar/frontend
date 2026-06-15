@@ -23,6 +23,7 @@ type QueueState = {
   lastUpdatedAt?: string
   loading: boolean
   noShowTickets: Ticket[]
+  postponedTickets: Ticket[]
   recommendations: QueueRecommendation[]
   returnedTicketOverrides: Record<string, Ticket>
   rooms: Room[]
@@ -35,6 +36,8 @@ type QueueState = {
   loadQueue: (options?: { force?: boolean; successMessage?: string }) => Promise<void>
   loadRoomQueue: (roomId: string | number) => Promise<void>
   loadRoomNoShowTickets: (roomId: string | number) => Promise<void>
+  loadRoomPostponedTickets: (roomId: string | number) => Promise<void>
+  postponeTicket: (ticketId: string) => Promise<void>
   redirectTicket: (input: RedirectTicketInput) => Promise<void>
   refreshAnalyticsData: () => Promise<void>
   resolveRecommendation: (id: string) => Promise<void>
@@ -84,6 +87,10 @@ function isActiveTicket(ticket: Ticket): boolean {
 
 function isNoShowTicket(ticket: Ticket): boolean {
   return ticket.status === 'no_show'
+}
+
+function isPostponedTicket(ticket: Ticket): boolean {
+  return ticket.status === 'postponed'
 }
 
 function getEventTime(event: QueueEvent): number {
@@ -167,7 +174,7 @@ function applyReturnedOverrides(
 }
 
 function getClosedTickets(tickets: Ticket[]): Ticket[] {
-  return tickets.filter((ticket) => !isActiveTicket(ticket) && !isNoShowTicket(ticket))
+  return tickets.filter((ticket) => !isActiveTicket(ticket) && !isNoShowTicket(ticket) && !isPostponedTicket(ticket))
 }
 
 function createSnapshotUpdate(
@@ -177,11 +184,13 @@ function createSnapshotUpdate(
   const resolved = applyReturnedOverrides(snapshot.tickets, state.returnedTicketOverrides)
   const activeTickets = resolved.tickets.filter(isActiveTicket)
   const noShowTickets = resolved.tickets.filter(isNoShowTicket)
+  const postponedTickets = resolved.tickets.filter(isPostponedTicket)
 
   return {
     ...snapshot,
     activeTickets,
     noShowTickets,
+    postponedTickets,
     events: mergeQueueEvents(snapshot.events, state.events),
     returnedTicketOverrides: resolved.returnedTicketOverrides,
     tickets: resolved.tickets,
@@ -196,13 +205,14 @@ function createRoomActiveUpdate(
   const resolved = applyReturnedOverrides(snapshot.tickets, state.returnedTicketOverrides)
   const nextRoomActiveTickets = resolved.tickets.filter(isActiveTicket)
   const activeTickets = replaceRoomTickets(state.activeTickets, nextRoomActiveTickets, roomId)
-  const tickets = mergeTicketsById(getClosedTickets(state.tickets), activeTickets, state.noShowTickets)
+  const tickets = mergeTicketsById(getClosedTickets(state.tickets), activeTickets, state.noShowTickets, state.postponedTickets)
 
   return {
     ...snapshot,
     activeTickets,
     events: mergeQueueEvents(snapshot.events, state.events),
     noShowTickets: state.noShowTickets,
+    postponedTickets: state.postponedTickets,
     returnedTicketOverrides: resolved.returnedTicketOverrides,
     tickets,
   }
@@ -218,15 +228,17 @@ function createRoomSnapshotUpdate(
   const roomTickets = resolved.tickets.filter((ticket) => String(ticket.roomId) === roomIdValue)
   const activeTickets = replaceRoomTickets(state.activeTickets, roomTickets.filter(isActiveTicket), roomId)
   const noShowTickets = replaceRoomTickets(state.noShowTickets, roomTickets.filter(isNoShowTicket), roomId)
-  const newClosedTickets = roomTickets.filter((ticket) => !isActiveTicket(ticket) && !isNoShowTicket(ticket))
+  const postponedTickets = replaceRoomTickets(state.postponedTickets, roomTickets.filter(isPostponedTicket), roomId)
+  const newClosedTickets = roomTickets.filter((ticket) => !isActiveTicket(ticket) && !isNoShowTicket(ticket) && !isPostponedTicket(ticket))
 
   return {
     ...snapshot,
     activeTickets,
     events: mergeQueueEvents(snapshot.events, state.events),
     noShowTickets,
+    postponedTickets,
     returnedTicketOverrides: resolved.returnedTicketOverrides,
-    tickets: mergeTicketsById(getClosedTickets(state.tickets), newClosedTickets, activeTickets, noShowTickets),
+    tickets: mergeTicketsById(getClosedTickets(state.tickets), newClosedTickets, activeTickets, noShowTickets, postponedTickets),
   }
 }
 
@@ -240,8 +252,19 @@ function createRoomNoShowUpdate(noShowSnapshotTickets: Ticket[], state: QueueSta
   return {
     activeTickets,
     noShowTickets,
+    postponedTickets: state.postponedTickets,
     returnedTicketOverrides: resolved.returnedTicketOverrides,
-    tickets: mergeTicketsById(getClosedTickets(state.tickets), activeTickets, noShowTickets),
+    tickets: mergeTicketsById(getClosedTickets(state.tickets), activeTickets, noShowTickets, state.postponedTickets),
+  }
+}
+
+function createRoomPostponedUpdate(postponedSnapshotTickets: Ticket[], state: QueueState, roomId: string | number) {
+  const roomPostponedTickets = postponedSnapshotTickets.filter(isPostponedTicket)
+  const postponedTickets = replaceRoomTickets(state.postponedTickets, roomPostponedTickets, roomId)
+
+  return {
+    postponedTickets,
+    tickets: mergeTicketsById(getClosedTickets(state.tickets), state.activeTickets, state.noShowTickets, postponedTickets),
   }
 }
 
@@ -249,16 +272,17 @@ async function getRoomSnapshotWithNoShow(roomId: string | number): Promise<{
   roomId: string | number
   snapshot: QueueSnapshot
 }> {
-  const [snapshot, noShowTickets] = await Promise.all([
+  const [snapshot, noShowTickets, postponedTickets] = await Promise.all([
     queueApi.getRoomQueueSnapshot(roomId),
     queueApi.getRoomNoShowTickets(roomId),
+    queueApi.getRoomPostponedTickets(roomId),
   ])
 
   return {
     roomId,
     snapshot: {
       ...snapshot,
-      tickets: mergeTicketsById(snapshot.tickets, noShowTickets),
+      tickets: mergeTicketsById(snapshot.tickets, noShowTickets, postponedTickets),
     },
   }
 }
@@ -272,6 +296,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   kpi: emptyKpi,
   loading: false,
   noShowTickets: [],
+  postponedTickets: [],
   recommendations: [],
   returnedTicketOverrides: {},
   rooms: [],
@@ -424,6 +449,47 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     } catch (error) {
       console.error('Queue no-show load failed', error)
       set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })
+    }
+  },
+
+  loadRoomPostponedTickets: async (roomId) => {
+    set({ error: null, loading: true, statusMessage: null })
+
+    try {
+      const tickets = await queueApi.getRoomPostponedTickets(roomId)
+
+      set((state) => ({
+        ...createRoomPostponedUpdate(tickets, state, roomId),
+        error: null,
+        hydrated: true,
+        lastUpdatedAt: new Date().toISOString(),
+        loading: false,
+        statusMessage: defaultSuccessMessage,
+      }))
+    } catch (error) {
+      console.error('Queue postponed tickets load failed', error)
+      set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })
+    }
+  },
+
+  postponeTicket: async (ticketId) => {
+    set({ error: null, loading: true, statusMessage: null })
+
+    try {
+      const snapshot = await queueApi.postponeTicket(ticketId)
+      set((state) => ({
+        ...createSnapshotUpdate(snapshot, state),
+        error: null,
+        hydrated: true,
+        lastUpdatedAt: new Date().toISOString(),
+        loading: false,
+        selectedTicketId: undefined,
+        statusMessage: defaultSuccessMessage,
+      }))
+    } catch (error) {
+      console.error('Queue postpone ticket failed', error)
+      set({ error: getQueueErrorMessage(error), loading: false, statusMessage: null })
+      throw error
     }
   },
 
@@ -583,6 +649,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     try {
       const currentTicket = get().tickets.find((ticket) => ticket.id === ticketId)
         ?? get().noShowTickets.find((ticket) => ticket.id === ticketId)
+        ?? get().postponedTickets.find((ticket) => ticket.id === ticketId)
       const currentRoomId = roomId ?? currentTicket?.roomId
       const snapshot = await queueApi.returnTicket(ticketId, currentRoomId)
       const returnedTicket = snapshot.tickets.find((ticket) => ticket.id === ticketId) ?? currentTicket

@@ -8,6 +8,7 @@ const statusLabels: Record<TicketStatus, string> = {
   completed: 'Завершён',
   cancelled: 'Отменён',
   no_show: 'Не явился',
+  postponed: 'Отложен',
   redirected: 'Перенаправлен',
 }
 

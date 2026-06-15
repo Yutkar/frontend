@@ -36,6 +36,7 @@ export type BackendTicketStatus =
   | 'completed'
   | 'cancelled'
   | 'no_show'
+  | 'postponed'
   | 'redirected'
 
 export type BackendServiceType = {
@@ -640,6 +641,16 @@ export function toSharedStatus(status?: BackendTicketStatus | string): TicketSta
 
   if (normalizedStatus === 'no_show' || normalizedStatus === 'noshow') {
     return 'no_show'
+  }
+
+  if (
+    normalizedStatus === 'postponed' ||
+    normalizedStatus === 'on_hold' ||
+    normalizedStatus === 'hold' ||
+    normalizedStatus === 'held' ||
+    normalizedStatus === 'deferred'
+  ) {
+    return 'postponed'
   }
 
   if (

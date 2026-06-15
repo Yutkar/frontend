@@ -8,6 +8,7 @@ export type TicketStatus =
   | 'completed'
   | 'cancelled'
   | 'no_show'
+  | 'postponed'
   | 'redirected'
 
 export type TicketPriority = 'low' | 'normal' | 'above_normal' | 'high' | 'critical'

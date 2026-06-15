@@ -21,7 +21,7 @@ export type VisitFilters = {
   userId?: string | number
 }
 
-const visibleVisitStatuses: TicketStatus[] = ['completed', 'no_show', 'cancelled', 'redirected']
+const visibleVisitStatuses: TicketStatus[] = ['completed', 'no_show', 'cancelled', 'redirected', 'postponed']
 
 function getVisitTimestamp(ticket: Ticket): number {
   const value = ticket.completedAt ?? ticket.startedAt ?? ticket.calledAt ?? ticket.updatedAt ?? ticket.createdAt

@@ -75,6 +75,17 @@ export const mockQueueApi: QueueApi = {
     )
   },
 
+  getRoomPostponedTickets(roomId: string | number) {
+    const roomIdValue = String(roomId)
+
+    return Promise.resolve(
+      getQueueSnapshot().tickets.filter((ticket) =>
+        ticket.roomId === roomIdValue &&
+        ticket.status === 'postponed',
+      ),
+    )
+  },
+
   createTicket(input) {
     createSharedTicket(input)
 
@@ -101,6 +112,12 @@ export const mockQueueApi: QueueApi = {
 
   completeService(ticketId: string) {
     updateSharedTicketStatus(ticketId, 'completed')
+
+    return Promise.resolve(getQueueSnapshot())
+  },
+
+  postponeTicket(ticketId: string) {
+    updateSharedTicketStatus(ticketId, 'postponed')
 
     return Promise.resolve(getQueueSnapshot())
   },

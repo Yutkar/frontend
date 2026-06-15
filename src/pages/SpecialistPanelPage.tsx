@@ -190,6 +190,7 @@ export function SpecialistPanelPage() {
   const user = useGlobalStore((state) => state.user)
   const hydrated = useQueueStore((state) => state.hydrated)
   const loadRoomNoShowTickets = useQueueStore((state) => state.loadRoomNoShowTickets)
+  const loadRoomPostponedTickets = useQueueStore((state) => state.loadRoomPostponedTickets)
   const loadRoomQueue = useQueueStore((state) => state.loadRoomQueue)
   const loading = useQueueStore((state) => state.loading)
   const rooms = useQueueStore((state) => state.rooms)
@@ -230,6 +231,7 @@ export function SpecialistPanelPage() {
       await Promise.all([
         loadRoomQueue(specialistRoomId),
         loadRoomNoShowTickets(specialistRoomId),
+        loadRoomPostponedTickets(specialistRoomId),
       ])
     }
   }
@@ -249,6 +251,7 @@ export function SpecialistPanelPage() {
       await Promise.all([
         loadRoomQueue(roomId),
         loadRoomNoShowTickets(roomId),
+        loadRoomPostponedTickets(roomId),
       ])
 
       if (active) {
@@ -265,7 +268,7 @@ export function SpecialistPanelPage() {
       active = false
       window.clearInterval(interval)
     }
-  }, [loadRoomNoShowTickets, loadRoomQueue, specialistRoomId])
+  }, [loadRoomNoShowTickets, loadRoomPostponedTickets, loadRoomQueue, specialistRoomId])
 
   useEffect(() => {
     let active = true
