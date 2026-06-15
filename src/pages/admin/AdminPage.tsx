@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Building2, CheckCircle2, Stethoscope, UsersRound } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { useLocale } from '@shared/locales/useLocale'
@@ -45,11 +46,15 @@ const emptySummary: AdminSummary = {
   totalRooms: 0,
 }
 
+function isAdminSectionId(value: string | null): value is AdminSectionId {
+  return adminSections.some((section) => section.id === value)
+}
+
 export function AdminPage() {
   const t = useLocale()
   const user = useGlobalStore((state) => state.user)
   const loadQueue = useQueueStore((state) => state.loadQueue)
-  const [activeSection, setActiveSection] = useState<AdminSectionId>('rooms')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [roomsVersion, setRoomsVersion] = useState(0)
   const [summary, setSummary] = useState<AdminSummary>(emptySummary)
   const canManageManagers = user?.role === 'admin'
@@ -58,7 +63,10 @@ export function AdminPage() {
     () => adminSections.filter((section) => user && section.roles.includes(user.role)),
     [user],
   )
-  const selectedSection = visibleSections.find((section) => section.id === activeSection) ?? visibleSections[0]
+  const sectionParam = searchParams.get('section')
+  const selectedSection = visibleSections.find((section) => (
+    isAdminSectionId(sectionParam) && section.id === sectionParam
+  )) ?? visibleSections[0]
 
   const loadSummary = useCallback(async () => {
     try {
@@ -97,6 +105,13 @@ export function AdminPage() {
 
   function handleServiceTypesChange() {
     void loadQueue({ force: true, successMessage: 'Типы услуг обновлены' })
+  }
+
+  function selectSection(sectionId: AdminSectionId) {
+    const nextSearchParams = new URLSearchParams(searchParams)
+
+    nextSearchParams.set('section', sectionId)
+    setSearchParams(nextSearchParams)
   }
 
   function getSectionLabel(section: AdminSectionConfig): string {
@@ -144,7 +159,7 @@ export function AdminPage() {
           <button
             className={selectedSection?.id === section.id ? 'active' : ''}
             key={section.id}
-            onClick={() => setActiveSection(section.id)}
+            onClick={() => selectSection(section.id)}
             type="button"
           >
             {getSectionLabel(section)}

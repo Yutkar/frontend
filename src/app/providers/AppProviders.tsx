@@ -1,4 +1,4 @@
-import { Fragment, useEffect, type ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { appSettingsService, useAppSettings } from '@services/appSettingsService'
 import { StaticTextLocalizer } from '@shared/locales/StaticTextLocalizer'
 import { useLanguage } from '@shared/locales/useLocale'
@@ -48,9 +48,9 @@ export function AppProviders({ children }: AppProvidersProps) {
   }, [startRealtime, stopRealtime, user])
 
   return (
-    <Fragment key={language}>
+    <>
       <StaticTextLocalizer />
       {children}
-    </Fragment>
+    </>
   )
 }
