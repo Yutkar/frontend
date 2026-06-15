@@ -4726,6 +4726,51 @@ h3 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.board-font-scale-control {
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.field .board-font-scale-input {
+  -webkit-text-fill-color: var(--text);
+  appearance: textfield;
+  background: var(--surface);
+  border: 0;
+  border-radius: 0;
+  color: var(--text);
+  color-scheme: light dark;
+  font-weight: 850;
+  min-height: 44px;
+  opacity: 1;
+  padding-inline: 12px;
+}
+
+.field .board-font-scale-input:focus {
+  box-shadow: none;
+}
+
+.board-font-scale-control:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.board-font-scale-control > span {
+  align-items: center;
+  background: var(--surface-strong);
+  border-left: 1px solid var(--border);
+  color: var(--text);
+  display: flex;
+  font-size: 14px;
+  font-weight: 850;
+  justify-content: center;
+}
+
 .board-screen-format-settings {
   align-items: stretch;
 }
@@ -4838,6 +4883,7 @@ h3 {
 }
 
 .board-color-hex-input {
+  -webkit-text-fill-color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -4851,6 +4897,10 @@ h3 {
   padding: 0 10px;
   text-transform: uppercase;
   width: 100%;
+}
+
+.board-color-hex-input[aria-invalid="true"] {
+  border-color: var(--danger);
 }
 
 .board-color-hex-input:focus {
@@ -5214,12 +5264,151 @@ h3 {
 }
 
 .board-format-16-9 {
+  height: 100svh;
+  max-height: 100svh;
   max-width: none;
+  overflow: hidden;
   width: 100%;
+}
+
+.board-format-16-9.tv-board-grid,
+.board-format-16-9.tv-board-list,
+.board-format-16-9.tv-board-minimal {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-format-16-9 > .tv-header {
+  flex: 0 0 auto;
+  margin-bottom: clamp(14px, 1.5vw, 24px);
+}
+
+.board-format-16-9 > .tv-layout,
+.board-format-16-9 > .tv-grid,
+.board-format-16-9 > .tv-video-layout,
+.board-format-16-9 > .tv-big-board {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.board-format-16-9.tv-board-classic > .tv-grid {
+  grid-template-areas: "history current";
+  grid-template-columns: minmax(320px, 0.42fr) minmax(0, 0.58fr);
+}
+
+.board-format-16-9.tv-board-classic .tv-recent {
+  grid-area: history;
+  overflow: hidden;
+}
+
+.board-format-16-9.tv-board-classic .tv-current {
+  grid-area: current;
+}
+
+.board-format-16-9.tv-board-classic .tv-grid-single {
+  grid-template-areas: "current";
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.board-format-16-9 .tv-layout-grid {
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-format-16-9 .tv-layout-grid .tv-call-card {
+  min-height: 0;
+}
+
+.board-format-16-9 .tv-layout-list {
+  gap: clamp(8px, 1vh, 14px);
+  min-height: 0;
+  overflow: hidden;
+  padding: clamp(14px, 1.5vw, 24px);
+}
+
+.board-format-16-9 .tv-list-row {
+  min-height: 0;
+  padding-block: clamp(10px, 1.5vh, 20px);
+}
+
+.board-format-16-9 .tv-layout-cards {
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-format-16-9 .tv-layout-cards .tv-call-featured {
+  min-height: min(34svh, 360px);
+}
+
+.board-format-16-9 .tv-layout-cards .tv-call-card {
+  min-height: 0;
+}
+
+.board-format-16-9 .tv-video-layout {
+  gap: clamp(14px, 1.5vw, 24px);
+  grid-template-columns: minmax(320px, 0.42fr) minmax(0, 0.58fr);
+  grid-template-rows: minmax(180px, 0.3fr) minmax(0, 0.7fr);
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-format-16-9 .tv-video-current {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+
+.board-format-16-9 .tv-video-history,
+.board-format-16-9 .tv-big-history {
+  overflow: hidden;
+}
+
+.board-format-16-9 .tv-video-history .tv-call-history-table th,
+.board-format-16-9 .tv-big-history .tv-call-history-table th {
+  font-size: calc(clamp(1rem, 1.4vw, 1.5rem) * var(--board-font-scale));
+}
+
+.board-format-16-9 .tv-video-history .tv-call-history-table td,
+.board-format-16-9 .tv-big-history .tv-call-history-table td {
+  font-size: calc(clamp(1.8rem, 2.8vw, 3rem) * var(--board-font-scale));
+  padding-block: clamp(8px, 1.4vh, 15px);
+  white-space: nowrap;
+}
+
+.board-format-16-9 .tv-video-history .tv-call-history-table td:first-child,
+.board-format-16-9 .tv-big-history .tv-call-history-table td:first-child {
+  font-size: calc(clamp(2.2rem, 3.4vw, 3.6rem) * var(--board-font-scale));
+}
+
+.board-format-16-9 .tv-big-board {
+  grid-template-rows: minmax(0, 1fr) minmax(190px, 0.34fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-format-16-9 .tv-big-history {
+  max-height: none;
+}
+
+.board-format-16-9 .tv-call-card > span,
+.board-format-16-9 .tv-list-row span,
+.board-format-16-9 .tv-call-history-table td:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-format-4-3 {
   height: 100svh;
+  max-height: 100svh;
   margin-inline: auto;
   max-width: calc(100svh * 4 / 3);
   overflow: hidden;
@@ -5257,8 +5446,27 @@ h3 {
 
 .board-format-4-3.tv-board-classic > .tv-grid {
   gap: 14px;
-  grid-template-columns: minmax(300px, 0.82fr) minmax(0, 1.18fr);
+  grid-template-areas:
+    "current"
+    "history";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 0.58fr) minmax(0, 0.42fr);
   padding: 14px 18px 18px;
+}
+
+.board-format-4-3.tv-board-classic .tv-current {
+  grid-area: current;
+}
+
+.board-format-4-3.tv-board-classic .tv-recent {
+  grid-area: history;
+  max-height: none;
+  overflow: hidden;
+}
+
+.board-format-4-3.tv-board-classic .tv-grid-single {
+  grid-template-areas: "current";
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .board-format-4-3 .tv-current,
@@ -5289,7 +5497,9 @@ h3 {
 
 .board-format-4-3 .tv-classic-history td {
   font-size: calc(clamp(1.25rem, 2.1vw, 2rem) * var(--board-font-scale));
-  padding: clamp(9px, 1.3vh, 15px) 14px;
+  overflow: hidden;
+  padding: clamp(6px, 0.9vh, 10px) 14px;
+  text-overflow: ellipsis;
 }
 
 .board-format-4-3 .tv-classic-history td:first-child {
@@ -5352,7 +5562,7 @@ h3 {
 
 .board-format-4-3 .tv-list-row {
   gap: 14px;
-  grid-template-columns: minmax(130px, 0.55fr) minmax(0, 1fr);
+  grid-template-columns: minmax(110px, 0.45fr) minmax(0, 1fr) auto;
   min-height: 0;
   padding: 10px 16px;
 }
@@ -5440,6 +5650,13 @@ h3 {
   gap: 18px;
 }
 
+.board-format-4-3 .tv-route-call strong,
+.board-format-4-3 .tv-big-route strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .board-format-4-3 .tv-route-call strong {
   font-size: calc(clamp(5rem, 13vmin, 8rem) * var(--board-font-scale));
 }
@@ -5523,6 +5740,11 @@ h3 {
 
 .board-format-4-3 .tv-big-history .tv-call-history-table td:first-child {
   font-size: calc(clamp(1.8rem, 4vmin, 2.7rem) * var(--board-font-scale));
+}
+
+.board-format-4-3 .tv-call-history-table td:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @page {

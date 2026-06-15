@@ -84,35 +84,49 @@ function BoardFontScaleField({
   value: number
 }) {
   const [inputValue, setInputValue] = useState(String(value))
+  const numericValue = inputValue.trim() ? Number(inputValue) : Number.NaN
+  const inputInvalid = !Number.isFinite(numericValue) || numericValue < 50 || numericValue > 300
 
   return (
-    <label className="field">
+    <label className="field board-font-scale-field">
       <span>Размер шрифта, %</span>
-      <input
-        max={300}
-        min={50}
-        onBlur={() => {
-          const numericValue = inputValue.trim() ? Number(inputValue) : Number.NaN
-          const normalizedValue = Number.isFinite(numericValue)
-            ? Math.min(300, Math.max(50, Math.round(numericValue)))
-            : value
+      <div className="board-font-scale-control">
+        <input
+          aria-invalid={inputInvalid}
+          className="board-font-scale-input"
+          max={300}
+          min={50}
+          onBlur={() => {
+            const normalizedValue = Number.isFinite(numericValue)
+              ? Math.min(300, Math.max(50, Math.round(numericValue)))
+              : value
 
-          setInputValue(String(normalizedValue))
-          onChange(normalizedValue)
-        }}
-        onChange={(event) => {
-          const nextInputValue = event.currentTarget.value
-          const numericValue = Number(nextInputValue)
+            setInputValue(String(normalizedValue))
+            onChange(normalizedValue)
+          }}
+          onChange={(event) => {
+            const nextInputValue = event.currentTarget.value
+            const nextNumericValue = Number(nextInputValue)
 
-          setInputValue(nextInputValue)
-          if (nextInputValue && Number.isFinite(numericValue) && numericValue >= 50 && numericValue <= 300) {
-            onChange(Math.round(numericValue))
-          }
-        }}
-        step={5}
-        type="number"
-        value={inputValue}
-      />
+            setInputValue(nextInputValue)
+            if (
+              nextInputValue
+              && Number.isFinite(nextNumericValue)
+              && nextNumericValue >= 50
+              && nextNumericValue <= 300
+            ) {
+              onChange(Math.round(nextNumericValue))
+            }
+          }}
+          step={5}
+          type="number"
+          value={inputValue}
+        />
+        <span aria-hidden="true">%</span>
+      </div>
+      {inputInvalid ? (
+        <small className="field-error">Введите значение от 50 до 300</small>
+      ) : null}
       <small className="field-help">100% — стандартный размер, допустимо от 50% до 300%.</small>
     </label>
   )
@@ -130,6 +144,7 @@ function BoardColorField({
   value: string
 }) {
   const [hexValue, setHexValue] = useState(value.toUpperCase())
+  const [hexError, setHexError] = useState('')
   const inputId = `board-color-${colorKey}`
 
   return (
@@ -143,6 +158,7 @@ function BoardColorField({
             const nextValue = event.currentTarget.value
 
             setHexValue(nextValue.toUpperCase())
+            setHexError('')
             onChange(nextValue)
           }}
           type="color"
@@ -154,7 +170,7 @@ function BoardColorField({
           maxLength={7}
           onBlur={() => {
             if (!boardHexColorPattern.test(hexValue.trim())) {
-              setHexValue(value.toUpperCase())
+              setHexError('Введите цвет в формате #RRGGBB')
             }
           }}
           onChange={(event) => {
@@ -162,15 +178,20 @@ function BoardColorField({
 
             setHexValue(nextValue)
             if (boardHexColorPattern.test(nextValue.trim())) {
+              setHexError('')
               onChange(nextValue.trim())
+            } else {
+              setHexError('Введите цвет в формате #RRGGBB')
             }
           }}
+          aria-invalid={Boolean(hexError)}
           pattern="#[0-9a-fA-F]{6}"
           spellCheck={false}
           type="text"
           value={hexValue}
         />
       </div>
+      {hexError ? <small className="field-error">{hexError}</small> : null}
     </div>
   )
 }
@@ -373,6 +394,7 @@ export function BoardSettingsSection() {
   }
 
   function startEditProfile(profile: BoardSettingsProfile) {
+    setBoardStyleSettings(boardStyleSettingsService.getSettings(profile.id))
     setDraftProfile(profile)
   }
 
