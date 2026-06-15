@@ -6,6 +6,8 @@ export type BoardFontFamily =
   | 'Open Sans'
   | 'System'
 
+export type BoardScreenFormat = '16:9' | '4:3'
+
 export type BoardStyleSettings = {
   accentColor: string
   boardBackground: string
@@ -15,6 +17,7 @@ export type BoardStyleSettings = {
   fontFamily: BoardFontFamily
   historyBackground: string
   historyText: string
+  screenFormat: BoardScreenFormat
 }
 
 export const boardFontOptions: Array<{ label: string; value: BoardFontFamily }> = [
@@ -26,6 +29,15 @@ export const boardFontOptions: Array<{ label: string; value: BoardFontFamily }> 
   { label: 'System', value: 'System' },
 ]
 
+export const boardScreenFormatOptions: Array<{
+  description: string
+  label: string
+  value: BoardScreenFormat
+}> = [
+  { description: 'Широкий экран', label: '16:9', value: '16:9' },
+  { description: 'Квадратный экран', label: '4:3', value: '4:3' },
+]
+
 export const defaultBoardStyleSettings: BoardStyleSettings = {
   accentColor: '#1769aa',
   boardBackground: '#f7fbff',
@@ -35,6 +47,7 @@ export const defaultBoardStyleSettings: BoardStyleSettings = {
   fontFamily: 'Inter',
   historyBackground: '#ffffff',
   historyText: '#102033',
+  screenFormat: '16:9',
 }
 
 const boardStyleSettingsStorageKey = 'smartq_board_style_settings'
@@ -60,6 +73,7 @@ export function normalizeBoardStyleSettings(value?: Partial<BoardStyleSettings> 
   const fontFamily = value?.fontFamily && fontFamilies.has(value.fontFamily)
     ? value.fontFamily
     : defaultBoardStyleSettings.fontFamily
+  const screenFormat = value?.screenFormat === '4:3' ? '4:3' : '16:9'
 
   return {
     accentColor: normalizeColor(value?.accentColor, defaultBoardStyleSettings.accentColor),
@@ -76,6 +90,7 @@ export function normalizeBoardStyleSettings(value?: Partial<BoardStyleSettings> 
       defaultBoardStyleSettings.historyBackground,
     ),
     historyText: normalizeColor(value?.historyText, defaultBoardStyleSettings.historyText),
+    screenFormat,
   }
 }
 

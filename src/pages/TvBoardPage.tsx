@@ -173,7 +173,6 @@ export function TvBoardPage() {
     : undefined
   const roomClosed = Boolean(roomId) && isRoomClosed(boardRoom)
   const roomHeaderName = roomClosed && roomName && tickets.length > 0 ? `${roomName} — закрыт` : roomName
-  const boardClassName = `tv-board tv-board-${routeBoardSettings.template}`
 
   useEffect(() => {
     const loadLocalBoardSettings = () => {
@@ -198,9 +197,17 @@ export function TvBoardPage() {
     background: boardStyleSettings.boardBackground,
     fontFamily: getBoardFontStack(boardStyleSettings.fontFamily),
   } as CSSProperties
+  const screenFormatClass = boardStyleSettings.screenFormat === '4:3'
+    ? 'board-format-4-3'
+    : 'board-format-16-9'
+  const boardClassName = `tv-board tv-board-${routeBoardSettings.template} ${screenFormatClass}`
 
   return (
-    <main className={boardClassName} style={boardStyle}>
+    <main
+      className={boardClassName}
+      data-screen-format={boardStyleSettings.screenFormat}
+      style={boardStyle}
+    >
       {roomHeaderName ? (
         <header className="tv-header">
           <strong>{roomHeaderName}</strong>

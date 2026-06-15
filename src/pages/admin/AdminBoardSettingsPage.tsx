@@ -22,9 +22,11 @@ import {
 } from '@services/boardPromoMediaService'
 import {
   boardFontOptions,
+  boardScreenFormatOptions,
   boardStyleSettingsService,
   defaultBoardStyleSettings,
   type BoardFontFamily,
+  type BoardScreenFormat,
   type BoardStyleSettings,
 } from '@services/boardStyleSettingsService'
 import {
@@ -57,7 +59,7 @@ const defaultBoardSettings: BoardSettings = {
   voiceEnabled: true,
 }
 
-type BoardColorSettingKey = Exclude<keyof BoardStyleSettings, 'fontFamily'>
+type BoardColorSettingKey = Exclude<keyof BoardStyleSettings, 'fontFamily' | 'screenFormat'>
 
 const boardColorFields: Array<{ key: BoardColorSettingKey; label: string }> = [
   { key: 'boardBackground', label: 'Цвет фона табло' },
@@ -100,6 +102,39 @@ function BoardTemplateSelector({
   )
 }
 
+function BoardScreenFormatSelector({
+  onSelect,
+  selectedFormat,
+}: {
+  onSelect: (format: BoardScreenFormat) => void
+  selectedFormat: BoardScreenFormat
+}) {
+  return (
+    <div className="board-format-selector">
+      {boardScreenFormatOptions.map((option) => (
+        <button
+          className={selectedFormat === option.value
+            ? 'board-format-card active'
+            : 'board-format-card'}
+          key={option.value}
+          onClick={() => onSelect(option.value)}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className={`board-format-preview board-format-preview-${option.value.replace(':', '-')}`}
+          >
+            <i />
+            <i />
+          </span>
+          <strong>{option.label}</strong>
+          <small>{option.label} — {option.description.toLowerCase()}</small>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function BoardSettingsSection() {
   const t = useLocale()
   const [rooms, setRooms] = useState<AdminRoomRecord[]>([])
@@ -112,6 +147,7 @@ export function BoardSettingsSection() {
   const [newScreenName, setNewScreenName] = useState('')
   const [newScreenRooms, setNewScreenRooms] = useState<string[]>([])
   const [newScreenTemplate, setNewScreenTemplate] = useState<BoardTemplate>(defaultBoardTemplate)
+  const [newScreenFormat, setNewScreenFormat] = useState<BoardScreenFormat>('16:9')
   const [newScreenVideoUrl, setNewScreenVideoUrl] = useState('')
   const [newScreenVideoPreviewFailed, setNewScreenVideoPreviewFailed] = useState(false)
   const [promoMedia, setPromoMedia] = useState<BoardPromoMedia>({})
@@ -368,9 +404,14 @@ export function BoardSettingsSection() {
     if (newScreenTemplate === 'video_queue' && videoUrlValidation.normalizedUrl) {
       boardPromoMediaService.saveVideoUrl(screenProfileId, videoUrlValidation.normalizedUrl)
     }
+    boardStyleSettingsService.saveSettings(screenProfileId, {
+      ...defaultBoardStyleSettings,
+      screenFormat: newScreenFormat,
+    })
     setNewScreenName('')
     setNewScreenRooms([])
     setNewScreenTemplate(defaultBoardTemplate)
+    setNewScreenFormat('16:9')
     setNewScreenVideoUrl('')
     setNewScreenVideoPreviewFailed(false)
   }
@@ -756,6 +797,14 @@ export function BoardSettingsSection() {
               />
             </fieldset>
 
+            <fieldset className="admin-checkbox-group board-screen-format-settings">
+              <legend>Формат экрана</legend>
+              <BoardScreenFormatSelector
+                onSelect={(screenFormat) => updateBoardStyleSettings({ screenFormat })}
+                selectedFormat={boardStyleSettings.screenFormat}
+              />
+            </fieldset>
+
             <fieldset className="admin-checkbox-group board-style-settings">
               <legend>Внешний вид табло</legend>
 
@@ -1022,6 +1071,14 @@ export function BoardSettingsSection() {
                   setNewScreenVideoPreviewFailed(false)
                 }}
                 selectedTemplate={newScreenTemplate}
+              />
+            </fieldset>
+
+            <fieldset className="admin-checkbox-group board-screen-format-settings">
+              <legend>Формат экрана</legend>
+              <BoardScreenFormatSelector
+                onSelect={setNewScreenFormat}
+                selectedFormat={newScreenFormat}
               />
             </fieldset>
 

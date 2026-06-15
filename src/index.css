@@ -4645,6 +4645,73 @@ h3 {
   align-items: stretch;
 }
 
+.board-screen-format-settings {
+  align-items: stretch;
+}
+
+.board-format-selector {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.board-format-card {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  padding: 12px;
+}
+
+.board-format-card.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+.board-format-card strong {
+  font-size: 14px;
+}
+
+.board-format-card small {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.board-format-preview {
+  background: #0c3557;
+  border: 2px solid var(--primary);
+  border-radius: 5px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 0.8fr 1.2fr;
+  padding: 5px;
+}
+
+.board-format-preview-16-9 {
+  aspect-ratio: 16 / 9;
+  width: min(100%, 132px);
+}
+
+.board-format-preview-4-3 {
+  aspect-ratio: 4 / 3;
+  width: min(100%, 104px);
+}
+
+.board-format-preview i {
+  background: #ffffff;
+  border-radius: 2px;
+  display: block;
+}
+
+.board-format-preview i:first-child {
+  background: var(--primary-soft);
+}
+
 .board-color-settings-grid {
   display: grid;
   gap: 12px;
@@ -5026,9 +5093,307 @@ h3 {
   .admin-page-grid,
   .admin-summary-grid,
   .admin-inline-form,
-  .board-color-settings-grid {
+  .board-color-settings-grid,
+  .board-format-selector {
     grid-template-columns: 1fr;
   }
+}
+
+.board-format-16-9 {
+  max-width: none;
+  width: 100%;
+}
+
+.board-format-4-3 {
+  height: 100svh;
+  margin-inline: auto;
+  max-width: calc(100svh * 4 / 3);
+  overflow: hidden;
+  padding: clamp(14px, 1.8vw, 24px);
+  width: 100%;
+}
+
+.board-format-4-3.tv-board-classic {
+  padding: 0;
+}
+
+.board-format-4-3.tv-board-grid,
+.board-format-4-3.tv-board-list,
+.board-format-4-3.tv-board-minimal {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-format-4-3 > .tv-header {
+  flex: 0 0 auto;
+  margin-bottom: 14px;
+}
+
+.board-format-4-3 > .tv-layout,
+.board-format-4-3 > .tv-grid,
+.board-format-4-3 > .tv-video-layout,
+.board-format-4-3 > .tv-big-board {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.board-format-4-3.tv-board-classic > .tv-header {
+  padding: 12px 18px 0;
+}
+
+.board-format-4-3.tv-board-classic > .tv-grid {
+  gap: 14px;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(0, 1.18fr);
+  padding: 14px 18px 18px;
+}
+
+.board-format-4-3 .tv-current,
+.board-format-4-3 .tv-recent {
+  padding: 14px;
+}
+
+.board-format-4-3 .tv-current {
+  gap: 12px;
+}
+
+.board-format-4-3 .tv-call-featured {
+  min-height: 0;
+  padding: clamp(18px, 3vmin, 32px);
+}
+
+.board-format-4-3 .tv-call-featured strong {
+  font-size: clamp(6rem, 17vmin, 11rem);
+}
+
+.board-format-4-3 .tv-call-featured > span {
+  font-size: clamp(2rem, 5vmin, 3.6rem);
+  white-space: nowrap;
+}
+
+.board-format-4-3 .tv-classic-history td {
+  font-size: clamp(1.25rem, 2.1vw, 2rem);
+  padding: clamp(9px, 1.3vh, 15px) 14px;
+}
+
+.board-format-4-3 .tv-classic-history td:first-child {
+  font-size: clamp(1.8rem, 3vw, 3rem);
+}
+
+.board-format-4-3 .tv-classic-history-compact td {
+  font-size: clamp(1rem, 1.55vw, 1.45rem);
+  padding-block: clamp(6px, 0.8vh, 9px);
+}
+
+.board-format-4-3 .tv-classic-history-compact td:first-child {
+  font-size: clamp(1.4rem, 2.1vw, 2rem);
+}
+
+.board-format-4-3 .tv-classic-history-dense td,
+.board-format-4-3 .tv-classic-history-ultra td {
+  font-size: clamp(0.75rem, 1.05vw, 1rem);
+  padding-block: 4px;
+}
+
+.board-format-4-3 .tv-classic-history-dense td:first-child,
+.board-format-4-3 .tv-classic-history-ultra td:first-child {
+  font-size: clamp(1rem, 1.4vw, 1.35rem);
+}
+
+.board-format-4-3 .tv-layout-grid {
+  align-content: stretch;
+  gap: 12px;
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-format-4-3 .tv-layout-grid .tv-call-card {
+  gap: 10px;
+  min-height: 0;
+  padding: 16px;
+}
+
+.board-format-4-3 .tv-layout-grid .tv-call-card strong {
+  font-size: clamp(3.5rem, 9vmin, 6.5rem);
+}
+
+.board-format-4-3 .tv-layout-grid .tv-call-card > span {
+  font-size: clamp(1.35rem, 3.2vmin, 2.3rem);
+  white-space: nowrap;
+}
+
+.board-format-4-3 .tv-layout-list {
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.board-format-4-3 .tv-list-row {
+  gap: 14px;
+  grid-template-columns: minmax(130px, 0.55fr) minmax(0, 1fr);
+  min-height: 0;
+  padding: 10px 16px;
+}
+
+.board-format-4-3 .tv-list-row strong {
+  font-size: clamp(2.5rem, 6vmin, 4rem);
+}
+
+.board-format-4-3 .tv-list-row span {
+  font-size: clamp(1.35rem, 3.2vmin, 2.2rem);
+  white-space: nowrap;
+}
+
+.board-format-4-3 .tv-layout-minimal .tv-call-card {
+  min-height: 0;
+  padding: 24px;
+}
+
+.board-format-4-3 .tv-layout-minimal .tv-call-card strong {
+  font-size: clamp(8rem, 25vmin, 16rem);
+}
+
+.board-format-4-3 .tv-layout-cards {
+  gap: 12px;
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-format-4-3 .tv-layout-cards .tv-call-featured {
+  min-height: clamp(190px, 30svh, 260px);
+}
+
+.board-format-4-3 .tv-layout-cards .tv-call-featured strong {
+  font-size: clamp(6rem, 15vmin, 10rem);
+}
+
+.board-format-4-3 .tv-layout-cards .tv-call-featured > span {
+  font-size: clamp(2rem, 4vmin, 3rem);
+  white-space: nowrap;
+}
+
+.board-format-4-3 .tv-layout-cards .tv-call-card {
+  gap: 10px;
+  min-height: 0;
+  padding: 14px;
+}
+
+.board-format-4-3 .tv-layout-cards .tv-call-card strong {
+  font-size: clamp(3rem, 7vmin, 5rem);
+}
+
+.board-format-4-3 .tv-layout-cards .tv-call-card > span {
+  font-size: clamp(1.25rem, 2.8vmin, 2rem);
+  white-space: nowrap;
+}
+
+.board-format-4-3 .tv-video-layout {
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr);
+  grid-template-rows: minmax(160px, 0.3fr) minmax(0, 0.7fr);
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-format-4-3 .tv-video-current {
+  grid-column: 1 / -1;
+  min-height: 0;
+  padding: 12px 20px;
+}
+
+.board-format-4-3 .tv-route-call {
+  gap: 18px;
+}
+
+.board-format-4-3 .tv-route-call strong {
+  font-size: clamp(5rem, 13vmin, 8rem);
+}
+
+.board-format-4-3 .tv-route-call span {
+  font-size: clamp(3rem, 7vmin, 4.8rem);
+}
+
+.board-format-4-3 .tv-route-place-label {
+  font-size: clamp(1.3rem, 3vmin, 2rem);
+}
+
+.board-format-4-3 .tv-video-history {
+  gap: 8px;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.board-format-4-3 .tv-video-section-title {
+  font-size: clamp(1.25rem, 2.5vmin, 1.8rem);
+}
+
+.board-format-4-3 .tv-video-history .tv-call-history-table th {
+  font-size: clamp(0.8rem, 1.6vmin, 1.1rem);
+}
+
+.board-format-4-3 .tv-video-history .tv-call-history-table td {
+  font-size: clamp(1.35rem, 3vmin, 2rem);
+  padding: 8px 6px;
+  white-space: nowrap;
+}
+
+.board-format-4-3 .tv-video-history .tv-call-history-table td:first-child {
+  font-size: clamp(1.8rem, 4vmin, 2.6rem);
+}
+
+.board-format-4-3 .tv-promo-panel video,
+.board-format-4-3 .tv-promo-panel img {
+  object-fit: contain;
+}
+
+.board-format-4-3 .tv-big-board {
+  gap: 12px;
+  grid-template-rows: minmax(0, 1fr) minmax(180px, auto);
+  min-height: 0;
+  padding: 14px;
+}
+
+.board-format-4-3 .tv-big-current {
+  gap: 12px;
+  padding: 18px;
+}
+
+.board-format-4-3 .tv-big-route strong {
+  font-size: clamp(7rem, 18vmin, 12rem);
+}
+
+.board-format-4-3 .tv-big-route span {
+  font-size: clamp(4rem, 9vmin, 6rem);
+}
+
+.board-format-4-3 .tv-big-place {
+  font-size: clamp(1.5rem, 3.5vmin, 2.4rem);
+}
+
+.board-format-4-3 .tv-big-history {
+  max-height: min(30svh, 260px);
+  overflow: hidden;
+  padding: 10px 14px;
+}
+
+.board-format-4-3 .tv-big-history .tv-call-history-table th {
+  font-size: clamp(0.9rem, 1.7vmin, 1.2rem);
+}
+
+.board-format-4-3 .tv-big-history .tv-call-history-table td {
+  font-size: clamp(1.4rem, 3vmin, 2.1rem);
+  padding: 8px 6px;
+  white-space: nowrap;
+}
+
+.board-format-4-3 .tv-big-history .tv-call-history-table td:first-child {
+  font-size: clamp(1.8rem, 4vmin, 2.7rem);
 }
 
 @page {
