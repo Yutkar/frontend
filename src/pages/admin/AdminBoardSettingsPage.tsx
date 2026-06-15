@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react'
 import {
   Monitor,
   Copy,
@@ -76,6 +76,33 @@ const boardColorFields: Array<{ key: BoardColorSettingKey; label: string }> = [
 
 const boardHexColorPattern = /^#[0-9a-f]{6}$/i
 
+function BoardSettingsAccordion({
+  children,
+  defaultOpen = false,
+  title,
+}: {
+  children: ReactNode
+  defaultOpen?: boolean
+  title: string
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <details
+      className="board-settings-accordion"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      open={open}
+    >
+      <summary>
+        <span>{title}</span>
+      </summary>
+      <div className="board-settings-accordion-content">
+        {children}
+      </div>
+    </details>
+  )
+}
+
 function BoardFontScaleField({
   onChange,
   value,
@@ -83,13 +110,14 @@ function BoardFontScaleField({
   onChange: (value: number) => void
   value: number
 }) {
-  const [inputValue, setInputValue] = useState(String(value))
+  const initialValue = Number.isFinite(value) ? value : defaultBoardStyleSettings.fontScalePercent
+  const [inputValue, setInputValue] = useState(String(initialValue))
   const numericValue = inputValue.trim() ? Number(inputValue) : Number.NaN
   const inputInvalid = !Number.isFinite(numericValue) || numericValue < 50 || numericValue > 300
 
   return (
     <label className="field board-font-scale-field">
-      <span>Размер шрифта, %</span>
+      <span>Размер шрифта</span>
       <div className="board-font-scale-control">
         <input
           aria-invalid={inputInvalid}
@@ -99,7 +127,7 @@ function BoardFontScaleField({
           onBlur={() => {
             const normalizedValue = Number.isFinite(numericValue)
               ? Math.min(300, Math.max(50, Math.round(numericValue)))
-              : value
+              : initialValue
 
             setInputValue(String(normalizedValue))
             onChange(normalizedValue)
@@ -134,16 +162,19 @@ function BoardFontScaleField({
 
 function BoardColorField({
   colorKey,
+  fallbackValue,
   label,
   onChange,
   value,
 }: {
   colorKey: BoardColorSettingKey
+  fallbackValue: string
   label: string
   onChange: (value: string) => void
   value: string
 }) {
-  const [hexValue, setHexValue] = useState(value.toUpperCase())
+  const colorValue = boardHexColorPattern.test(value) ? value : fallbackValue
+  const [hexValue, setHexValue] = useState(colorValue.toUpperCase())
   const [hexError, setHexError] = useState('')
   const inputId = `board-color-${colorKey}`
 
@@ -162,11 +193,13 @@ function BoardColorField({
             onChange(nextValue)
           }}
           type="color"
-          value={value}
+          value={colorValue}
         />
         <input
           aria-label={`${label}, HEX`}
+          autoComplete="off"
           className="board-color-hex-input"
+          inputMode="text"
           maxLength={7}
           onBlur={() => {
             if (!boardHexColorPattern.test(hexValue.trim())) {
@@ -186,6 +219,7 @@ function BoardColorField({
           }}
           aria-invalid={Boolean(hexError)}
           pattern="#[0-9a-fA-F]{6}"
+          placeholder={fallbackValue.toUpperCase()}
           spellCheck={false}
           type="text"
           value={hexValue}
@@ -867,6 +901,7 @@ export function BoardSettingsSection() {
               </p>
             ) : (
               <>
+            <BoardSettingsAccordion defaultOpen title="Основные настройки">
             <label className="field">
               <span>Название</span>
               <input
@@ -914,26 +949,23 @@ export function BoardSettingsSection() {
               <span>Ссылка выбранного табло:</span>
               <code>{getProfileUrl(draftProfile)}</code>
             </div>
+            </BoardSettingsAccordion>
 
-            <fieldset className="admin-checkbox-group">
-              <legend>Вид табло</legend>
+            <BoardSettingsAccordion title="Шаблон табло">
               <BoardTemplateSelector
                 onSelect={(template) => updateDraftProfile({ template })}
                 selectedTemplate={draftProfile.template}
               />
-            </fieldset>
+            </BoardSettingsAccordion>
 
-            <fieldset className="admin-checkbox-group board-screen-format-settings">
-              <legend>Формат экрана</legend>
+            <BoardSettingsAccordion title="Формат экрана">
               <BoardScreenFormatSelector
                 onSelect={(screenFormat) => updateBoardStyleSettings({ screenFormat })}
                 selectedFormat={boardStyleSettings.screenFormat}
               />
-            </fieldset>
+            </BoardSettingsAccordion>
 
-            <fieldset className="admin-checkbox-group board-style-settings">
-              <legend>Внешний вид табло</legend>
-
+            <BoardSettingsAccordion title="Шрифты">
               <div className="board-typography-settings">
                 <label className="field">
                   <span>Шрифт табло</span>
@@ -955,11 +987,14 @@ export function BoardSettingsSection() {
                   value={boardStyleSettings.fontScalePercent}
                 />
               </div>
+            </BoardSettingsAccordion>
 
+            <BoardSettingsAccordion title="Цвета">
               <div className="board-color-settings-grid">
                 {boardColorFields.map((field) => (
                   <BoardColorField
                     colorKey={field.key}
+                    fallbackValue={defaultBoardStyleSettings[field.key]}
                     key={`${draftProfile.id}-${field.key}`}
                     label={field.label}
                     onChange={(value) => updateBoardStyleSettings({ [field.key]: value })}
@@ -967,12 +1002,10 @@ export function BoardSettingsSection() {
                   />
                 ))}
               </div>
-            </fieldset>
+            </BoardSettingsAccordion>
 
             {draftProfile.template === 'video_queue' ? (
-              <fieldset className="admin-checkbox-group promo-media-settings">
-                <legend>Промо-видео</legend>
-
+              <BoardSettingsAccordion title="Фото и видео">
                 {promoMediaError ? <div className="modal-error">{promoMediaError}</div> : null}
 
                 <label className="field">
@@ -1094,9 +1127,10 @@ export function BoardSettingsSection() {
                 ) : (
                   <div className="promo-media-empty">Изображение не задано</div>
                 )}
-              </fieldset>
+              </BoardSettingsAccordion>
             ) : null}
 
+            <BoardSettingsAccordion title="История и озвучка">
             <label className="admin-toggle-row">
               <input
                 checked={draftProfile.voiceEnabled}
@@ -1130,6 +1164,7 @@ export function BoardSettingsSection() {
               />
               <small className="field-help">От 0 до 30. При значении 0 история скрыта.</small>
             </label>
+            </BoardSettingsAccordion>
 
             <div className="modal-actions">
               <Button
@@ -1156,7 +1191,8 @@ export function BoardSettingsSection() {
             )}
           </div>
 
-          <div className="admin-form">
+          {!draftProfile ? (
+          <div className="admin-form board-create-form">
             <div className="panel-header">
               <div>
                 <span className="eyebrow">Объединённый экран</span>
@@ -1164,6 +1200,7 @@ export function BoardSettingsSection() {
               </div>
             </div>
 
+            <BoardSettingsAccordion defaultOpen title="Основные настройки">
             <label className="field">
               <span>Название экрана</span>
               <input
@@ -1173,8 +1210,8 @@ export function BoardSettingsSection() {
               />
             </label>
 
-            <fieldset className="admin-checkbox-group">
-              <legend>Выберите места обслуживания</legend>
+            <div className="board-room-selection">
+              <span className="board-settings-field-label">Выберите места обслуживания</span>
               {activeRooms.map((room) => {
                 const name = getRoomName(room)
                 return (
@@ -1188,10 +1225,10 @@ export function BoardSettingsSection() {
                   </label>
                 )
               })}
-            </fieldset>
+            </div>
+            </BoardSettingsAccordion>
 
-            <fieldset className="admin-checkbox-group">
-              <legend>Вид табло</legend>
+            <BoardSettingsAccordion title="Шаблон табло">
               <BoardTemplateSelector
                 onSelect={(template) => {
                   setNewScreenTemplate(template)
@@ -1199,20 +1236,17 @@ export function BoardSettingsSection() {
                 }}
                 selectedTemplate={newScreenTemplate}
               />
-            </fieldset>
+            </BoardSettingsAccordion>
 
-            <fieldset className="admin-checkbox-group board-screen-format-settings">
-              <legend>Формат экрана</legend>
+            <BoardSettingsAccordion title="Формат экрана">
               <BoardScreenFormatSelector
                 onSelect={setNewScreenFormat}
                 selectedFormat={newScreenFormat}
               />
-            </fieldset>
+            </BoardSettingsAccordion>
 
             {newScreenTemplate === 'video_queue' ? (
-              <fieldset className="admin-checkbox-group promo-media-settings">
-                <legend>Промо-видео</legend>
-
+              <BoardSettingsAccordion title="Фото и видео">
                 <label className="field">
                   <span>Ссылка на видео</span>
                   <input
@@ -1263,7 +1297,7 @@ export function BoardSettingsSection() {
                 ) : (
                   <div className="promo-media-empty">Видео не задано</div>
                 )}
-              </fieldset>
+              </BoardSettingsAccordion>
             ) : null}
 
             <div className="modal-actions">
@@ -1281,6 +1315,7 @@ export function BoardSettingsSection() {
               </Button>
             </div>
           </div>
+          ) : null}
 
           <div className="admin-form">
             <div className="panel-header">
@@ -1290,6 +1325,7 @@ export function BoardSettingsSection() {
               </div>
             </div>
 
+            <BoardSettingsAccordion defaultOpen title="Параметры озвучки">
             <label className="field">
               <span>{t.admin.voiceAddress}</span>
               <select
@@ -1311,6 +1347,7 @@ export function BoardSettingsSection() {
                 <option value="enter">{getVoiceActionLabel('enter')}</option>
               </select>
             </label>
+            </BoardSettingsAccordion>
           </div>
         </aside>
       </section>
