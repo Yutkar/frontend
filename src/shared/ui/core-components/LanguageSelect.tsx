@@ -15,6 +15,28 @@ export function LanguageSelect({ className = '', variant = 'compact' }: Language
   const language = useLanguage()
   const t = useLocale()
 
+  if (variant === 'large') {
+    return (
+      <div aria-label={t.common.language} className={`language-select language-select-large ${className}`}>
+        <span>{t.common.language}</span>
+        <div className="language-segmented" role="group">
+          {languageOptions.map((option) => (
+            <button
+              aria-pressed={language === option.value}
+              className={language === option.value ? 'active' : ''}
+              data-smartq-no-i18n
+              key={option.value}
+              onClick={() => setLanguage(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <label className={`language-select language-select-${variant} ${className}`}>
       <span>{t.common.language}</span>
@@ -24,7 +46,7 @@ export function LanguageSelect({ className = '', variant = 'compact' }: Language
         value={language}
       >
         {languageOptions.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option data-smartq-no-i18n key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
