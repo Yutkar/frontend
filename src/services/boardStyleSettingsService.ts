@@ -15,6 +15,7 @@ export type BoardStyleSettings = {
   currentCallBackground: string
   currentCallText: string
   fontFamily: BoardFontFamily
+  fontScalePercent: number
   historyBackground: string
   historyText: string
   screenFormat: BoardScreenFormat
@@ -45,6 +46,7 @@ export const defaultBoardStyleSettings: BoardStyleSettings = {
   currentCallBackground: '#ffffff',
   currentCallText: '#0c3557',
   fontFamily: 'Inter',
+  fontScalePercent: 100,
   historyBackground: '#ffffff',
   historyText: '#102033',
   screenFormat: '16:9',
@@ -69,6 +71,16 @@ function normalizeColor(value: unknown, fallback: string): string {
     : fallback
 }
 
+function normalizeFontScalePercent(value: unknown): number {
+  const numericValue = typeof value === 'number' ? value : Number(value)
+
+  if (!Number.isFinite(numericValue)) {
+    return defaultBoardStyleSettings.fontScalePercent
+  }
+
+  return Math.min(300, Math.max(50, Math.round(numericValue)))
+}
+
 export function normalizeBoardStyleSettings(value?: Partial<BoardStyleSettings> | null): BoardStyleSettings {
   const fontFamily = value?.fontFamily && fontFamilies.has(value.fontFamily)
     ? value.fontFamily
@@ -85,6 +97,7 @@ export function normalizeBoardStyleSettings(value?: Partial<BoardStyleSettings> 
     ),
     currentCallText: normalizeColor(value?.currentCallText, defaultBoardStyleSettings.currentCallText),
     fontFamily,
+    fontScalePercent: normalizeFontScalePercent(value?.fontScalePercent),
     historyBackground: normalizeColor(
       value?.historyBackground,
       defaultBoardStyleSettings.historyBackground,

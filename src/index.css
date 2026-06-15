@@ -3171,12 +3171,14 @@ h3 {
   --board-border-color: #cfe1f0;
   --board-current-background: #ffffff;
   --board-current-text: #0c3557;
+  --board-font-scale: 1;
   --board-history-background: #ffffff;
   --board-history-text: #102033;
   background: var(--board-background);
   box-sizing: border-box;
   color: var(--board-history-text);
   min-height: 100svh;
+  overflow-x: hidden;
   padding: 34px;
 }
 
@@ -3257,7 +3259,7 @@ h3 {
   border-radius: var(--radius);
   color: #ffffff;
   display: inline-flex;
-  font-size: 14px;
+  font-size: calc(14px * var(--board-font-scale));
   font-style: normal;
   font-weight: 900;
   height: 38px;
@@ -3273,19 +3275,19 @@ h3 {
 
 .tv-header span {
   color: var(--board-accent-color);
-  font-size: 18px;
+  font-size: calc(18px * var(--board-font-scale));
   font-weight: 750;
 }
 
 .tv-header strong {
   color: var(--board-history-text);
-  font-size: 42px;
+  font-size: calc(42px * var(--board-font-scale));
   line-height: 1.08;
 }
 
 .tv-header time {
   color: #23435f;
-  font-size: 34px;
+  font-size: calc(34px * var(--board-font-scale));
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -3320,15 +3322,15 @@ h3 {
 }
 
 .tv-layout-grid .tv-call-card strong {
-  font-size: clamp(72px, 10vw, 150px);
+  font-size: calc(clamp(72px, 10vw, 150px) * var(--board-font-scale));
 }
 
 .tv-layout-grid .tv-call-card > span {
-  font-size: clamp(28px, 3.5vw, 48px);
+  font-size: calc(clamp(28px, 3.5vw, 48px) * var(--board-font-scale));
 }
 
 .tv-layout-grid .tv-call-card time {
-  font-size: clamp(24px, 3vw, 40px);
+  font-size: calc(clamp(24px, 3vw, 40px) * var(--board-font-scale));
 }
 
 .tv-layout-cards {
@@ -3350,12 +3352,12 @@ h3 {
 
 .tv-layout-cards .tv-call-featured strong {
   color: var(--board-current-text);
-  font-size: clamp(8rem, 10vw, 12rem);
+  font-size: calc(clamp(8rem, 10vw, 12rem) * var(--board-font-scale));
 }
 
 .tv-layout-cards .tv-call-featured > span {
   color: var(--board-current-text);
-  font-size: clamp(3.2rem, 4.5vw, 5rem);
+  font-size: calc(clamp(3.2rem, 4.5vw, 5rem) * var(--board-font-scale));
 }
 
 .tv-layout-cards .tv-call-card {
@@ -3368,12 +3370,12 @@ h3 {
 }
 
 .tv-layout-cards .tv-call-card strong {
-  font-size: clamp(5.5rem, 6.5vw, 8.5rem);
+  font-size: calc(clamp(5.5rem, 6.5vw, 8.5rem) * var(--board-font-scale));
   overflow-wrap: anywhere;
 }
 
 .tv-layout-cards .tv-call-card > span {
-  font-size: clamp(2.4rem, 3.2vw, 3.8rem);
+  font-size: calc(clamp(2.4rem, 3.2vw, 3.8rem) * var(--board-font-scale));
   overflow-wrap: anywhere;
 }
 
@@ -3420,7 +3422,7 @@ h3 {
 .tv-route-call strong,
 .tv-big-route strong {
   color: var(--board-current-text);
-  font-size: 12rem;
+  font-size: calc(12rem * var(--board-font-scale));
   font-variant-numeric: tabular-nums;
   font-weight: 950;
   line-height: 0.9;
@@ -3436,7 +3438,7 @@ h3 {
 .tv-route-call span,
 .tv-big-route span {
   color: var(--board-accent-color);
-  font-size: 7.5rem;
+  font-size: calc(7.5rem * var(--board-font-scale));
   font-weight: 950;
   line-height: 1;
 }
@@ -3444,7 +3446,7 @@ h3 {
 .tv-route-place-label,
 .tv-big-place {
   color: var(--board-accent-color);
-  font-size: 2.35rem;
+  font-size: calc(2.35rem * var(--board-font-scale));
   font-weight: 950;
   line-height: 1;
   text-transform: uppercase;
@@ -3469,7 +3471,7 @@ h3 {
 
 .tv-video-section-title {
   color: var(--board-history-text);
-  font-size: 2.4rem;
+  font-size: calc(2.4rem * var(--board-font-scale));
   font-weight: 950;
   line-height: 1;
 }
@@ -3490,13 +3492,13 @@ h3 {
 
 .tv-call-history-table th {
   color: var(--board-history-text);
-  font-size: 1.7rem;
+  font-size: calc(1.7rem * var(--board-font-scale));
   font-weight: 950;
 }
 
 .tv-call-history-table td {
   color: var(--board-history-text);
-  font-size: 3.1rem;
+  font-size: calc(3.1rem * var(--board-font-scale));
   font-variant-numeric: tabular-nums;
   font-weight: 950;
   overflow-wrap: anywhere;
@@ -3504,7 +3506,7 @@ h3 {
 
 .tv-call-history-table td:first-child {
   color: var(--board-accent-color);
-  font-size: 3.7rem;
+  font-size: calc(3.7rem * var(--board-font-scale));
 }
 
 .tv-promo-panel {
@@ -3528,17 +3530,14 @@ h3 {
   height: 100%;
   max-height: 100%;
   max-width: 100%;
-  object-fit: cover;
-  width: 100%;
-}
-
-.tv-promo-panel video {
   object-fit: contain;
+  object-position: center;
+  width: 100%;
 }
 
 .tv-promo-empty strong {
   color: #ffffff;
-  font-size: 5.5rem;
+  font-size: calc(5.5rem * var(--board-font-scale));
   font-weight: 950;
   line-height: 1;
 }
@@ -3549,7 +3548,7 @@ h3 {
 }
 
 .tv-promo-unavailable strong {
-  font-size: clamp(2rem, 4vw, 4rem);
+  font-size: calc(clamp(2rem, 4vw, 4rem) * var(--board-font-scale));
 }
 
 .tv-big-board {
@@ -3572,16 +3571,17 @@ h3 {
   gap: 18px;
   justify-content: center;
   min-height: 0;
+  overflow: hidden;
   padding: 28px;
   text-align: center;
 }
 
 .tv-big-route strong {
-  font-size: 15rem;
+  font-size: calc(15rem * var(--board-font-scale));
 }
 
 .tv-big-route span {
-  font-size: 9rem;
+  font-size: calc(9rem * var(--board-font-scale));
 }
 
 .tv-big-history {
@@ -3590,16 +3590,16 @@ h3 {
 }
 
 .tv-big-history .tv-call-history-table th {
-  font-size: 1.9rem;
+  font-size: calc(1.9rem * var(--board-font-scale));
 }
 
 .tv-big-history .tv-call-history-table td {
-  font-size: 3.15rem;
+  font-size: calc(3.15rem * var(--board-font-scale));
   padding: 17px 12px;
 }
 
 .tv-big-history .tv-call-history-table td:first-child {
-  font-size: 3.85rem;
+  font-size: calc(3.85rem * var(--board-font-scale));
 }
 
 .tv-layout-list {
@@ -3627,7 +3627,7 @@ h3 {
 
 .tv-list-row strong {
   color: var(--board-history-text);
-  font-size: clamp(4rem, 4.8rem, 5.6rem);
+  font-size: calc(clamp(4rem, 4.8rem, 5.6rem) * var(--board-font-scale));
   line-height: 1;
   overflow-wrap: anywhere;
 }
@@ -3635,7 +3635,7 @@ h3 {
 .tv-list-row span,
 .tv-list-row time {
   color: var(--board-history-text);
-  font-size: clamp(2.6rem, 3rem, 3.5rem);
+  font-size: calc(clamp(2.6rem, 3rem, 3.5rem) * var(--board-font-scale));
   font-weight: 950;
   overflow-wrap: anywhere;
 }
@@ -3649,7 +3649,7 @@ h3 {
   background: #ffe8e5;
   border-radius: 999px;
   color: #a33a31;
-  font-size: 14px;
+  font-size: calc(14px * var(--board-font-scale));
   font-style: normal;
   font-weight: 900;
   padding: 6px 10px;
@@ -3676,7 +3676,7 @@ h3 {
 }
 
 .tv-layout-minimal .tv-call-card strong {
-  font-size: clamp(150px, 24vw, 360px);
+  font-size: calc(clamp(150px, 24vw, 360px) * var(--board-font-scale));
 }
 
 .tv-current,
@@ -3702,7 +3702,7 @@ h3 {
 
 .tv-section-label {
   color: var(--board-accent-color);
-  font-size: 22px;
+  font-size: calc(22px * var(--board-font-scale));
   font-weight: 900;
   grid-column: 1 / -1;
   text-transform: uppercase;
@@ -3717,7 +3717,7 @@ h3 {
 
 .tv-section-heading time {
   color: #23435f;
-  font-size: clamp(24px, 3vw, 38px);
+  font-size: calc(clamp(24px, 3vw, 38px) * var(--board-font-scale));
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -3746,7 +3746,9 @@ h3 {
   flex-direction: column;
   gap: 28px;
   justify-content: center;
+  min-width: 0;
   min-height: 460px;
+  overflow: hidden;
   padding: 42px;
   text-align: center;
 }
@@ -3768,12 +3770,14 @@ h3 {
 
 .tv-call-card strong {
   color: var(--board-current-text);
-  font-size: clamp(120px, 16vw, 260px);
+  font-size: calc(clamp(120px, 16vw, 260px) * var(--board-font-scale));
   line-height: 1;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .tv-call-featured strong {
-  font-size: clamp(140px, 18vw, 300px);
+  font-size: calc(clamp(140px, 18vw, 300px) * var(--board-font-scale));
 }
 
 .tv-call-animated strong {
@@ -3782,14 +3786,16 @@ h3 {
 
 .tv-call-card > span {
   color: var(--board-current-text);
-  font-size: clamp(42px, 5vw, 82px);
+  font-size: calc(clamp(42px, 5vw, 82px) * var(--board-font-scale));
   font-weight: 900;
   line-height: 1.05;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .tv-call-card time {
   color: var(--board-accent-color);
-  font-size: clamp(38px, 4vw, 68px);
+  font-size: calc(clamp(38px, 4vw, 68px) * var(--board-font-scale));
   font-weight: 900;
 }
 
@@ -3800,7 +3806,7 @@ h3 {
   border-radius: var(--radius);
   color: #1769aa;
   display: flex;
-  font-size: 46px;
+  font-size: calc(46px * var(--board-font-scale));
   font-weight: 900;
   grid-column: 1 / -1;
   justify-content: center;
@@ -3834,7 +3840,7 @@ h3 {
 
 .tv-recent-row strong {
   color: var(--board-accent-color);
-  font-size: clamp(3.4rem, 4rem, 4.8rem);
+  font-size: calc(clamp(3.4rem, 4rem, 4.8rem) * var(--board-font-scale));
   line-height: 1;
   overflow-wrap: anywhere;
 }
@@ -3842,7 +3848,7 @@ h3 {
 .tv-recent-row span,
 .tv-recent-row time {
   color: var(--board-history-text);
-  font-size: clamp(2.2rem, 2.65rem, 3.2rem);
+  font-size: calc(clamp(2.2rem, 2.65rem, 3.2rem) * var(--board-font-scale));
   font-weight: 950;
 }
 
@@ -3862,7 +3868,7 @@ h3 {
   background: #ffe8e5;
   border-radius: 999px;
   color: #a33a31;
-  font-size: 13px;
+  font-size: calc(13px * var(--board-font-scale));
   font-style: normal;
   font-weight: 900;
   grid-column: 2 / -1;
@@ -3892,7 +3898,7 @@ h3 {
 
 .tv-classic-history td {
   color: var(--board-history-text);
-  font-size: clamp(1.65rem, 2.2vw, 2.8rem);
+  font-size: calc(clamp(1.65rem, 2.2vw, 2.8rem) * var(--board-font-scale));
   font-weight: 900;
   line-height: 1;
   padding: clamp(14px, 2vh, 24px) clamp(14px, 1.8vw, 26px);
@@ -3902,7 +3908,7 @@ h3 {
 
 .tv-classic-history td:first-child {
   color: var(--board-accent-color);
-  font-size: clamp(2.4rem, 3.4vw, 4.2rem);
+  font-size: calc(clamp(2.4rem, 3.4vw, 4.2rem) * var(--board-font-scale));
   width: 42%;
 }
 
@@ -3912,30 +3918,30 @@ h3 {
 }
 
 .tv-classic-history-compact td {
-  font-size: clamp(1.35rem, 1.8vw, 2.15rem);
+  font-size: calc(clamp(1.35rem, 1.8vw, 2.15rem) * var(--board-font-scale));
   padding-block: clamp(9px, 1.25vh, 15px);
 }
 
 .tv-classic-history-compact td:first-child {
-  font-size: clamp(1.9rem, 2.6vw, 3rem);
+  font-size: calc(clamp(1.9rem, 2.6vw, 3rem) * var(--board-font-scale));
 }
 
 .tv-classic-history-dense td {
-  font-size: clamp(1.05rem, 1.35vw, 1.65rem);
+  font-size: calc(clamp(1.05rem, 1.35vw, 1.65rem) * var(--board-font-scale));
   padding-block: clamp(5px, 0.75vh, 9px);
 }
 
 .tv-classic-history-dense td:first-child {
-  font-size: clamp(1.45rem, 1.9vw, 2.2rem);
+  font-size: calc(clamp(1.45rem, 1.9vw, 2.2rem) * var(--board-font-scale));
 }
 
 .tv-classic-history-ultra td {
-  font-size: clamp(0.8rem, 1vw, 1.15rem);
+  font-size: calc(clamp(0.8rem, 1vw, 1.15rem) * var(--board-font-scale));
   padding-block: 4px;
 }
 
 .tv-classic-history-ultra td:first-child {
-  font-size: clamp(1rem, 1.3vw, 1.5rem);
+  font-size: calc(clamp(1rem, 1.3vw, 1.5rem) * var(--board-font-scale));
 }
 
 .tv-video-layout-no-history .tv-promo-panel {
@@ -3974,7 +3980,7 @@ h3 {
   background: #eef7ff;
   border-radius: var(--radius);
   color: #173a57;
-  font-size: 24px;
+  font-size: calc(24px * var(--board-font-scale));
   font-weight: 850;
   padding: 20px;
   text-align: center;
@@ -3995,7 +4001,7 @@ h3 {
 
 .tv-closed-state h1 {
   color: #0c3557;
-  font-size: clamp(56px, 8vw, 132px);
+  font-size: calc(clamp(56px, 8vw, 132px) * var(--board-font-scale));
   font-weight: 950;
   line-height: 1.05;
 }
@@ -4085,19 +4091,19 @@ h3 {
 
   .tv-route-call strong,
   .tv-layout-cards .tv-call-featured strong {
-    font-size: 8rem;
+    font-size: calc(8rem * var(--board-font-scale));
   }
 
   .tv-route-call span {
-    font-size: 5rem;
+    font-size: calc(5rem * var(--board-font-scale));
   }
 
   .tv-big-route strong {
-    font-size: 10rem;
+    font-size: calc(10rem * var(--board-font-scale));
   }
 
   .tv-big-route span {
-    font-size: 6rem;
+    font-size: calc(6rem * var(--board-font-scale));
   }
 
   .tv-big-board {
@@ -4268,19 +4274,19 @@ h3 {
   }
 
   .tv-header strong {
-    font-size: 32px;
+    font-size: calc(32px * var(--board-font-scale));
   }
 
   .tv-header time {
-    font-size: 26px;
+    font-size: calc(26px * var(--board-font-scale));
   }
 
   .tv-call-card strong {
-    font-size: 50px;
+    font-size: calc(50px * var(--board-font-scale));
   }
 
   .tv-call-featured strong {
-    font-size: 64px;
+    font-size: calc(64px * var(--board-font-scale));
   }
 
   .tv-route-call,
@@ -4291,26 +4297,26 @@ h3 {
   .tv-route-call strong,
   .tv-big-route strong,
   .tv-layout-cards .tv-call-featured strong {
-    font-size: 4.6rem;
+    font-size: calc(4.6rem * var(--board-font-scale));
   }
 
   .tv-route-call span,
   .tv-big-route span {
-    font-size: 3rem;
+    font-size: calc(3rem * var(--board-font-scale));
   }
 
   .tv-route-place-label,
   .tv-big-place {
-    font-size: 1.5rem;
+    font-size: calc(1.5rem * var(--board-font-scale));
   }
 
   .tv-call-history-table th {
-    font-size: 1rem;
+    font-size: calc(1rem * var(--board-font-scale));
   }
 
   .tv-call-history-table td,
   .tv-call-history-table td:first-child {
-    font-size: 1.6rem;
+    font-size: calc(1.6rem * var(--board-font-scale));
   }
 
   .tv-layout-cards {
@@ -4324,11 +4330,11 @@ h3 {
   }
 
   .tv-layout-cards .tv-call-card strong {
-    font-size: 3.8rem;
+    font-size: calc(3.8rem * var(--board-font-scale));
   }
 
   .tv-layout-cards .tv-call-card > span {
-    font-size: 1.7rem;
+    font-size: calc(1.7rem * var(--board-font-scale));
   }
 
   .tv-layout-list {
@@ -4344,12 +4350,12 @@ h3 {
   }
 
   .tv-list-row strong {
-    font-size: 3rem;
+    font-size: calc(3rem * var(--board-font-scale));
   }
 
   .tv-list-row span,
   .tv-list-row time {
-    font-size: 1.7rem;
+    font-size: calc(1.7rem * var(--board-font-scale));
   }
 
   .tv-video-current,
@@ -4714,6 +4720,12 @@ h3 {
   align-items: stretch;
 }
 
+.board-typography-settings {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .board-screen-format-settings {
   align-items: stretch;
 }
@@ -4783,44 +4795,68 @@ h3 {
 
 .board-color-settings-grid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
 }
 
 .board-color-field {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   display: grid;
-  gap: 7px;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
 }
 
-.board-color-field > span {
+.board-color-field > label {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
+  line-height: 1.35;
 }
 
-.board-color-field > div {
+.board-color-controls {
   align-items: center;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  display: flex;
+  display: grid;
   gap: 10px;
-  padding: 7px 10px;
+  grid-template-columns: 52px minmax(0, 1fr);
+  min-width: 0;
+  padding: 8px;
 }
 
 .board-color-field input[type="color"] {
   background: transparent;
   border: 0;
   cursor: pointer;
-  height: 34px;
+  height: 40px;
   padding: 0;
-  width: 48px;
+  width: 52px;
 }
 
-.board-color-field code {
+.board-color-hex-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-sizing: border-box;
   color: var(--text);
-  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 750;
+  height: 40px;
+  min-width: 0;
+  padding: 0 10px;
   text-transform: uppercase;
+  width: 100%;
+}
+
+.board-color-hex-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
+  outline: 0;
 }
 
 .promo-upload-button {
@@ -5163,8 +5199,17 @@ h3 {
   .admin-summary-grid,
   .admin-inline-form,
   .board-color-settings-grid,
-  .board-format-selector {
+  .board-format-selector,
+  .board-typography-settings {
     grid-template-columns: 1fr;
+  }
+
+  .board-color-controls {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .board-color-field input[type="color"] {
+    width: 46px;
   }
 }
 
@@ -5231,41 +5276,44 @@ h3 {
 }
 
 .board-format-4-3 .tv-call-featured strong {
-  font-size: clamp(6rem, 17vmin, 11rem);
+  font-size: calc(clamp(6rem, 17vmin, 11rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-call-featured > span {
-  font-size: clamp(2rem, 5vmin, 3.6rem);
+  font-size: calc(clamp(2rem, 5vmin, 3.6rem) * var(--board-font-scale));
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .board-format-4-3 .tv-classic-history td {
-  font-size: clamp(1.25rem, 2.1vw, 2rem);
+  font-size: calc(clamp(1.25rem, 2.1vw, 2rem) * var(--board-font-scale));
   padding: clamp(9px, 1.3vh, 15px) 14px;
 }
 
 .board-format-4-3 .tv-classic-history td:first-child {
-  font-size: clamp(1.8rem, 3vw, 3rem);
+  font-size: calc(clamp(1.8rem, 3vw, 3rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-classic-history-compact td {
-  font-size: clamp(1rem, 1.55vw, 1.45rem);
+  font-size: calc(clamp(1rem, 1.55vw, 1.45rem) * var(--board-font-scale));
   padding-block: clamp(6px, 0.8vh, 9px);
 }
 
 .board-format-4-3 .tv-classic-history-compact td:first-child {
-  font-size: clamp(1.4rem, 2.1vw, 2rem);
+  font-size: calc(clamp(1.4rem, 2.1vw, 2rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-classic-history-dense td,
 .board-format-4-3 .tv-classic-history-ultra td {
-  font-size: clamp(0.75rem, 1.05vw, 1rem);
+  font-size: calc(clamp(0.75rem, 1.05vw, 1rem) * var(--board-font-scale));
   padding-block: 4px;
 }
 
 .board-format-4-3 .tv-classic-history-dense td:first-child,
 .board-format-4-3 .tv-classic-history-ultra td:first-child {
-  font-size: clamp(1rem, 1.4vw, 1.35rem);
+  font-size: calc(clamp(1rem, 1.4vw, 1.35rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-layout-grid {
@@ -5284,11 +5332,14 @@ h3 {
 }
 
 .board-format-4-3 .tv-layout-grid .tv-call-card strong {
-  font-size: clamp(3.5rem, 9vmin, 6.5rem);
+  font-size: calc(clamp(3.5rem, 9vmin, 6.5rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-layout-grid .tv-call-card > span {
-  font-size: clamp(1.35rem, 3.2vmin, 2.3rem);
+  font-size: calc(clamp(1.35rem, 3.2vmin, 2.3rem) * var(--board-font-scale));
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -5307,11 +5358,14 @@ h3 {
 }
 
 .board-format-4-3 .tv-list-row strong {
-  font-size: clamp(2.5rem, 6vmin, 4rem);
+  font-size: calc(clamp(2.5rem, 6vmin, 4rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-list-row span {
-  font-size: clamp(1.35rem, 3.2vmin, 2.2rem);
+  font-size: calc(clamp(1.35rem, 3.2vmin, 2.2rem) * var(--board-font-scale));
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -5321,7 +5375,7 @@ h3 {
 }
 
 .board-format-4-3 .tv-layout-minimal .tv-call-card strong {
-  font-size: clamp(8rem, 25vmin, 16rem);
+  font-size: calc(clamp(8rem, 25vmin, 16rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-layout-cards {
@@ -5337,11 +5391,14 @@ h3 {
 }
 
 .board-format-4-3 .tv-layout-cards .tv-call-featured strong {
-  font-size: clamp(6rem, 15vmin, 10rem);
+  font-size: calc(clamp(6rem, 15vmin, 10rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-layout-cards .tv-call-featured > span {
-  font-size: clamp(2rem, 4vmin, 3rem);
+  font-size: calc(clamp(2rem, 4vmin, 3rem) * var(--board-font-scale));
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -5352,11 +5409,14 @@ h3 {
 }
 
 .board-format-4-3 .tv-layout-cards .tv-call-card strong {
-  font-size: clamp(3rem, 7vmin, 5rem);
+  font-size: calc(clamp(3rem, 7vmin, 5rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-layout-cards .tv-call-card > span {
-  font-size: clamp(1.25rem, 2.8vmin, 2rem);
+  font-size: calc(clamp(1.25rem, 2.8vmin, 2rem) * var(--board-font-scale));
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -5381,15 +5441,15 @@ h3 {
 }
 
 .board-format-4-3 .tv-route-call strong {
-  font-size: clamp(5rem, 13vmin, 8rem);
+  font-size: calc(clamp(5rem, 13vmin, 8rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-route-call span {
-  font-size: clamp(3rem, 7vmin, 4.8rem);
+  font-size: calc(clamp(3rem, 7vmin, 4.8rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-route-place-label {
-  font-size: clamp(1.3rem, 3vmin, 2rem);
+  font-size: calc(clamp(1.3rem, 3vmin, 2rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-video-history {
@@ -5399,21 +5459,21 @@ h3 {
 }
 
 .board-format-4-3 .tv-video-section-title {
-  font-size: clamp(1.25rem, 2.5vmin, 1.8rem);
+  font-size: calc(clamp(1.25rem, 2.5vmin, 1.8rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-video-history .tv-call-history-table th {
-  font-size: clamp(0.8rem, 1.6vmin, 1.1rem);
+  font-size: calc(clamp(0.8rem, 1.6vmin, 1.1rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-video-history .tv-call-history-table td {
-  font-size: clamp(1.35rem, 3vmin, 2rem);
+  font-size: calc(clamp(1.35rem, 3vmin, 2rem) * var(--board-font-scale));
   padding: 8px 6px;
   white-space: nowrap;
 }
 
 .board-format-4-3 .tv-video-history .tv-call-history-table td:first-child {
-  font-size: clamp(1.8rem, 4vmin, 2.6rem);
+  font-size: calc(clamp(1.8rem, 4vmin, 2.6rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-promo-panel video,
@@ -5434,15 +5494,15 @@ h3 {
 }
 
 .board-format-4-3 .tv-big-route strong {
-  font-size: clamp(7rem, 18vmin, 12rem);
+  font-size: calc(clamp(7rem, 18vmin, 12rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-big-route span {
-  font-size: clamp(4rem, 9vmin, 6rem);
+  font-size: calc(clamp(4rem, 9vmin, 6rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-big-place {
-  font-size: clamp(1.5rem, 3.5vmin, 2.4rem);
+  font-size: calc(clamp(1.5rem, 3.5vmin, 2.4rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-big-history {
@@ -5452,17 +5512,17 @@ h3 {
 }
 
 .board-format-4-3 .tv-big-history .tv-call-history-table th {
-  font-size: clamp(0.9rem, 1.7vmin, 1.2rem);
+  font-size: calc(clamp(0.9rem, 1.7vmin, 1.2rem) * var(--board-font-scale));
 }
 
 .board-format-4-3 .tv-big-history .tv-call-history-table td {
-  font-size: clamp(1.4rem, 3vmin, 2.1rem);
+  font-size: calc(clamp(1.4rem, 3vmin, 2.1rem) * var(--board-font-scale));
   padding: 8px 6px;
   white-space: nowrap;
 }
 
 .board-format-4-3 .tv-big-history .tv-call-history-table td:first-child {
-  font-size: clamp(1.8rem, 4vmin, 2.7rem);
+  font-size: calc(clamp(1.8rem, 4vmin, 2.7rem) * var(--board-font-scale));
 }
 
 @page {

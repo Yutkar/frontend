@@ -59,7 +59,10 @@ const defaultBoardSettings: BoardSettings = {
   voiceEnabled: true,
 }
 
-type BoardColorSettingKey = Exclude<keyof BoardStyleSettings, 'fontFamily' | 'screenFormat'>
+type BoardColorSettingKey = Exclude<
+  keyof BoardStyleSettings,
+  'fontFamily' | 'fontScalePercent' | 'screenFormat'
+>
 
 const boardColorFields: Array<{ key: BoardColorSettingKey; label: string }> = [
   { key: 'boardBackground', label: 'Цвет фона табло' },
@@ -70,6 +73,107 @@ const boardColorFields: Array<{ key: BoardColorSettingKey; label: string }> = [
   { key: 'borderColor', label: 'Цвет рамок/разделителей' },
   { key: 'accentColor', label: 'Цвет акцента' },
 ]
+
+const boardHexColorPattern = /^#[0-9a-f]{6}$/i
+
+function BoardFontScaleField({
+  onChange,
+  value,
+}: {
+  onChange: (value: number) => void
+  value: number
+}) {
+  const [inputValue, setInputValue] = useState(String(value))
+
+  return (
+    <label className="field">
+      <span>Размер шрифта, %</span>
+      <input
+        max={300}
+        min={50}
+        onBlur={() => {
+          const numericValue = inputValue.trim() ? Number(inputValue) : Number.NaN
+          const normalizedValue = Number.isFinite(numericValue)
+            ? Math.min(300, Math.max(50, Math.round(numericValue)))
+            : value
+
+          setInputValue(String(normalizedValue))
+          onChange(normalizedValue)
+        }}
+        onChange={(event) => {
+          const nextInputValue = event.currentTarget.value
+          const numericValue = Number(nextInputValue)
+
+          setInputValue(nextInputValue)
+          if (nextInputValue && Number.isFinite(numericValue) && numericValue >= 50 && numericValue <= 300) {
+            onChange(Math.round(numericValue))
+          }
+        }}
+        step={5}
+        type="number"
+        value={inputValue}
+      />
+      <small className="field-help">100% — стандартный размер, допустимо от 50% до 300%.</small>
+    </label>
+  )
+}
+
+function BoardColorField({
+  colorKey,
+  label,
+  onChange,
+  value,
+}: {
+  colorKey: BoardColorSettingKey
+  label: string
+  onChange: (value: string) => void
+  value: string
+}) {
+  const [hexValue, setHexValue] = useState(value.toUpperCase())
+  const inputId = `board-color-${colorKey}`
+
+  return (
+    <div className="board-color-field">
+      <label htmlFor={inputId}>{label}</label>
+      <div className="board-color-controls">
+        <input
+          aria-label={label}
+          id={inputId}
+          onChange={(event) => {
+            const nextValue = event.currentTarget.value
+
+            setHexValue(nextValue.toUpperCase())
+            onChange(nextValue)
+          }}
+          type="color"
+          value={value}
+        />
+        <input
+          aria-label={`${label}, HEX`}
+          className="board-color-hex-input"
+          maxLength={7}
+          onBlur={() => {
+            if (!boardHexColorPattern.test(hexValue.trim())) {
+              setHexValue(value.toUpperCase())
+            }
+          }}
+          onChange={(event) => {
+            const nextValue = event.currentTarget.value
+
+            setHexValue(nextValue)
+            if (boardHexColorPattern.test(nextValue.trim())) {
+              onChange(nextValue.trim())
+            }
+          }}
+          pattern="#[0-9a-fA-F]{6}"
+          spellCheck={false}
+          type="text"
+          value={hexValue}
+        />
+      </div>
+    </div>
+  )
+}
 
 function BoardTemplateSelector({
   onSelect,
@@ -808,36 +912,37 @@ export function BoardSettingsSection() {
             <fieldset className="admin-checkbox-group board-style-settings">
               <legend>Внешний вид табло</legend>
 
-              <label className="field">
-                <span>Шрифт табло</span>
-                <select
-                  onChange={(event) => updateBoardStyleSettings({
-                    fontFamily: event.target.value as BoardFontFamily,
-                  })}
-                  value={boardStyleSettings.fontFamily}
-                >
-                  {boardFontOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="board-typography-settings">
+                <label className="field">
+                  <span>Шрифт табло</span>
+                  <select
+                    onChange={(event) => updateBoardStyleSettings({
+                      fontFamily: event.target.value as BoardFontFamily,
+                    })}
+                    value={boardStyleSettings.fontFamily}
+                  >
+                    {boardFontOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <BoardFontScaleField
+                  key={draftProfile.id}
+                  onChange={(fontScalePercent) => updateBoardStyleSettings({ fontScalePercent })}
+                  value={boardStyleSettings.fontScalePercent}
+                />
+              </div>
 
               <div className="board-color-settings-grid">
                 {boardColorFields.map((field) => (
-                  <label className="board-color-field" key={field.key}>
-                    <span>{field.label}</span>
-                    <div>
-                      <input
-                        aria-label={field.label}
-                        onChange={(event) => updateBoardStyleSettings({
-                          [field.key]: event.target.value,
-                        })}
-                        type="color"
-                        value={boardStyleSettings[field.key]}
-                      />
-                      <code>{boardStyleSettings[field.key]}</code>
-                    </div>
-                  </label>
+                  <BoardColorField
+                    colorKey={field.key}
+                    key={`${draftProfile.id}-${field.key}`}
+                    label={field.label}
+                    onChange={(value) => updateBoardStyleSettings({ [field.key]: value })}
+                    value={boardStyleSettings[field.key]}
+                  />
                 ))}
               </div>
             </fieldset>

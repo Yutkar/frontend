@@ -192,6 +192,7 @@ export function TvBoardPage() {
     '--board-border-color': boardStyleSettings.borderColor,
     '--board-current-background': boardStyleSettings.currentCallBackground,
     '--board-current-text': boardStyleSettings.currentCallText,
+    '--board-font-scale': boardStyleSettings.fontScalePercent / 100,
     '--board-history-background': boardStyleSettings.historyBackground,
     '--board-history-text': boardStyleSettings.historyText,
     background: boardStyleSettings.boardBackground,
