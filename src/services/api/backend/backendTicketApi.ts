@@ -494,6 +494,12 @@ export const backendTicketApi: TicketApi = {
     return toArchitectureTicket(response.data)
   },
 
+  async getTicketHistory(id: string) {
+    const response = await apiClient.get<BackendTicket>(`/tickets/${id}`)
+
+    return toSharedTicket(response.data)
+  },
+
   async createTicket(input) {
     await assertRoomAcceptsTickets(input.roomId)
 

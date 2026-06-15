@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownUp,
+  History,
   PlusCircle,
   RotateCcw,
   SlidersHorizontal,
   UserX,
+  X,
   XCircle,
 } from 'lucide-react'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
@@ -23,9 +25,9 @@ import {
 import type { TicketSettingsOptions } from '@services/api'
 import { ticketService } from '@services/ticketService'
 import { t } from '@shared/locales/useLocale'
-import type { Ticket, TicketPriority, TicketStatus } from '@shared/types'
+import type { Room, Ticket, TicketPriority, TicketStatus } from '@shared/types'
 import { Button, QueueTableBase, TicketCard } from '@shared/ui/components'
-import { formatRoomName, getWaitingMinutes, useCurrentTime } from '@shared/utils'
+import { formatRoomName, formatWaitingTime, getWaitingMinutes, useCurrentTime } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 import { DashboardKpis, RecentCallsWidget, RoomLoadWidget } from '@widgets'
@@ -55,6 +57,8 @@ const closedTicketStatuses: TicketStatus[] = ['completed', 'cancelled', 'no_show
 const noShowStatuses: TicketStatus[] = ['waiting', 'called', 'redirected']
 
 type TicketFilterState = {
+  dateFrom: string
+  dateTo: string
   doctorId: string
   priority: string
   roomId: string
@@ -64,6 +68,8 @@ type TicketFilterState = {
 }
 
 const emptyTicketFilters: TicketFilterState = {
+  dateFrom: '',
+  dateTo: '',
   doctorId: '',
   priority: '',
   roomId: '',
@@ -78,22 +84,53 @@ const emptyFilterOptions: TicketSettingsOptions = {
   specialists: [],
 }
 
+function getDateInputValue(date: Date | number = Date.now()): string {
+  const resolvedDate = typeof date === 'number' ? new Date(date) : date
+  const year = resolvedDate.getFullYear()
+  const month = String(resolvedDate.getMonth() + 1).padStart(2, '0')
+  const day = String(resolvedDate.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function getInitialTicketFilters(): TicketFilterState {
+  const today = getDateInputValue()
+
+  return {
+    ...emptyTicketFilters,
+    dateFrom: today,
+    dateTo: today,
+  }
+}
+
 function normalizeFilterValue(value?: string | number | null): string {
   return value == null ? '' : String(value)
 }
 
-function isTicketCreatedToday(ticket: Ticket, now: number): boolean {
+function isTicketCreatedInDateRange(ticket: Ticket, dateFrom: string, dateTo: string): boolean {
   const createdAt = new Date(ticket.createdAt)
 
   if (!Number.isFinite(createdAt.getTime())) {
     return false
   }
 
-  const today = new Date(now)
+  if (dateFrom) {
+    const from = new Date(`${dateFrom}T00:00:00`)
 
-  return createdAt.getFullYear() === today.getFullYear() &&
-    createdAt.getMonth() === today.getMonth() &&
-    createdAt.getDate() === today.getDate()
+    if (createdAt < from) {
+      return false
+    }
+  }
+
+  if (dateTo) {
+    const to = new Date(`${dateTo}T23:59:59.999`)
+
+    if (createdAt > to) {
+      return false
+    }
+  }
+
+  return true
 }
 
 function getTicketServiceOptionLabel(ticket: Ticket, options: TicketSettingsOptions): string {
@@ -121,14 +158,183 @@ function getTicketServiceOptionLabel(ticket: Ticket, options: TicketSettingsOpti
     })
 }
 
+function formatDateTime(value?: string): string {
+  if (!value) {
+    return 'Нет данных'
+  }
+
+  const date = new Date(value)
+
+  if (!Number.isFinite(date.getTime())) {
+    return 'Нет данных'
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+}
+
+function getDurationMinutes(start?: string, end?: string): number | null {
+  if (!start || !end) {
+    return null
+  }
+
+  const startTime = Date.parse(start)
+  const endTime = Date.parse(end)
+
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+    return null
+  }
+
+  return Math.max(0, Math.floor((endTime - startTime) / 60_000))
+}
+
+function getTicketWaitingHistoryMinutes(ticket: Ticket, now: number): number | null {
+  return getDurationMinutes(ticket.createdAt, ticket.calledAt)
+    ?? getWaitingMinutes(ticket, now)
+}
+
+function getTicketServiceHistoryMinutes(ticket: Ticket, now: number): number | null {
+  const serviceEnd = ticket.completedAt ?? (ticket.status === 'in_service' ? new Date(now).toISOString() : undefined)
+
+  return getDurationMinutes(ticket.startedAt ?? ticket.serviceStartedAt, serviceEnd)
+}
+
+function getTicketEventLabel(eventType: string): string {
+  const labels: Record<string, string> = {
+    patient_arrived: 'Пациент вернулся в очередь',
+    patient_redirected: 'Пациент перенаправлен',
+    queue_overloaded: 'Очередь перегружена',
+    service_completed: 'Обслуживание завершено',
+    service_started: 'Обслуживание начато',
+    status_update: 'Статус обновлён',
+    ticket_called: 'Талон вызван',
+    ticket_cancelled: 'Талон отменён',
+    ticket_created: 'Талон создан',
+  }
+
+  return labels[eventType] ?? eventType
+}
+
+function TicketHistoryModal({
+  onClose,
+  options,
+  rooms,
+  ticket,
+  now,
+}: {
+  onClose: () => void
+  options: TicketSettingsOptions
+  rooms: Room[]
+  ticket: Ticket
+  now: number
+}) {
+  const room = rooms.find((item) => String(item.id) === String(ticket.roomId))
+  const events = [...(ticket.events ?? [])].sort((left, right) => (
+    new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+  ))
+  const waitingMinutes = getTicketWaitingHistoryMinutes(ticket, now)
+  const serviceMinutes = getTicketServiceHistoryMinutes(ticket, now)
+
+  return (
+    <div aria-modal="true" className="modal-backdrop" role="dialog">
+      <article className="ticket-settings-modal ticket-history-modal">
+        <header className="modal-header">
+          <div>
+            <span className="eyebrow">
+              <History size={14} />
+              История талона
+            </span>
+            <h2>Талон {ticket.number}</h2>
+          </div>
+          <button aria-label="Закрыть" className="modal-close" onClick={onClose} type="button">
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="ticket-history-summary">
+          <div>
+            <span>Тип услуги</span>
+            <strong>{getTicketServiceOptionLabel(ticket, options)}</strong>
+          </div>
+          <div>
+            <span>Кабинет</span>
+            <strong>{formatRoomName(room ?? { id: ticket.roomId, name: ticket.roomName })}</strong>
+          </div>
+          <div>
+            <span>Создан</span>
+            <strong>{formatDateTime(ticket.createdAt)}</strong>
+          </div>
+          <div>
+            <span>Вызван</span>
+            <strong>{formatDateTime(ticket.calledAt)}</strong>
+          </div>
+          <div>
+            <span>Ожидание в очереди</span>
+            <strong>{formatWaitingTime(waitingMinutes)}</strong>
+          </div>
+          <div>
+            <span>Время обслуживания</span>
+            <strong>{formatWaitingTime(serviceMinutes)}</strong>
+          </div>
+          <div>
+            <span>Статус</span>
+            <strong>{getStatusLabel(ticket.status)}</strong>
+          </div>
+        </div>
+
+        <section className="ticket-history-events">
+          <h3>Хронология</h3>
+          {events.length > 0 ? (
+            <ol>
+              {events.map((event) => (
+                <li key={String(event.id)}>
+                  <time>{formatDateTime(event.createdAt)}</time>
+                  <div>
+                    <strong>{getTicketEventLabel(event.eventType)}</strong>
+                    {event.oldStatus || event.newStatus ? (
+                      <span>
+                        {event.oldStatus ? getStatusLabel(event.oldStatus) : 'нет статуса'}
+                        {' -> '}
+                        {event.newStatus ? getStatusLabel(event.newStatus) : 'нет статуса'}
+                      </span>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="empty-state compact-empty">
+              <h2>События по талону не найдены</h2>
+            </div>
+          )}
+        </section>
+
+        <footer className="modal-actions">
+          <Button onClick={onClose} variant="primary">
+            Закрыть
+          </Button>
+        </footer>
+      </article>
+    </div>
+  )
+}
+
 export function DashboardPage() {
   useQueueBootstrap({ force: true })
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [filters, setFilters] = useState<TicketFilterState>(emptyTicketFilters)
+  const [filters, setFilters] = useState<TicketFilterState>(() => getInitialTicketFilters())
   const [filterOptions, setFilterOptions] = useState<TicketSettingsOptions>(emptyFilterOptions)
   const [sortBy, setSortBy] = useState<QueueSort>('priority')
   const [settingsTicket, setSettingsTicket] = useState<Ticket | undefined>()
+  const [historyTicket, setHistoryTicket] = useState<Ticket | undefined>()
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historyLoadingTicketId, setHistoryLoadingTicketId] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [busyTicketId, setBusyTicketId] = useState<string | null>(null)
   const now = useCurrentTime()
@@ -145,11 +351,11 @@ export function DashboardPage() {
   const tickets = useQueueStore((state) => state.tickets)
   const user = useGlobalStore((state) => state.user)
 
-  const todayTickets = useMemo(
-    () => tickets.filter((ticket) => isTicketCreatedToday(ticket, now)),
-    [now, tickets],
+  const dateFilteredTickets = useMemo(
+    () => tickets.filter((ticket) => isTicketCreatedInDateRange(ticket, filters.dateFrom, filters.dateTo)),
+    [filters.dateFrom, filters.dateTo, tickets],
   )
-  const selectedTicket = todayTickets.find((ticket) => ticket.id === selectedTicketId) ?? todayTickets[0]
+  const selectedTicket = dateFilteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? dateFilteredTickets[0]
   const canManageTicketSettings = user?.role === 'admin' || user?.role === 'manager'
   const canMarkTicketNoShow = user?.role === 'admin' || user?.role === 'specialist'
   const visibleSuccessMessage = successMessage ?? statusMessage
@@ -197,7 +403,7 @@ export function DashboardPage() {
       (serviceType) => normalizeFilterValue(serviceType.id) === filters.serviceTypeId,
     )
 
-    return todayTickets.filter((ticket) => {
+    return dateFilteredTickets.filter((ticket) => {
       if (filters.roomId && normalizeFilterValue(ticket.roomId) !== filters.roomId) {
         return false
       }
@@ -232,7 +438,7 @@ export function DashboardPage() {
 
       return true
     })
-  }, [filters, serviceFilterOptions, todayTickets])
+  }, [dateFilteredTickets, filters, serviceFilterOptions])
 
   const sortedTickets = useMemo(() => {
     return [...filteredTickets].sort((left, right) => {
@@ -256,6 +462,23 @@ export function DashboardPage() {
   async function handleTicketCreated() {
     await loadQueue({ force: true, successMessage: t.tickets.createdTicket })
     setSuccessMessage(t.tickets.createdTicket)
+  }
+
+  async function handleOpenTicketHistory(ticket: Ticket) {
+    setHistoryError(null)
+    setHistoryLoadingTicketId(ticket.id)
+
+    try {
+      const detailedTicket = await ticketService.getTicketHistory(ticket.id)
+
+      setHistoryTicket(detailedTicket ?? ticket)
+    } catch (historyLoadError) {
+      console.error('Dashboard ticket history load failed', historyLoadError)
+      setHistoryError('Не удалось загрузить историю талона')
+      setHistoryTicket(ticket)
+    } finally {
+      setHistoryLoadingTicketId(null)
+    }
   }
 
   async function handleTicketAction(
@@ -303,6 +526,7 @@ export function DashboardPage() {
     <div className="page-stack">
       {loading ? <div className="modal-info">Загрузка данных...</div> : null}
       {error ? <div className="modal-error">Не удалось загрузить данные</div> : null}
+      {historyError ? <div className="modal-error">{historyError}</div> : null}
       {!loading && !error && visibleSuccessMessage ? (
         <div className="modal-success">{visibleSuccessMessage}</div>
       ) : null}
@@ -368,6 +592,28 @@ export function DashboardPage() {
               </Button>
             </div>
             <div className="ticket-filters-grid">
+              <label className="field">
+                <span>Дата от</span>
+                <input
+                  onChange={(event) => {
+                    setFilters((current) => ({ ...current, dateFrom: event.target.value }))
+                  }}
+                  type="date"
+                  value={filters.dateFrom}
+                />
+              </label>
+
+              <label className="field">
+                <span>Дата до</span>
+                <input
+                  onChange={(event) => {
+                    setFilters((current) => ({ ...current, dateTo: event.target.value }))
+                  }}
+                  type="date"
+                  value={filters.dateTo}
+                />
+              </label>
+
               <label className="field">
                 <span>{t.queue.servicePlace}</span>
                 <select
@@ -486,6 +732,17 @@ export function DashboardPage() {
                   </Button>
                   {canManageTicketSettings ? (
                     <Button
+                      disabled={historyLoadingTicketId === ticket.id}
+                      icon={<History size={15} />}
+                      onClick={() => void handleOpenTicketHistory(ticket)}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      {historyLoadingTicketId === ticket.id ? 'Загрузка...' : 'История'}
+                    </Button>
+                  ) : null}
+                  {canManageTicketSettings ? (
+                    <Button
                       icon={<SlidersHorizontal size={15} />}
                       onClick={() => {
                         setSuccessMessage(null)
@@ -579,6 +836,15 @@ export function DashboardPage() {
         open={Boolean(settingsTicket)}
         ticket={settingsTicket}
       />
+      {historyTicket ? (
+        <TicketHistoryModal
+          now={now}
+          onClose={() => setHistoryTicket(undefined)}
+          options={filterOptions}
+          rooms={rooms}
+          ticket={historyTicket}
+        />
+      ) : null}
       <TicketManualCreateModal
         fallbackRooms={rooms}
         onClose={() => setCreateModalOpen(false)}

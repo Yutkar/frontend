@@ -7,6 +7,7 @@ import {
   getArchitectureTickets,
   getMockServiceTypeOptions,
   getQueueSnapshot,
+  getSharedTicketById,
   getSharedServiceTypeByOptionId,
   redirectSharedTicket,
   toArchitectureTicket,
@@ -27,6 +28,10 @@ export const mockTicketApi: TicketApi = {
 
   getTicketById(id: string) {
     return Promise.resolve(getArchitectureTicketById(id))
+  },
+
+  getTicketHistory(id: string) {
+    return Promise.resolve(getSharedTicketById(id))
   },
 
   createTicket(input) {

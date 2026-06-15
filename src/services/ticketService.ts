@@ -32,6 +32,15 @@ export const ticketService = {
     }
   },
 
+  async getTicketHistory(id: string): Promise<SharedTicket | undefined> {
+    try {
+      return await ticketApi.getTicketHistory(id)
+    } catch (error) {
+      console.error('ticketService.getTicketHistory failed', error)
+      throw toServiceError(error, 'Не удалось получить историю талона')
+    }
+  },
+
   async createTicket(input: CreateTicketInput): Promise<Ticket> {
     try {
       return await withOperationalRefresh(

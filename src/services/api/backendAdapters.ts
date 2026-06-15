@@ -133,6 +133,18 @@ export type BackendTicket = {
   user?: { _id?: number | string; id?: number | string } | null
   userId?: number | string | null
   user_id?: number | string | null
+  events?: Array<{
+    id?: number | string
+    eventType?: string
+    event_type?: string
+    oldStatus?: BackendTicketStatus | string | null
+    old_status?: BackendTicketStatus | string | null
+    newStatus?: BackendTicketStatus | string | null
+    new_status?: BackendTicketStatus | string | null
+    payload?: Record<string, unknown> | null
+    createdAt?: string
+    created_at?: string
+  }>
 }
 
 export type BackendQueueStats = {
@@ -535,6 +547,17 @@ function getBackendTicketAssigneeId(ticket: BackendTicket): string {
   )
 }
 
+function toSharedTicketEvents(ticket: BackendTicket): Ticket['events'] {
+  return ticket.events?.map((event, index) => ({
+    id: event.id ?? `${ticket.id}-${index}`,
+    eventType: event.eventType ?? event.event_type ?? 'status_update',
+    oldStatus: event.oldStatus || event.old_status ? toSharedStatus(event.oldStatus ?? event.old_status ?? undefined) : null,
+    newStatus: event.newStatus || event.new_status ? toSharedStatus(event.newStatus ?? event.new_status ?? undefined) : null,
+    payload: event.payload ?? null,
+    createdAt: event.createdAt ?? event.created_at ?? getBackendCreatedAt(ticket),
+  })) ?? []
+}
+
 function toSharedLanguage(value: unknown): Ticket['language'] {
   return isSmartQLanguage(value) ? value : undefined
 }
@@ -678,6 +701,7 @@ export function toSharedTicket(ticket: BackendTicket): Ticket {
     etaMinutes: ticket.etaMinutes ?? ticket.waitMinutes ?? 0,
     peopleAhead,
     queuePosition,
+    events: toSharedTicketEvents(ticket),
   }
 }
 

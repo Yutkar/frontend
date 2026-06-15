@@ -50,6 +50,7 @@ export type Ticket = {
   notes?: string
   peopleAhead?: number
   queuePosition?: number
+  events?: TicketEvent[]
 }
 
 export type Room = {
@@ -81,10 +82,22 @@ export type Room = {
 export type QueueEventType =
   | 'status_update'
   | 'ticket_created'
+  | 'patient_arrived'
   | 'ticket_called'
   | 'service_started'
   | 'service_completed'
+  | 'ticket_cancelled'
+  | 'patient_redirected'
   | 'queue_overloaded'
+
+export type TicketEvent = {
+  id: string | number
+  eventType: QueueEventType | string
+  oldStatus?: TicketStatus | null
+  newStatus?: TicketStatus | null
+  payload?: Record<string, unknown> | null
+  createdAt: string
+}
 
 export type QueueEvent = {
   id: string

@@ -103,6 +103,7 @@ export type TicketCreateSettingsPayload = TicketSettingsPayload & {
 export type TicketApi = {
   getTickets: () => Promise<ArchitectureTicket[]>
   getTicketById: (id: string) => Promise<ArchitectureTicket | undefined>
+  getTicketHistory: (id: string) => Promise<SharedTicket | undefined>
   createTicket: (input: ArchitectureCreateTicketInput) => Promise<ArchitectureTicket>
   createKioskTicket: (input: ArchitectureCreateTicketInput) => Promise<ArchitectureTicket>
   arriveTicket: (id: string) => Promise<ArchitectureTicket>

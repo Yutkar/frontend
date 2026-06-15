@@ -1479,6 +1479,75 @@ h3 {
   opacity: 0.6;
 }
 
+.ticket-history-modal {
+  max-width: 860px;
+}
+
+.ticket-history-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ticket-history-summary div,
+.ticket-history-events li {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ticket-history-summary div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.ticket-history-summary span,
+.ticket-history-events time,
+.ticket-history-events span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ticket-history-summary strong,
+.ticket-history-events strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.ticket-history-events {
+  display: grid;
+  gap: 14px;
+}
+
+.ticket-history-events h3 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.ticket-history-events ol {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ticket-history-events li {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 170px 1fr;
+  padding: 14px;
+}
+
+.ticket-history-events li div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .modal-error {
   background: #fee2e2;
   border: 1px solid #fecaca;

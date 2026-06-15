@@ -353,6 +353,10 @@ export function getArchitectureTicketById(id: string): ArchitectureTicket | unde
   return getArchitectureTickets().find((ticket) => ticket.id === id)
 }
 
+export function getSharedTicketById(id: string): SharedTicket | undefined {
+  return getQueueSnapshot().tickets.find((ticket) => ticket.id === id)
+}
+
 export function createSharedTicket(input: SharedTicketCreateInput): SharedTicket {
   assertMockRoomAcceptsTickets(input.roomId)
 
