@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Building2, PlusCircle } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { notifyServiceTypesChanged, subscribeServiceTypesChanged } from '@services/serviceTypeSync'
@@ -19,6 +19,7 @@ import {
   getRoomName,
   getRoomServiceTypeIds,
   getServiceTypeNames,
+  moveItemToTop,
   type AdminRoomRecord,
 } from './adminPageHelpers'
 
@@ -92,8 +93,9 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
   const [saving, setSaving] = useState(false)
   const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const lastSavedRoomIdRef = useRef<string | number | null>(null)
 
-  async function loadData() {
+  async function loadData(prioritizedId: string | number | null = lastSavedRoomIdRef.current) {
     setLoading(true)
     setError(null)
 
@@ -103,7 +105,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
         adminService.getServiceTypes(),
       ])
 
-      setRooms(nextRooms as AdminRoomRecord[])
+      setRooms(moveItemToTop(nextRooms as AdminRoomRecord[], prioritizedId))
       setServiceTypes(nextServiceTypes)
     } catch (loadError) {
       console.error('Admin rooms load failed', loadError)
@@ -180,15 +182,16 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
     }
 
     try {
-      if (editingRoomId) {
-        await adminService.updateRoom(editingRoomId, payload)
-      } else {
-        await adminService.createRoom(payload)
-      }
+      const savedRoom = editingRoomId
+        ? await adminService.updateRoom(editingRoomId, payload)
+        : await adminService.createRoom(payload)
+
+      lastSavedRoomIdRef.current = savedRoom.id
+      setRooms((current) => moveItemToTop(current, savedRoom as AdminRoomRecord))
 
       setSuccessMessage('Место обслуживания успешно сохранено')
       resetForm()
-      await loadData()
+      await loadData(savedRoom.id)
       notifyServiceTypesChanged()
       onRoomsChange?.()
     } catch (saveError) {

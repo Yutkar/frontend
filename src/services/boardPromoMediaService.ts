@@ -222,8 +222,14 @@ export const boardPromoMediaService = {
   },
 
   async uploadVideoFile(profileId: string | undefined | null, file: File): Promise<BoardPromoMedia> {
-    if (file.type && file.type !== 'video/mp4') {
-      throw new Error('Выберите mp4-файл')
+    const supportedVideoTypes = new Set(['video/mp4', 'video/webm', 'video/ogg'])
+
+    if (file.type && !supportedVideoTypes.has(file.type)) {
+      throw new Error('Выберите видеофайл mp4/webm/ogg')
+    }
+
+    if (!file.type && !/\.(mp4|webm|ogg)$/i.test(file.name)) {
+      throw new Error('Выберите видеофайл mp4/webm/ogg')
     }
 
     const videoUrl = await readFileAsDataUrl(file)

@@ -171,3 +171,27 @@ export function getAdminErrorMessage(error: unknown, fallbackMessage: string): s
 
   return `${fallbackMessage}. Проверьте подключение к backend.`
 }
+
+export function moveItemToTop<T extends { id?: string | number }>(
+  items: T[],
+  itemOrId?: T | string | number | null,
+): T[] {
+  if (itemOrId === undefined || itemOrId === null) {
+    return items
+  }
+
+  const itemId = typeof itemOrId === 'object' ? itemOrId.id : itemOrId
+
+  if (itemId === undefined || itemId === null) {
+    return items
+  }
+
+  const existingItem = items.find((item) => String(item.id) === String(itemId))
+  const topItem = typeof itemOrId === 'object' ? itemOrId : existingItem
+
+  if (!topItem) {
+    return items
+  }
+
+  return [topItem, ...items.filter((item) => String(item.id) !== String(itemId))]
+}

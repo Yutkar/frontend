@@ -1,9 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { PlusCircle, ShieldCheck } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import type { User } from '@shared/types'
 import { Button } from '@shared/ui/components'
-import { getAdminErrorMessage, getUserLogin } from './adminPageHelpers'
+import { getAdminErrorMessage, getUserLogin, moveItemToTop } from './adminPageHelpers'
 
 type ManagerFormState = {
   login: string
@@ -29,13 +29,14 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
   const [managers, setManagers] = useState<User[]>([])
   const [saving, setSaving] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const lastSavedManagerIdRef = useRef<string | number | null>(null)
 
-  async function loadData() {
+  async function loadData(prioritizedId: string | number | null = lastSavedManagerIdRef.current) {
     setLoading(true)
     setError(null)
 
     try {
-      setManagers(await adminService.getManagers())
+      setManagers(moveItemToTop(await adminService.getManagers(), prioritizedId))
     } catch (loadError) {
       console.error('Admin managers load failed', loadError)
       setError(getAdminErrorMessage(loadError, 'Не удалось загрузить менеджеров'))
@@ -87,15 +88,15 @@ export function ManagersSection({ onManagersChange }: ManagersSectionProps) {
     }
 
     try {
-      if (editingManagerId) {
-        await adminService.updateManager(editingManagerId, payload)
-      } else {
-        await adminService.createManager(payload)
-      }
+      const savedManager = editingManagerId
+        ? await adminService.updateManager(editingManagerId, payload)
+        : await adminService.createManager(payload)
 
+      lastSavedManagerIdRef.current = savedManager.id
+      setManagers((current) => moveItemToTop(current, savedManager))
       setSuccessMessage('Менеджер успешно сохранён')
       resetForm()
-      await loadData()
+      await loadData(savedManager.id)
       onManagersChange?.()
     } catch (saveError) {
       console.error('Admin manager save failed', saveError)

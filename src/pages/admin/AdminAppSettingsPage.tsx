@@ -8,6 +8,7 @@ import {
 } from '@services/appSettingsService'
 import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
+import { AdminFileInput } from './AdminFileInput'
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -26,6 +27,7 @@ export function AppSettingsSection() {
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<AppSettings>(() => appSettingsService.getSettings())
   const [saving, setSaving] = useState(false)
+  const [selectedLogoFileName, setSelectedLogoFileName] = useState('')
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export function AppSettingsSection() {
       const logoDataUrl = await readFileAsDataUrl(file)
 
       setForm((current) => ({ ...current, logoDataUrl }))
+      setSelectedLogoFileName(file.name)
       setSuccessMessage(null)
     } catch (fileError) {
       console.error('Logo read failed', fileError)
@@ -127,15 +130,30 @@ export function AppSettingsSection() {
               />
             </label>
 
-            <label className="field">
+            <div className="field">
               <span>{t.admin.appIcon}</span>
-              <input accept="image/*" onChange={(event) => void handleLogoChange(event)} type="file" />
-            </label>
+              <AdminFileInput
+                accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+                fileName={selectedLogoFileName}
+                hint={t.file.imageHint}
+                id="app-logo-file"
+                onChange={(event) => void handleLogoChange(event)}
+                onClear={form.logoDataUrl
+                  ? () => {
+                      setForm((current) => ({ ...current, logoDataUrl: '' }))
+                      setSelectedLogoFileName('')
+                    }
+                  : undefined}
+              />
+            </div>
 
             {form.logoDataUrl ? (
               <Button
                 icon={<ImagePlus size={16} />}
-                onClick={() => setForm((current) => ({ ...current, logoDataUrl: '' }))}
+                onClick={() => {
+                  setForm((current) => ({ ...current, logoDataUrl: '' }))
+                  setSelectedLogoFileName('')
+                }}
                 type="button"
                 variant="secondary"
               >

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import {
   Monitor,
   Copy,
@@ -10,7 +10,6 @@ import {
   Save,
   X,
   Image as ImageIcon,
-  Upload,
   Video,
 } from 'lucide-react'
 import { adminService } from '@services/adminService'
@@ -46,7 +45,14 @@ import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { copyTextToClipboard } from '@shared/utils/clipboard'
 import { getRoomBoardId, normalizeRoomLookupValue, roomMatchesIdentifier } from '@shared/utils'
-import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
+import {
+  getAdminErrorMessage,
+  getRoomName,
+  getRoomActive,
+  moveItemToTop,
+  type AdminRoomRecord,
+} from './adminPageHelpers'
+import { AdminFileInput } from './AdminFileInput'
 
 const defaultBoardSettings: BoardSettings = {
   boardType: 'general',
@@ -304,6 +310,7 @@ export function BoardSettingsSection() {
   const [copied, setCopied] = useState<string | null>(null)
   const [draftProfile, setDraftProfile] = useState<BoardSettingsProfile | null>(null)
   const [boardRoomSearch, setBoardRoomSearch] = useState('')
+  const lastSavedBoardProfileIdRef = useRef<string | null>(null)
   const [newScreenName, setNewScreenName] = useState('')
   const [newScreenRooms, setNewScreenRooms] = useState<string[]>([])
   const [newScreenTemplate, setNewScreenTemplate] = useState<BoardTemplate>(defaultBoardTemplate)
@@ -570,7 +577,10 @@ export function BoardSettingsSection() {
     }
 
     const profiles = boardSettings.profiles ?? []
-    const nextScreens = draftProfile.id.startsWith('screen-')
+    const draftScreenId = draftProfile.id.startsWith('screen-')
+      ? draftProfile.id.slice('screen-'.length)
+      : null
+    const nextScreens = draftScreenId
       ? boardSettings.screens.map((screen) => {
         if (`screen-${screen.id}` !== draftProfile.id) {
           return screen
@@ -590,8 +600,11 @@ export function BoardSettingsSection() {
       })
       : boardSettings.screens
     const nextProfiles = profiles.some((profile) => profile.id === draftProfile.id)
-      ? profiles.map((profile) => profile.id === draftProfile.id ? draftProfile : profile)
-      : [...profiles, draftProfile]
+      ? moveItemToTop(
+        profiles.map((profile) => profile.id === draftProfile.id ? draftProfile : profile),
+        draftProfile.id,
+      )
+      : [draftProfile, ...profiles]
     const savedSettings = await adminService.updateBoardSettings({
       ...boardSettings,
       boardType: draftProfile.boardType,
@@ -604,6 +617,11 @@ export function BoardSettingsSection() {
       template: draftProfile.template,
       voiceEnabled: draftProfile.voiceEnabled,
     })
+    const orderedSavedSettings = {
+      ...savedSettings,
+      profiles: moveItemToTop(savedSettings.profiles ?? [], draftProfile.id),
+      screens: draftScreenId ? moveItemToTop(savedSettings.screens, draftScreenId) : savedSettings.screens,
+    }
     let nextPromoMedia = boardPromoMediaService.getMedia(draftProfile.id)
     const savedVideoUrl = getBoardPromoUrlInputValue(nextPromoMedia.videoUrl)
     const savedImageUrl = getBoardPromoUrlInputValue(nextPromoMedia.imageUrl)
@@ -615,7 +633,8 @@ export function BoardSettingsSection() {
       nextPromoMedia = boardPromoMediaService.saveImageUrl(draftProfile.id, promoImageUrl)
     }
 
-    setBoardSettings(savedSettings)
+    lastSavedBoardProfileIdRef.current = draftProfile.id
+    setBoardSettings(orderedSavedSettings)
     setPromoMedia(nextPromoMedia)
     setBoardStyleSettings(boardStyleSettingsService.saveSettings(draftProfile.id, boardStyleSettings))
     cancelEditProfile()
@@ -631,13 +650,29 @@ export function BoardSettingsSection() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  async function updateBoardSettings(nextSettings: Partial<BoardSettings>) {
+  async function updateBoardSettings(
+    nextSettings: Partial<BoardSettings>,
+    prioritizedProfileId?: string,
+    prioritizedScreenId?: string,
+  ) {
     const savedSettings = await adminService.updateBoardSettings({
       ...boardSettings,
       ...nextSettings,
     })
 
-    setBoardSettings(savedSettings)
+    if (prioritizedProfileId) {
+      lastSavedBoardProfileIdRef.current = prioritizedProfileId
+    }
+
+    setBoardSettings({
+      ...savedSettings,
+      profiles: prioritizedProfileId
+        ? moveItemToTop(savedSettings.profiles ?? [], prioritizedProfileId)
+        : savedSettings.profiles,
+      screens: prioritizedScreenId
+        ? moveItemToTop(savedSettings.screens, prioritizedScreenId)
+        : savedSettings.screens,
+    })
   }
 
   async function addScreen() {
@@ -656,10 +691,8 @@ export function BoardSettingsSection() {
     const screenId = String(Date.now())
     const screenProfileId = `screen-${screenId}`
     const screenBoardType = roomIds.length === 1 ? 'individual' : 'general'
-    const newScreens = [
-      ...boardSettings.screens,
-      { id: screenId, name: newScreenName.trim(), roomIds, roomNames: newScreenRooms },
-    ]
+    const newScreen = { id: screenId, name: newScreenName.trim(), roomIds, roomNames: newScreenRooms }
+    const newScreens = [newScreen, ...boardSettings.screens]
     const newProfile: BoardSettingsProfile = {
       boardType: screenBoardType,
       id: screenProfileId,
@@ -674,9 +707,9 @@ export function BoardSettingsSection() {
     }
 
     await updateBoardSettings({
-      profiles: [...(boardSettings.profiles ?? []), newProfile],
+      profiles: [newProfile, ...(boardSettings.profiles ?? [])],
       screens: newScreens,
-    })
+    }, screenProfileId, screenId)
     if (newScreenTemplate === 'video_queue' && videoUrlValidation.normalizedUrl) {
       boardPromoMediaService.saveVideoUrl(screenProfileId, videoUrlValidation.normalizedUrl)
     }
@@ -822,6 +855,12 @@ export function BoardSettingsSection() {
       room,
     }
   })
+  const orderedRoomProfiles = lastSavedBoardProfileIdRef.current
+    ? [
+        ...roomProfiles.filter(({ profile }) => profile.id === lastSavedBoardProfileIdRef.current),
+        ...roomProfiles.filter(({ profile }) => profile.id !== lastSavedBoardProfileIdRef.current),
+      ]
+    : roomProfiles
   const draftSelectedRoomIds = draftProfile ? getProfileRoomIds(draftProfile) : []
   const draftSelectedRoomNames = draftProfile ? getProfileSelectedRoomNames(draftProfile) : []
   const normalizedBoardRoomSearch = normalizeRoomLookupValue(boardRoomSearch)
@@ -906,7 +945,7 @@ export function BoardSettingsSection() {
                   </tr>
 
                   {/* Отдельные места обслуживания */}
-                  {roomProfiles.map(({ profile, room }) => {
+                  {orderedRoomProfiles.map(({ profile, room }) => {
                     const name = getRoomName(room)
                     const url = getRoomBoardUrl(room, profile)
                     return (
@@ -1199,15 +1238,14 @@ export function BoardSettingsSection() {
                   >
                     Сохранить URL
                   </Button>
-                  <label className="button button-secondary button-sm promo-upload-button">
-                    <span className="button-icon"><Upload size={14} /></span>
-                    <span>Загрузить mp4</span>
-                    <input
-                      accept="video/mp4"
-                      onChange={(event) => void uploadPromoVideo(event)}
-                      type="file"
-                    />
-                  </label>
+                  <AdminFileInput
+                    accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogg"
+                    fileName={promoMedia.videoName && promoMedia.videoName !== 'URL' ? promoMedia.videoName : undefined}
+                    hint={t.file.videoHint}
+                    id={`promo-video-file-${draftProfile.id}`}
+                    onChange={(event) => void uploadPromoVideo(event)}
+                    onClear={promoMedia.videoName && promoMedia.videoName !== 'URL' ? removePromoVideo : undefined}
+                  />
                   <Button
                     disabled={!promoVideoUrl.trim() && !promoMedia.videoUrl}
                     icon={<X size={14} />}
@@ -1255,15 +1293,14 @@ export function BoardSettingsSection() {
                   >
                     Сохранить изображение
                   </Button>
-                  <label className="button button-secondary button-sm promo-upload-button">
-                    <span className="button-icon"><Upload size={14} /></span>
-                    <span>Загрузить изображение</span>
-                    <input
-                      accept="image/*"
-                      onChange={(event) => void uploadPromoImage(event)}
-                      type="file"
-                    />
-                  </label>
+                  <AdminFileInput
+                    accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+                    fileName={promoMedia.imageName && promoMedia.imageName !== 'URL' ? promoMedia.imageName : undefined}
+                    hint={t.file.imageHint}
+                    id={`promo-image-file-${draftProfile.id}`}
+                    onChange={(event) => void uploadPromoImage(event)}
+                    onClear={promoMedia.imageName && promoMedia.imageName !== 'URL' ? removePromoImage : undefined}
+                  />
                   <Button
                     disabled={!promoMedia.imageUrl}
                     icon={<Trash2 size={14} />}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Check, Copy, ExternalLink, PlusCircle, TabletSmartphone } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
@@ -10,6 +10,7 @@ import {
   getAdminErrorMessage,
   getRoomActive,
   getRoomName,
+  moveItemToTop,
   type AdminRoomRecord,
 } from './adminPageHelpers'
 
@@ -103,8 +104,9 @@ export function TerminalsSection() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [terminals, setTerminals] = useState<AdminTerminalRecord[]>([])
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+  const lastSavedTerminalIdRef = useRef<string | number | null>(null)
 
-  async function loadData() {
+  async function loadData(prioritizedId: string | number | null = lastSavedTerminalIdRef.current) {
     setLoading(true)
     setError(null)
 
@@ -115,7 +117,7 @@ export function TerminalsSection() {
         adminService.getServiceTypes(),
       ])
 
-      setTerminals(nextTerminals)
+      setTerminals(moveItemToTop(nextTerminals, prioritizedId))
       setRooms(nextRooms as AdminRoomRecord[])
       setServiceTypes(nextServiceTypes.filter((serviceType) => serviceType.active !== false))
     } catch (loadError) {
@@ -203,15 +205,15 @@ export function TerminalsSection() {
     }
 
     try {
-      if (editingTerminalId) {
-        await adminService.updateTerminal(editingTerminalId, payload)
-      } else {
-        await adminService.createTerminal(payload)
-      }
+      const savedTerminal = editingTerminalId
+        ? await adminService.updateTerminal(editingTerminalId, payload)
+        : await adminService.createTerminal(payload)
 
+      lastSavedTerminalIdRef.current = savedTerminal.id
+      setTerminals((current) => moveItemToTop(current, savedTerminal))
       setSuccessMessage('Терминал сохранён')
       resetForm()
-      await loadData()
+      await loadData(savedTerminal.id)
     } catch (saveError) {
       console.error('Admin terminal save failed', saveError)
       setError(getAdminErrorMessage(saveError, 'Не удалось сохранить терминал'))

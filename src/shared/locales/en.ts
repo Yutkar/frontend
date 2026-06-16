@@ -46,6 +46,15 @@ export const en: Locale = {
     ru: 'Русский',
     en: 'English',
   },
+  file: {
+    choose: 'Choose file',
+    notSelected: 'No file selected',
+    selected: 'File selected',
+    clear: 'Remove file',
+    change: 'Change file',
+    videoHint: 'MP4, WebM, OGG are supported',
+    imageHint: 'PNG, JPG, WebP are supported',
+  },
   placeTypes: {
     room: 'Room',
     roomLower: 'room',

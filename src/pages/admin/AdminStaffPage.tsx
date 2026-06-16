@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { PlusCircle, UsersRound } from 'lucide-react'
 import { adminService } from '@services/adminService'
 import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
@@ -13,6 +13,7 @@ import {
   getRoomServiceNames,
   getUserLogin,
   getUserRoomIds,
+  moveItemToTop,
   roleLabels,
   type AdminRoomRecord,
 } from './adminPageHelpers'
@@ -50,8 +51,9 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
   const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const [staff, setStaff] = useState<User[]>([])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const lastSavedStaffIdRef = useRef<string | number | null>(null)
 
-  async function loadData() {
+  async function loadData(prioritizedId: string | number | null = lastSavedStaffIdRef.current) {
     setLoading(true)
     setError(null)
 
@@ -62,7 +64,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
         adminService.getServiceTypes(),
       ])
 
-      setStaff(nextStaff)
+      setStaff(moveItemToTop(nextStaff, prioritizedId))
       setRooms(nextRooms as AdminRoomRecord[])
       setServiceTypes(nextServiceTypes)
     } catch (loadError) {
@@ -141,11 +143,13 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
         ? await adminService.updateStaff(editingUserId, payload)
         : await adminService.createDoctor(payload)
 
+      lastSavedStaffIdRef.current = savedUser.id
+      setStaff((current) => moveItemToTop(current, savedUser))
       setSuccessMessage(savedUser.roomAssignmentPending
         ? 'Пользователь создан. Кабинет можно назначить после обновления списка.'
         : 'Врач успешно сохранён')
       resetForm()
-      await loadData()
+      await loadData(savedUser.id)
       onStaffChange?.()
     } catch (saveError) {
       console.error('Admin staff save failed', saveError)

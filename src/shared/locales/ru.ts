@@ -39,6 +39,15 @@ export const ru = {
     ru: 'Русский',
     en: 'English',
   },
+  file: {
+    choose: 'Выбрать файл',
+    notSelected: 'Файл не выбран',
+    selected: 'Выбран файл',
+    clear: 'Удалить файл',
+    change: 'Изменить файл',
+    videoHint: 'Поддерживаются MP4, WebM, OGG',
+    imageHint: 'Поддерживаются PNG, JPG, WebP',
+  },
   placeTypes: {
     room: 'Кабинет',
     roomLower: 'кабинет',

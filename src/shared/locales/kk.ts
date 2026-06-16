@@ -46,6 +46,15 @@ export const kk: Locale = {
     ru: 'Русский',
     en: 'English',
   },
+  file: {
+    choose: 'Файлды таңдау',
+    notSelected: 'Файл таңдалмаған',
+    selected: 'Файл таңдалды',
+    clear: 'Файлды жою',
+    change: 'Файлды өзгерту',
+    videoHint: 'MP4, WebM, OGG қолдау көрсетіледі',
+    imageHint: 'PNG, JPG, WebP қолдау көрсетіледі',
+  },
   placeTypes: {
     room: 'Кабинет',
     roomLower: 'кабинет',

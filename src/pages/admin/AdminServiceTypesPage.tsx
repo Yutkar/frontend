@@ -1,11 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ClipboardList, PlusCircle } from 'lucide-react'
 import { adminService, type AdminServiceTypePayload } from '@services/adminService'
 import type { ServiceType } from '@shared/types'
 import { Button, StatusBadge } from '@shared/ui/components'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
-import { getAdminErrorMessage } from './adminPageHelpers'
+import { getAdminErrorMessage, moveItemToTop } from './adminPageHelpers'
 
 type ServiceTypeFormState = {
   active: boolean
@@ -58,13 +58,14 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
   const [saving, setSaving] = useState(false)
   const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const lastSavedServiceTypeIdRef = useRef<string | number | null>(null)
 
-  async function loadData() {
+  async function loadData(prioritizedId: string | number | null = lastSavedServiceTypeIdRef.current) {
     setLoading(true)
     setError(null)
 
     try {
-      setServiceTypes(await adminService.getServiceTypes())
+      setServiceTypes(moveItemToTop(await adminService.getServiceTypes(), prioritizedId))
     } catch (loadError) {
       console.error('Admin service types load failed', loadError)
       setError(getAdminErrorMessage(loadError, 'Не удалось загрузить типы услуг'))
@@ -103,15 +104,15 @@ export function ServiceTypesSection({ onServiceTypesChange }: ServiceTypesSectio
     try {
       const payload = toPayload(form)
 
-      if (editingServiceTypeId) {
-        await adminService.updateServiceType(editingServiceTypeId, payload)
-      } else {
-        await adminService.createServiceType(payload)
-      }
+      const savedServiceType = editingServiceTypeId
+        ? await adminService.updateServiceType(editingServiceTypeId, payload)
+        : await adminService.createServiceType(payload)
 
+      lastSavedServiceTypeIdRef.current = savedServiceType.id
+      setServiceTypes((current) => moveItemToTop(current, savedServiceType))
       setSuccessMessage('Типы услуг обновлены')
       resetForm()
-      await loadData()
+      await loadData(savedServiceType.id)
       onServiceTypesChange?.()
     } catch (saveError) {
       console.error('Admin service type save failed', saveError)

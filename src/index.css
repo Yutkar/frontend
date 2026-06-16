@@ -4759,6 +4759,33 @@ h3 {
   margin: 0;
 }
 
+.admin-file-input {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-file-input input[type="file"] {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.admin-file-input-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-file-input-name {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
 .admin-muted-text {
   color: var(--text-muted);
   font-size: 13px;
