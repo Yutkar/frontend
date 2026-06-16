@@ -21,10 +21,11 @@ import {
 } from '@services/boardPromoMediaService'
 import { mediaService, type MediaFile } from '@services/mediaService'
 import {
-  DEFAULT_BOARD_STYLE_SETTINGS,
   boardFontOptions,
   boardScreenFormatOptions,
   boardStyleSettingsService,
+  defaultBoardStyleSettings,
+  normalizeBoardStyleSettings,
   type BoardFontFamily,
   type BoardScreenFormat,
   type BoardStyleSettings,
@@ -62,6 +63,7 @@ const defaultBoardSettings: BoardSettings = {
   screens: [],
   showRecentCalls: true,
   showTime: true,
+  styleSettings: {},
   template: 'classic',
   voiceEnabled: true,
 }
@@ -117,16 +119,10 @@ function BoardFontScaleField({
   onChange: (value: number) => void
   value: number
 }) {
-  const initialValue = Number.isFinite(value) ? value : DEFAULT_BOARD_STYLE_SETTINGS.fontScalePercent
+  const initialValue = Number.isFinite(value) ? value : defaultBoardStyleSettings.fontScalePercent
   const [inputValue, setInputValue] = useState(String(initialValue))
   const numericValue = inputValue.trim() ? Number(inputValue) : Number.NaN
   const inputInvalid = !Number.isFinite(numericValue) || numericValue < 50 || numericValue > 300
-
-  useEffect(() => {
-    const nextValue = Number.isFinite(value) ? value : DEFAULT_BOARD_STYLE_SETTINGS.fontScalePercent
-
-    setInputValue(String(nextValue))
-  }, [value])
 
   return (
     <label className="field board-font-scale-field">
@@ -190,11 +186,6 @@ function BoardColorField({
   const [hexValue, setHexValue] = useState(colorValue.toUpperCase())
   const [hexError, setHexError] = useState('')
   const inputId = `board-color-${colorKey}`
-
-  useEffect(() => {
-    setHexValue(colorValue.toUpperCase())
-    setHexError('')
-  }, [colorValue])
 
   return (
     <div className="board-color-field">
@@ -332,9 +323,7 @@ export function BoardSettingsSection() {
   const [promoMedia, setPromoMedia] = useState<BoardPromoMedia>({})
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [mediaFilesLoading, setMediaFilesLoading] = useState(false)
-  const [boardStyleSettings, setBoardStyleSettings] = useState<BoardStyleSettings>(DEFAULT_BOARD_STYLE_SETTINGS)
-  const [styleResetConfirmOpen, setStyleResetConfirmOpen] = useState(false)
-  const [styleFormVersion, setStyleFormVersion] = useState(0)
+  const [boardStyleSettings, setBoardStyleSettings] = useState<BoardStyleSettings>(defaultBoardStyleSettings)
   const [promoVideoUrl, setPromoVideoUrl] = useState('')
   const [promoImageUrl, setPromoImageUrl] = useState('')
   const [promoMediaError, setPromoMediaError] = useState<string | null>(null)
@@ -376,8 +365,7 @@ export function BoardSettingsSection() {
 
     if (!draftProfile) {
       setPromoMedia({})
-      setBoardStyleSettings(DEFAULT_BOARD_STYLE_SETTINGS)
-      setStyleResetConfirmOpen(false)
+      setBoardStyleSettings(defaultBoardStyleSettings)
       setPromoVideoUrl('')
       setPromoImageUrl('')
       setPromoMediaError(null)
@@ -389,8 +377,7 @@ export function BoardSettingsSection() {
     const nextPromoMedia = boardPromoMediaService.getMedia(draftProfile.id)
 
     setPromoMedia(nextPromoMedia)
-    setBoardStyleSettings(boardStyleSettingsService.getSettings(draftProfile.id))
-    setStyleResetConfirmOpen(false)
+    setBoardStyleSettings(getBoardProfileStyleSettings(draftProfile.id))
     setPromoVideoUrl(getBoardPromoUrlInputValue(nextPromoMedia.videoUrl))
     setPromoImageUrl(getBoardPromoUrlInputValue(nextPromoMedia.imageUrl))
     setPromoMediaError(null)
@@ -584,8 +571,14 @@ export function BoardSettingsSection() {
       : fallbackProfile
   }
 
+  function getBoardProfileStyleSettings(profileId: string): BoardStyleSettings {
+    return boardSettings.styleSettings?.[profileId]
+      ? normalizeBoardStyleSettings(boardSettings.styleSettings[profileId])
+      : boardStyleSettingsService.getSettings(profileId)
+  }
+
   function startEditProfile(profile: BoardSettingsProfile) {
-    setBoardStyleSettings(boardStyleSettingsService.getSettings(profile.id))
+    setBoardStyleSettings(getBoardProfileStyleSettings(profile.id))
     setDraftProfile(profile)
   }
 
@@ -595,12 +588,6 @@ export function BoardSettingsSection() {
 
   function updateBoardStyleSettings(nextSettings: Partial<BoardStyleSettings>) {
     setBoardStyleSettings((current) => ({ ...current, ...nextSettings }))
-  }
-
-  function resetBoardStyleSettingsToDefault() {
-    setBoardStyleSettings({ ...DEFAULT_BOARD_STYLE_SETTINGS })
-    setStyleFormVersion((current) => current + 1)
-    setStyleResetConfirmOpen(false)
   }
 
   function cancelEditProfile() {
@@ -645,6 +632,11 @@ export function BoardSettingsSection() {
         draftProfile.id,
       )
       : [draftProfile, ...profiles]
+    const normalizedBoardStyleSettings = normalizeBoardStyleSettings(boardStyleSettings)
+    const nextStyleSettings = {
+      ...(boardSettings.styleSettings ?? {}),
+      [draftProfile.id]: normalizedBoardStyleSettings,
+    }
     const savedSettings = await adminService.updateBoardSettings({
       ...boardSettings,
       boardType: draftProfile.boardType,
@@ -654,6 +646,7 @@ export function BoardSettingsSection() {
       screens: nextScreens,
       showRecentCalls: draftProfile.showRecentCalls,
       showTime: draftProfile.showTime,
+      styleSettings: nextStyleSettings,
       template: draftProfile.template,
       voiceEnabled: draftProfile.voiceEnabled,
     })
@@ -676,7 +669,7 @@ export function BoardSettingsSection() {
     lastSavedBoardProfileIdRef.current = draftProfile.id
     setBoardSettings(orderedSavedSettings)
     setPromoMedia(nextPromoMedia)
-    setBoardStyleSettings(boardStyleSettingsService.saveSettings(draftProfile.id, boardStyleSettings))
+    setBoardStyleSettings(boardStyleSettingsService.saveSettings(draftProfile.id, normalizedBoardStyleSettings))
     cancelEditProfile()
   }
 
@@ -745,18 +738,23 @@ export function BoardSettingsSection() {
       template: newScreenTemplate,
       voiceEnabled: boardSettings.voiceEnabled,
     }
+    const newScreenStyleSettings = normalizeBoardStyleSettings({
+      ...defaultBoardStyleSettings,
+      screenFormat: newScreenFormat,
+    })
 
     await updateBoardSettings({
       profiles: [newProfile, ...(boardSettings.profiles ?? [])],
       screens: newScreens,
+      styleSettings: {
+        ...(boardSettings.styleSettings ?? {}),
+        [screenProfileId]: newScreenStyleSettings,
+      },
     }, screenProfileId, screenId)
     if (newScreenTemplate === 'video_queue' && videoUrlValidation.normalizedUrl) {
       boardPromoMediaService.saveVideoUrl(screenProfileId, videoUrlValidation.normalizedUrl)
     }
-    boardStyleSettingsService.saveSettings(screenProfileId, {
-      ...DEFAULT_BOARD_STYLE_SETTINGS,
-      screenFormat: newScreenFormat,
-    })
+    boardStyleSettingsService.saveSettings(screenProfileId, newScreenStyleSettings)
     setNewScreenName('')
     setNewScreenRooms([])
     setNewScreenTemplate(defaultBoardTemplate)
@@ -766,8 +764,14 @@ export function BoardSettingsSection() {
   }
 
   async function deleteScreen(id: string) {
+    const nextStyleSettings = { ...(boardSettings.styleSettings ?? {}) }
+
+    delete nextStyleSettings[`screen-${id}`]
+
     await updateBoardSettings({
+      profiles: (boardSettings.profiles ?? []).filter((profile) => profile.id !== `screen-${id}`),
       screens: boardSettings.screens.filter((screen) => screen.id !== id),
+      styleSettings: nextStyleSettings,
     })
   }
 
@@ -1264,7 +1268,7 @@ export function BoardSettingsSection() {
                 </label>
 
                 <BoardFontScaleField
-                  key={`${draftProfile.id}-${styleFormVersion}`}
+                  key={draftProfile.id}
                   onChange={(fontScalePercent) => updateBoardStyleSettings({ fontScalePercent })}
                   value={boardStyleSettings.fontScalePercent}
                 />
@@ -1276,44 +1280,14 @@ export function BoardSettingsSection() {
                 {boardColorFields.map((field) => (
                   <BoardColorField
                     colorKey={field.key}
-                    fallbackValue={DEFAULT_BOARD_STYLE_SETTINGS[field.key]}
-                    key={`${draftProfile.id}-${field.key}-${styleFormVersion}`}
+                    fallbackValue={defaultBoardStyleSettings[field.key]}
+                    key={`${draftProfile.id}-${field.key}`}
                     label={field.label}
                     onChange={(value) => updateBoardStyleSettings({ [field.key]: value })}
                     value={boardStyleSettings[field.key]}
                   />
                 ))}
               </div>
-              <div className="board-style-reset-panel">
-                <div>
-                  <strong>Внешний вид табло</strong>
-                  <span>Сбросить цвета, шрифт, размер текста и формат экрана до стандартных значений.</span>
-                </div>
-                <Button
-                  onClick={() => setStyleResetConfirmOpen(true)}
-                  variant="secondary"
-                >
-                  Вернуть к стандартному
-                </Button>
-              </div>
-              {styleResetConfirmOpen ? (
-                <div
-                  aria-label="Подтверждение сброса внешнего вида табло"
-                  aria-modal="false"
-                  className="board-style-reset-confirm"
-                  role="alertdialog"
-                >
-                  <p>Вернуть стандартные цвета и шрифт табло?</p>
-                  <div className="button-row">
-                    <Button onClick={resetBoardStyleSettingsToDefault} variant="secondary">
-                      Вернуть
-                    </Button>
-                    <Button onClick={() => setStyleResetConfirmOpen(false)} variant="ghost">
-                      Отмена
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
             </BoardSettingsAccordion>
 
             {draftProfile.template === 'video_queue' ? (

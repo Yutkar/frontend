@@ -2,6 +2,7 @@ import { isAxiosError } from 'axios'
 import type { Role, ServiceType, User } from '@shared/types'
 import { apiClient, publicApiClient } from '../client'
 import { fallbackServiceTypeOptions } from '../serviceTypeCatalog'
+import { normalizeBoardStyleSettings, type BoardStyleSettings } from '../../boardStyleSettingsService'
 import type {
   AdminApi,
   AdminTerminalInput,
@@ -48,6 +49,7 @@ const defaultBoardSettings: BoardSettings = {
   screens: [],
   showRecentCalls: true,
   showTime: true,
+  styleSettings: {},
   template: 'classic',
   voiceEnabled: true,
 }
@@ -448,6 +450,16 @@ function normalizeRecentCallsLimit(value: unknown): BoardSettings['recentCallsLi
 
 function toBoardSettings(value: unknown): BoardSettings {
   const record = isRecord(value) ? value : {}
+  const styleSettings = isRecord(record.styleSettings)
+    ? Object.fromEntries(
+      Object.entries(record.styleSettings)
+        .filter(([, settings]) => isRecord(settings))
+        .map(([profileId, settings]) => [
+          profileId,
+          normalizeBoardStyleSettings(settings as Partial<BoardStyleSettings>),
+        ]),
+    )
+    : {}
   const screens = Array.isArray(record.screens)
     ? record.screens.filter(isRecord).map((screen) => ({
         id: getText(screen.id) ?? `screen-${Math.random().toString(36).slice(2, 8)}`,
@@ -480,6 +492,7 @@ function toBoardSettings(value: unknown): BoardSettings {
     screens,
     showRecentCalls: typeof record.showRecentCalls === 'boolean' ? record.showRecentCalls : true,
     showTime: typeof record.showTime === 'boolean' ? record.showTime : true,
+    styleSettings,
     template: normalizeBoardTemplate(record.template),
     voiceEnabled: typeof record.voiceEnabled === 'boolean' ? record.voiceEnabled : true,
   }
@@ -1037,6 +1050,7 @@ export const backendAdminApi: AdminApi = {
       ...defaultBoardSettings,
       ...input,
       screens: input.screens ?? defaultBoardSettings.screens,
+      styleSettings: input.styleSettings ?? defaultBoardSettings.styleSettings,
     }
     const response = await requestFirst([
       () => apiClient.patch<unknown>('/board-settings', payload).then((result) => result.data),

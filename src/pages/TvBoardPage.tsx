@@ -7,6 +7,7 @@ import {
   boardStyleSettingsService,
   defaultBoardStyleSettings,
   getBoardFontStack,
+  normalizeBoardStyleSettings,
   type BoardStyleSettings,
 } from '@services/boardStyleSettingsService'
 import { mediaService } from '@services/mediaService'
@@ -30,6 +31,7 @@ const defaultBoardSettings: BoardSettings = {
   screens: [],
   showRecentCalls: true,
   showTime: true,
+  styleSettings: {},
   template: 'classic',
   voiceEnabled: true,
 }
@@ -256,10 +258,14 @@ export function TvBoardPage() {
 
     const loadLocalBoardSettings = async () => {
       const localPromoMedia = boardPromoMediaService.getMedia(routeBoardSettings.resolvedProfileId)
+      const savedStyleSettings = routeBoardSettings.styleSettings?.[routeBoardSettings.resolvedProfileId]
+      const nextStyleSettings = savedStyleSettings
+        ? normalizeBoardStyleSettings(savedStyleSettings)
+        : boardStyleSettingsService.getSettings(routeBoardSettings.resolvedProfileId)
 
       if (active) {
         setPromoMedia(localPromoMedia)
-        setBoardStyleSettings(boardStyleSettingsService.getSettings(routeBoardSettings.resolvedProfileId))
+        setBoardStyleSettings(nextStyleSettings)
       }
 
       if (!hasBoardPromoMedia(localPromoMedia)) {
@@ -282,7 +288,7 @@ export function TvBoardPage() {
       active = false
       window.clearInterval(interval)
     }
-  }, [routeBoardSettings.resolvedProfileId])
+  }, [routeBoardSettings.resolvedProfileId, routeBoardSettings.styleSettings])
 
   const boardStyle = {
     '--board-accent-color': boardStyleSettings.accentColor,

@@ -11,6 +11,7 @@ import type {
   User as SharedUser,
 } from '@shared/types'
 import type { SmartQLanguage } from '@shared/locales/types'
+import type { BoardStyleSettings } from '../boardStyleSettingsService'
 import type {
   CreateTicketInput as ArchitectureCreateTicketInput,
   QueueStats as ArchitectureQueueStats,
@@ -221,6 +222,7 @@ export type BoardSettings = {
   screens: BoardScreen[]
   showRecentCalls: boolean
   showTime: boolean
+  styleSettings?: Record<string, Partial<BoardStyleSettings>>
   template: BoardTemplate
   voiceEnabled: boolean
 }

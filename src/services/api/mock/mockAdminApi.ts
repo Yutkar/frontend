@@ -28,6 +28,7 @@ let boardSettings: BoardSettings = {
   screens: [],
   showRecentCalls: true,
   showTime: true,
+  styleSettings: {},
   template: 'classic',
   voiceEnabled: true,
 }
@@ -331,6 +332,7 @@ export const mockAdminApi: AdminApi = {
       ...boardSettings,
       ...input,
       screens: input.screens ?? boardSettings.screens,
+      styleSettings: input.styleSettings ?? boardSettings.styleSettings,
     }
 
     return Promise.resolve(clone(boardSettings))

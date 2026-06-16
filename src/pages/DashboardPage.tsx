@@ -216,6 +216,7 @@ function getTicketEventLabel(eventType: string): string {
     ticket_called: 'Талон вызван',
     ticket_cancelled: 'Талон отменён',
     ticket_created: 'Талон создан',
+    ticket_postponed: 'Талон отложен',
   }
 
   return labels[eventType] ?? eventType

@@ -12,6 +12,7 @@ import {
 } from './api'
 import { refreshOperationalData, withOperationalRefresh } from './syncService'
 import { notifyServiceTypesChanged } from './serviceTypeSync'
+import { normalizeBoardStyleSettings } from './boardStyleSettingsService'
 import type { User } from '@shared/types'
 import type { BoardTemplate } from './api'
 
@@ -56,6 +57,7 @@ const defaultBoardSettings: AdminBoardSettings = {
   screens: [],
   showRecentCalls: true,
   showTime: true,
+  styleSettings: {},
   template: 'classic',
   voiceEnabled: true,
 }
@@ -159,6 +161,16 @@ function normalizeBoardSettings(settings: Partial<AdminBoardSettings> = {}): Adm
         voiceEnabled: profileSettings.voiceEnabled,
       }
     })
+  const styleSettings = settings.styleSettings && typeof settings.styleSettings === 'object'
+    ? Object.fromEntries(
+      Object.entries(settings.styleSettings)
+        .filter(([, profileSettings]) => profileSettings && typeof profileSettings === 'object')
+        .map(([profileId, profileSettings]) => [
+          profileId,
+          normalizeBoardStyleSettings(profileSettings),
+        ]),
+    )
+    : defaultBoardSettings.styleSettings
 
   return {
     boardType: settings.boardType === 'individual' ? 'individual' : defaultBoardSettings.boardType,
@@ -169,6 +181,7 @@ function normalizeBoardSettings(settings: Partial<AdminBoardSettings> = {}): Adm
     screens: settings.screens ?? defaultBoardSettings.screens,
     showRecentCalls: settings.showRecentCalls ?? defaultBoardSettings.showRecentCalls,
     showTime: settings.showTime ?? defaultBoardSettings.showTime,
+    styleSettings,
     template,
     voiceEnabled: settings.voiceEnabled ?? defaultBoardSettings.voiceEnabled,
   }
@@ -387,6 +400,9 @@ export const adminService = {
       return normalizeBoardSettings({
         ...remoteSettings,
         profiles: localSettings.profiles?.length ? localSettings.profiles : remoteSettings.profiles,
+        styleSettings: Object.keys(remoteSettings.styleSettings ?? {}).length > 0
+          ? remoteSettings.styleSettings
+          : localSettings.styleSettings,
       })
     } catch (error) {
       console.warn('adminService.getBoardSettings: backend endpoint недоступен, используем временное хранилище', error)
@@ -403,6 +419,7 @@ export const adminService = {
       const mergedSettings = normalizeBoardSettings({
         ...savedSettings,
         profiles: localSettings.profiles,
+        styleSettings: localSettings.styleSettings,
       })
 
       writeStoredBoardSettings(mergedSettings)

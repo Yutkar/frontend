@@ -102,6 +102,7 @@ export type QueueEventType =
   | 'service_started'
   | 'service_completed'
   | 'ticket_cancelled'
+  | 'ticket_postponed'
   | 'patient_redirected'
   | 'queue_overloaded'
 
