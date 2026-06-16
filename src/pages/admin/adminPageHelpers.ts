@@ -1,7 +1,17 @@
 import type { AdminRecord, TicketSettingsServiceTypeOption } from '@services/api'
 import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
+import type { SmartQLanguage } from '@shared/locales/useLocale'
 import type { Role, User } from '@shared/types'
 import { formatRoomName } from '@shared/utils'
+
+type AdminRoomServiceReference = string | number | {
+  _id?: string | number
+  id?: string | number
+  name?: string
+  serviceTypeId?: string | number
+  title?: string
+  translations?: Partial<Record<SmartQLanguage, string>>
+}
 
 export type AdminRoomRecord = AdminRecord & {
   active?: boolean
@@ -14,10 +24,10 @@ export type AdminRoomRecord = AdminRecord & {
   place_type?: string
   roomName?: string
   roomId?: string | number
-  services?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  services?: AdminRoomServiceReference[]
   serviceTypeId?: string | number
   serviceTypeIds?: Array<string | number>
-  serviceTypes?: Array<string | number | { id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  serviceTypes?: AdminRoomServiceReference[]
   status?: string
   ticketIssueEnabled?: boolean
   title?: string
@@ -73,23 +83,58 @@ export function getRoomServiceTypeIds(room: AdminRoomRecord): string[] {
   return []
 }
 
+function getRoomServiceReferenceName(
+  service: AdminRoomServiceReference,
+  serviceTypeById: Map<string, string>,
+  language: SmartQLanguage,
+): string {
+  if (typeof service === 'string' || typeof service === 'number') {
+    return serviceTypeById.get(String(service)) ?? ''
+  }
+
+  const serviceId = String(service.serviceTypeId ?? service.id ?? service._id ?? '')
+
+  return serviceTypeById.get(serviceId)
+    ?? service.translations?.[language]
+    ?? service.name
+    ?? service.title
+    ?? ''
+}
+
+export function getRoomServiceNames(
+  room: AdminRoomRecord,
+  serviceTypes: TicketSettingsServiceTypeOption[],
+  language: SmartQLanguage = 'ru',
+): string[] {
+  const serviceTypeById = new Map(serviceTypes.map((serviceType) => [
+    String(serviceType.id),
+    getServiceOptionLabel(serviceType, language),
+  ]))
+  const directServiceNames = [...(room.serviceTypes ?? []), ...(room.services ?? [])]
+    .map((service) => getRoomServiceReferenceName(service, serviceTypeById, language))
+    .filter(Boolean)
+  const idServiceNames = [
+    ...(room.serviceTypeId !== undefined ? [room.serviceTypeId] : []),
+    ...(room.serviceTypeIds ?? []),
+  ]
+    .map((serviceTypeId) => serviceTypeById.get(String(serviceTypeId)))
+    .filter((name): name is string => Boolean(name))
+
+  return Array.from(new Set([...directServiceNames, ...idServiceNames]))
+}
+
 export function getServiceTypeNames(
   room: AdminRoomRecord,
   serviceTypes: TicketSettingsServiceTypeOption[],
+  language: SmartQLanguage = 'ru',
 ): string {
-  const selectedIds = getRoomServiceTypeIds(room)
+  const serviceNames = getRoomServiceNames(room, serviceTypes, language)
 
-  if (selectedIds.length === 0) {
+  if (serviceNames.length === 0) {
     return 'Не выбраны'
   }
 
-  return selectedIds
-    .map((id) => {
-      const serviceType = serviceTypes.find((item) => String(item.id) === id)
-
-      return serviceType ? getServiceOptionLabel(serviceType) : id
-    })
-    .join(', ')
+  return serviceNames.join(', ')
 }
 
 export function getUserRoomId(user: User): string {

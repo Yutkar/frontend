@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bell, Check, ExternalLink, Info, LogOut, Radio, ShieldCheck, Siren, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Bell, Check, ExternalLink, Info, LogOut, ShieldCheck, Siren, Trash2, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppRoute } from '@shared/types'
 import { useLocale } from '@shared/locales/useLocale'
@@ -247,10 +247,6 @@ export function TopNavbar({ routes }: TopNavbarProps) {
   return (
     <header className="top-navbar">
       <div>
-        <span className="eyebrow">
-          <Radio size={14} />
-          {t.system.realtimeMonitoring}
-        </span>
         <h1>{getRouteLabel(currentRoute)}</h1>
       </div>
 

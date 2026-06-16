@@ -25,6 +25,7 @@ const defaultBoardSettings: BoardSettings = {
   boardType: 'general',
   recentCallsLimit: 10,
   roomBoardId: '',
+  roomIds: [],
   screens: [],
   showRecentCalls: true,
   showTime: true,
@@ -86,6 +87,7 @@ function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, prof
     boardType: profile.boardType,
     recentCallsLimit: profile.recentCallsLimit,
     roomBoardId: profile.roomBoardId,
+    roomIds: profile.roomIds ?? [],
     showRecentCalls: profile.showRecentCalls,
     showTime: profile.showTime,
     template: profile.template,
@@ -96,6 +98,35 @@ function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, prof
 
 function isRoomClosed(room?: Room): boolean {
   return Boolean(room && (room.active === false || room.isActive === false))
+}
+
+function getRouteRoomIds(settings: RouteBoardSettings): string[] {
+  if (settings.boardType === 'individual') {
+    return settings.roomBoardId ? [settings.roomBoardId] : []
+  }
+
+  return settings.roomIds ?? []
+}
+
+function filterRoomsByBoardIds(rooms: Room[], roomIds: string[]): Room[] {
+  if (roomIds.length === 0) {
+    return rooms
+  }
+
+  return rooms.filter((room) => roomIds.some((roomId) => roomMatchesIdentifier(room, roomId)))
+}
+
+function filterTicketsByBoardIds(tickets: Ticket[], rooms: Room[], roomIds: string[]): Ticket[] {
+  if (roomIds.length === 0) {
+    return tickets
+  }
+
+  const selectedRoomIds = new Set(filterRoomsByBoardIds(rooms, roomIds).map((room) => String(room.id)))
+
+  return tickets.filter((ticket) => (
+    (ticket.roomId !== undefined && selectedRoomIds.has(String(ticket.roomId))) ||
+    roomIds.some((roomId) => roomMatchesIdentifier({ id: ticket.roomId, name: ticket.roomName }, roomId))
+  ))
 }
 
 export function TvBoardPage() {
@@ -184,11 +215,14 @@ export function TvBoardPage() {
   }, [roomId, t.board.waiting])
 
   const routeBoardSettings = getBoardSettingsForRoute(boardSettings, roomId, profileId)
+  const selectedRouteRoomIds = roomId ? [] : getRouteRoomIds(routeBoardSettings)
+  const visibleRooms = filterRoomsByBoardIds(rooms, selectedRouteRoomIds)
+  const visibleTickets = filterTicketsByBoardIds(tickets, rooms, selectedRouteRoomIds)
   const boardRoom = roomId
     ? rooms.find((room) => roomMatchesIdentifier(room, roomId) || getRoomBoardId(room) === roomId || String(room.id) === roomId) ?? rooms[0]
     : undefined
   const roomClosed = Boolean(roomId) && isRoomClosed(boardRoom)
-  const roomHeaderName = roomClosed && roomName && tickets.length > 0 ? `${roomName} — закрыт` : roomName
+  const roomHeaderName = roomClosed && roomName && visibleTickets.length > 0 ? `${roomName} — закрыт` : roomName
 
   useEffect(() => {
     const loadLocalBoardSettings = () => {
@@ -235,7 +269,7 @@ export function TvBoardPage() {
           <h2>{error}</h2>
         </section>
       ) : null}
-      {roomClosed && tickets.length === 0 ? (
+      {roomClosed && visibleTickets.length === 0 ? (
         <section className="tv-closed-state">
           <h1>{getRoomClosedLabel(boardRoom)}</h1>
         </section>
@@ -244,10 +278,10 @@ export function TvBoardPage() {
           dataReady={boardDataReady}
           promoMedia={promoMedia}
           recentCallsLimit={routeBoardSettings.recentCallsLimit}
-          rooms={rooms}
+          rooms={visibleRooms}
           showRecentCalls={routeBoardSettings.showRecentCalls}
           template={routeBoardSettings.template}
-          tickets={tickets}
+          tickets={visibleTickets}
           voiceEnabled={routeBoardSettings.voiceEnabled}
           labels={t.board}
         />

@@ -1,13 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { PlusCircle, UsersRound } from 'lucide-react'
 import { adminService } from '@services/adminService'
-import { useLocale } from '@shared/locales/useLocale'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
+import type { TicketSettingsServiceTypeOption } from '@services/api'
+import { useLanguage, useLocale } from '@shared/locales/useLocale'
 import type { User } from '@shared/types'
 import { Button } from '@shared/ui/components'
 import {
   getAdminErrorMessage,
   getRoomActive,
   getRoomName,
+  getRoomServiceNames,
   getUserLogin,
   getUserRoomIds,
   roleLabels,
@@ -37,12 +40,14 @@ type StaffSectionProps = {
 
 export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProps) {
   const t = useLocale()
+  const language = useLanguage()
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<StaffFormState>(emptyForm)
   const [loading, setLoading] = useState(true)
   const [rooms, setRooms] = useState<AdminRoomRecord[]>([])
   const [saving, setSaving] = useState(false)
+  const [serviceTypes, setServiceTypes] = useState<TicketSettingsServiceTypeOption[]>([])
   const [staff, setStaff] = useState<User[]>([])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
@@ -51,13 +56,15 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
     setError(null)
 
     try {
-      const [nextStaff, nextRooms] = await Promise.all([
+      const [nextStaff, nextRooms, nextServiceTypes] = await Promise.all([
         adminService.getStaff(),
         adminService.getRooms(),
+        adminService.getServiceTypes(),
       ])
 
       setStaff(nextStaff)
       setRooms(nextRooms as AdminRoomRecord[])
+      setServiceTypes(nextServiceTypes)
     } catch (loadError) {
       console.error('Admin staff load failed', loadError)
       setError(getAdminErrorMessage(loadError, 'Не удалось загрузить персонал'))
@@ -69,6 +76,10 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
   useEffect(() => {
     void loadData()
   }, [refreshKey])
+
+  useEffect(() => subscribeServiceTypesChanged(() => {
+    void loadData()
+  }), [])
 
   function resetForm() {
     setEditingUserId(null)
@@ -177,6 +188,27 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
     return roomIds.map(getRoomLabel).join(', ')
   }
 
+  function getRoomsByIds(roomIds: string[]): AdminRoomRecord[] {
+    return roomIds
+      .map((roomId) => rooms.find((room) => String(room.id) === String(roomId)))
+      .filter((room): room is AdminRoomRecord => Boolean(room))
+  }
+
+  function getRoomServicesLabel(roomIds: string[]): string {
+    if (roomIds.length === 0 || getRoomsByIds(roomIds).length === 0) {
+      return 'Кабинет не назначен'
+    }
+
+    const serviceNames = getRoomsByIds(roomIds).flatMap((room) => (
+      getRoomServiceNames(room, serviceTypes, language)
+    ))
+    const uniqueServiceNames = Array.from(new Set(serviceNames))
+
+    return uniqueServiceNames.length > 0
+      ? uniqueServiceNames.join(', ')
+      : 'У кабинета не настроены услуги'
+  }
+
   return (
     <div className="page-stack">
       <section className="admin-page-grid">
@@ -213,6 +245,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                     <th>Логин</th>
                     <th>Роль</th>
                     <th>Место обслуживания</th>
+                    <th>Услуги кабинета</th>
                     <th>Действия</th>
                   </tr>
                 </thead>
@@ -223,6 +256,7 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                       <td>{getUserLogin(staffMember)}</td>
                       <td>{roleLabels[staffMember.role]}</td>
                       <td>{getRoomLabels(getUserRoomIds(staffMember))}</td>
+                      <td>{getRoomServicesLabel(getUserRoomIds(staffMember))}</td>
                       <td>
                         <div className="button-row">
                           <Button onClick={() => handleEdit(staffMember)} size="sm" variant="secondary">
@@ -314,6 +348,10 @@ export function StaffSection({ onStaffChange, refreshKey = 0 }: StaffSectionProp
                 )
               })}
             </fieldset>
+            <div className="admin-derived-info">
+              <span>Услуги кабинета</span>
+              <p>{getRoomServicesLabel(form.roomIds)}</p>
+            </div>
             <div className="modal-actions">
               <Button disabled={saving} onClick={resetForm} variant="ghost">
                 Отмена

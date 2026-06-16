@@ -24,6 +24,7 @@ let boardSettings: BoardSettings = {
   boardType: 'general',
   recentCallsLimit: 10,
   roomBoardId: '',
+  roomIds: [],
   screens: [],
   showRecentCalls: true,
   showTime: true,

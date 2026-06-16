@@ -45,7 +45,7 @@ import type { BoardScreen, BoardSettings, BoardSettingsProfile, BoardTemplate } 
 import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { copyTextToClipboard } from '@shared/utils/clipboard'
-import { getRoomBoardId, roomMatchesIdentifier } from '@shared/utils'
+import { getRoomBoardId, normalizeRoomLookupValue, roomMatchesIdentifier } from '@shared/utils'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
 
 const defaultBoardSettings: BoardSettings = {
@@ -303,6 +303,7 @@ export function BoardSettingsSection() {
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => voiceSettingsService.getSettings())
   const [copied, setCopied] = useState<string | null>(null)
   const [draftProfile, setDraftProfile] = useState<BoardSettingsProfile | null>(null)
+  const [boardRoomSearch, setBoardRoomSearch] = useState('')
   const [newScreenName, setNewScreenName] = useState('')
   const [newScreenRooms, setNewScreenRooms] = useState<string[]>([])
   const [newScreenTemplate, setNewScreenTemplate] = useState<BoardTemplate>(defaultBoardTemplate)
@@ -332,6 +333,8 @@ export function BoardSettingsSection() {
   }, [])
 
   useEffect(() => {
+    setBoardRoomSearch('')
+
     if (!draftProfile) {
       setPromoMedia({})
       setBoardStyleSettings(defaultBoardStyleSettings)
@@ -360,12 +363,114 @@ export function BoardSettingsSection() {
     )
   }
 
+  function getProfileRoomIds(profile: BoardSettingsProfile): string[] {
+    if (profile.boardType === 'individual') {
+      return profile.roomBoardId ? [profile.roomBoardId] : []
+    }
+
+    return (profile.roomIds ?? []).filter(Boolean)
+  }
+
+  function findRoomByBoardId(roomBoardId: string): AdminRoomRecord | undefined {
+    return rooms.find((room) => roomMatchesIdentifier(room, roomBoardId))
+  }
+
+  function getProfileRoomNames(profile: BoardSettingsProfile): string {
+    const roomIds = getProfileRoomIds(profile)
+
+    if (profile.boardType === 'general' && roomIds.length === 0) {
+      return t.queue.allRooms
+    }
+
+    if (roomIds.length === 0) {
+      return 'Кабинет не назначен'
+    }
+
+    return roomIds
+      .map((roomId) => {
+        const room = findRoomByBoardId(roomId)
+
+        return room ? getRoomName(room) : roomId
+      })
+      .join(', ')
+  }
+
+  function getProfileSelectedRoomNames(profile: BoardSettingsProfile): string[] {
+    return getProfileRoomIds(profile)
+      .map((roomId) => {
+        const room = findRoomByBoardId(roomId)
+
+        return room ? getRoomName(room) : roomId
+      })
+  }
+
+  function changeDraftBoardType(boardType: BoardSettingsProfile['boardType']) {
+    setDraftProfile((current) => {
+      if (!current) {
+        return current
+      }
+
+      if (boardType === 'individual') {
+        const roomBoardId = current.roomBoardId || current.roomIds?.[0] || ''
+
+        return {
+          ...current,
+          boardType,
+          roomBoardId,
+          roomIds: roomBoardId ? [roomBoardId] : [],
+        }
+      }
+
+      const roomIds = current.roomIds?.length
+        ? current.roomIds
+        : current.roomBoardId
+          ? [current.roomBoardId]
+          : []
+
+      return {
+        ...current,
+        boardType,
+        roomBoardId: '',
+        roomIds,
+      }
+    })
+  }
+
+  function setDraftIndividualRoom(roomBoardId: string) {
+    updateDraftProfile({
+      roomBoardId,
+      roomIds: roomBoardId ? [roomBoardId] : [],
+    })
+  }
+
+  function toggleDraftGeneralRoom(roomBoardId: string) {
+    setDraftProfile((current) => {
+      if (!current) {
+        return current
+      }
+
+      const selectedRoomIds = new Set(current.roomIds ?? [])
+
+      if (selectedRoomIds.has(roomBoardId)) {
+        selectedRoomIds.delete(roomBoardId)
+      } else {
+        selectedRoomIds.add(roomBoardId)
+      }
+
+      return {
+        ...current,
+        roomIds: Array.from(selectedRoomIds),
+      }
+    })
+  }
+
   function getScreenUrl(screen: BoardScreen): string {
     const profile = getBoardProfile(
       `screen-${screen.id}`,
       screen.name,
       screen.roomIds?.length === 1 ? 'individual' : 'general',
       screen.roomIds?.[0] ?? '',
+      screen.roomIds ?? [],
     )
     const profileParam = `profileId=${encodeURIComponent(profile.id)}`
 
@@ -402,6 +507,7 @@ export function BoardSettingsSection() {
     name: string,
     boardType: BoardSettingsProfile['boardType'],
     roomBoardId = '',
+    roomIds: string[] = [],
   ): BoardSettingsProfile {
     return {
       boardType,
@@ -409,6 +515,7 @@ export function BoardSettingsSection() {
       name,
       recentCallsLimit: boardSettings.recentCallsLimit,
       roomBoardId,
+      roomIds,
       showRecentCalls: boardSettings.showRecentCalls,
       showTime: boardSettings.showTime,
       template: boardSettings.template,
@@ -421,10 +528,19 @@ export function BoardSettingsSection() {
     name: string,
     boardType: BoardSettingsProfile['boardType'],
     roomBoardId = '',
+    roomIds: string[] = [],
   ): BoardSettingsProfile {
     const savedProfile = boardSettings.profiles?.find((profile) => profile.id === id)
+    const fallbackProfile = getDefaultProfile(id, name, boardType, roomBoardId, roomIds)
 
-    return savedProfile ?? getDefaultProfile(id, name, boardType, roomBoardId)
+    return savedProfile
+      ? {
+          ...fallbackProfile,
+          ...savedProfile,
+          roomBoardId: savedProfile.roomBoardId ?? fallbackProfile.roomBoardId,
+          roomIds: savedProfile.roomIds ?? fallbackProfile.roomIds,
+        }
+      : fallbackProfile
   }
 
   function startEditProfile(profile: BoardSettingsProfile) {
@@ -460,17 +576,16 @@ export function BoardSettingsSection() {
           return screen
         }
 
-        const selectedRoom = rooms.find((room) => roomMatchesIdentifier(room, draftProfile.roomBoardId))
+        const profileRoomIds = getProfileRoomIds(draftProfile)
+        const selectedRooms = profileRoomIds
+          .map((roomId) => findRoomByBoardId(roomId))
+          .filter((room): room is AdminRoomRecord => Boolean(room))
 
         return {
           ...screen,
           name: draftProfile.name,
-          roomIds: draftProfile.boardType === 'individual' && draftProfile.roomBoardId
-            ? [draftProfile.roomBoardId]
-            : screen.roomIds,
-          roomNames: draftProfile.boardType === 'individual' && selectedRoom
-            ? [getRoomName(selectedRoom)]
-            : screen.roomNames,
+          roomIds: profileRoomIds,
+          roomNames: selectedRooms.length > 0 ? selectedRooms.map(getRoomName) : [],
         }
       })
       : boardSettings.screens
@@ -551,6 +666,7 @@ export function BoardSettingsSection() {
       name: newScreenName.trim(),
       recentCallsLimit: boardSettings.recentCallsLimit,
       roomBoardId: screenBoardType === 'individual' ? roomIds[0] : '',
+      roomIds,
       showRecentCalls: boardSettings.showRecentCalls,
       showTime: boardSettings.showTime,
       template: newScreenTemplate,
@@ -702,10 +818,21 @@ export function BoardSettingsSection() {
     const boardId = getRoomBoardId(room)
 
     return {
-      profile: getBoardProfile(`room-${boardId}`, getRoomName(room), 'individual', boardId),
+      profile: getBoardProfile(`room-${boardId}`, getRoomName(room), 'individual', boardId, [boardId]),
       room,
     }
   })
+  const draftSelectedRoomIds = draftProfile ? getProfileRoomIds(draftProfile) : []
+  const draftSelectedRoomNames = draftProfile ? getProfileSelectedRoomNames(draftProfile) : []
+  const normalizedBoardRoomSearch = normalizeRoomLookupValue(boardRoomSearch)
+  const filteredBoardRooms = normalizedBoardRoomSearch
+    ? activeRooms.filter((room) => {
+        const boardId = getRoomBoardId(room)
+        const searchableText = `${getRoomName(room)} ${boardId}`
+
+        return normalizeRoomLookupValue(searchableText).includes(normalizedBoardRoomSearch)
+      })
+    : activeRooms
   return (
     <div className="page-stack">
       <section className="admin-page-grid">
@@ -742,7 +869,7 @@ export function BoardSettingsSection() {
                   {/* Общее табло */}
                   <tr>
                     <td><strong>Общее табло</strong></td>
-                    <td>{t.queue.allRooms}</td>
+                    <td>{getProfileRoomNames(generalProfile)}</td>
                     <td>
                       <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>
                         {generalUrl}
@@ -831,12 +958,13 @@ export function BoardSettingsSection() {
                       screen.name,
                       screen.roomIds?.length === 1 ? 'individual' : 'general',
                       screen.roomIds?.[0] ?? '',
+                      screen.roomIds ?? [],
                     )
                     const url = getScreenUrl(screen)
                     return (
                       <tr key={screen.id}>
                         <td><strong>{profile.name}</strong></td>
-                        <td>{screen.roomNames.join(', ')}</td>
+                        <td>{getProfileRoomNames(profile)}</td>
                         <td>
                           <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{url}</code>
                         </td>
@@ -913,10 +1041,7 @@ export function BoardSettingsSection() {
             <label className="field">
               <span>Тип табло</span>
               <select
-                onChange={(event) => updateDraftProfile({
-                  boardType: event.target.value as BoardSettings['boardType'],
-                  roomBoardId: event.target.value === 'general' ? '' : draftProfile.roomBoardId,
-                })}
+                onChange={(event) => changeDraftBoardType(event.target.value as BoardSettings['boardType'])}
                 value={draftProfile.boardType}
               >
                 <option value="general">Общее</option>
@@ -924,26 +1049,63 @@ export function BoardSettingsSection() {
               </select>
             </label>
 
-            {draftProfile.boardType === 'individual' ? (
-              <label className="field">
-                <span>Место обслуживания</span>
-                <select
-                  onChange={(event) => updateDraftProfile({ roomBoardId: event.target.value })}
-                  value={draftProfile.roomBoardId ?? ''}
-                >
-                  <option value="">Выберите место обслуживания</option>
-                  {rooms.map((room) => {
-                    const boardId = getRoomBoardId(room)
-
-                    return (
-                      <option key={String(room.id)} value={boardId}>
-                        {getRoomName(room)}
-                      </option>
-                    )
-                  })}
-                </select>
+            <div className="board-room-selection">
+              <span className="board-settings-field-label">Места обслуживания табло</span>
+              <label className="field board-room-search-field">
+                <span>Поиск места</span>
+                <input
+                  onChange={(event) => setBoardRoomSearch(event.target.value)}
+                  placeholder="Номер или название, например 12А"
+                  value={boardRoomSearch}
+                />
               </label>
-            ) : null}
+
+              {draftSelectedRoomNames.length > 0 ? (
+                <div className="board-selected-room-chips" aria-label="Выбранные места обслуживания">
+                  {draftSelectedRoomNames.map((name, index) => (
+                    <span key={`${name}-${index}`}>{name}</span>
+                  ))}
+                </div>
+              ) : (
+                <p className="admin-muted-text">
+                  {draftProfile.boardType === 'general'
+                    ? 'Если ничего не выбрано, табло покажет все активные места обслуживания.'
+                    : 'Выберите одно место обслуживания для индивидуального табло.'}
+                </p>
+              )}
+
+              <div className="board-room-selection-list">
+                {filteredBoardRooms.map((room) => {
+                  const boardId = getRoomBoardId(room)
+                  const checked = draftProfile.boardType === 'individual'
+                    ? normalizeRoomLookupValue(draftProfile.roomBoardId) === normalizeRoomLookupValue(boardId)
+                    : draftSelectedRoomIds.some((roomId) => (
+                        normalizeRoomLookupValue(roomId) === normalizeRoomLookupValue(boardId)
+                      ))
+
+                  return (
+                    <label key={String(room.id)}>
+                      <input
+                        checked={checked}
+                        name={`board-rooms-${draftProfile.id}`}
+                        onChange={() => {
+                          if (draftProfile.boardType === 'individual') {
+                            setDraftIndividualRoom(boardId)
+                          } else {
+                            toggleDraftGeneralRoom(boardId)
+                          }
+                        }}
+                        type={draftProfile.boardType === 'individual' ? 'radio' : 'checkbox'}
+                      />
+                      <span>{getRoomName(room)}</span>
+                    </label>
+                  )
+                })}
+                {filteredBoardRooms.length === 0 ? (
+                  <div className="promo-media-empty">Места обслуживания не найдены</div>
+                ) : null}
+              </div>
+            </div>
 
             <div className="admin-link-cell">
               <span>Ссылка выбранного табло:</span>

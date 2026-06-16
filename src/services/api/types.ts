@@ -205,6 +205,7 @@ export type BoardSettingsProfile = {
   name: string
   recentCallsLimit: number
   roomBoardId?: string
+  roomIds?: string[]
   showRecentCalls: boolean
   showTime: boolean
   template: BoardTemplate
@@ -216,6 +217,7 @@ export type BoardSettings = {
   profiles?: BoardSettingsProfile[]
   recentCallsLimit: number
   roomBoardId?: string
+  roomIds?: string[]
   screens: BoardScreen[]
   showRecentCalls: boolean
   showTime: boolean

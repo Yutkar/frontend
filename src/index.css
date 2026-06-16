@@ -270,7 +270,7 @@ h3 {
   display: flex;
   gap: 18px;
   justify-content: space-between;
-  min-height: 84px;
+  min-height: 68px;
   padding: 16px 24px;
   position: sticky;
   top: 0;
@@ -4600,6 +4600,36 @@ h3 {
   gap: 10px;
 }
 
+.board-room-search-field {
+  margin: 0;
+}
+
+.board-selected-room-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.board-selected-room-chips span {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-muted));
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 999px;
+  color: var(--primary-strong);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.board-room-selection-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px;
+}
+
 .board-settings-field-label {
   color: var(--text-muted);
   font-size: 12px;
@@ -4703,6 +4733,30 @@ h3 {
   accent-color: var(--primary);
   height: 18px;
   width: 18px;
+}
+
+.admin-derived-info {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.admin-derived-info span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-derived-info p {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .admin-muted-text {
