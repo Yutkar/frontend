@@ -39,7 +39,7 @@ export const boardScreenFormatOptions: Array<{
   { description: 'Квадратный экран', label: '4:3', value: '4:3' },
 ]
 
-export const defaultBoardStyleSettings: BoardStyleSettings = {
+export const DEFAULT_BOARD_STYLE_SETTINGS: BoardStyleSettings = {
   accentColor: '#1769aa',
   boardBackground: '#f7fbff',
   borderColor: '#cfe1f0',
@@ -51,6 +51,8 @@ export const defaultBoardStyleSettings: BoardStyleSettings = {
   historyText: '#102033',
   screenFormat: '16:9',
 }
+
+export const defaultBoardStyleSettings = DEFAULT_BOARD_STYLE_SETTINGS
 
 const boardStyleSettingsStorageKey = 'smartq_board_style_settings'
 const defaultProfileId = 'general'
@@ -75,7 +77,7 @@ function normalizeFontScalePercent(value: unknown): number {
   const numericValue = typeof value === 'number' ? value : Number(value)
 
   if (!Number.isFinite(numericValue)) {
-    return defaultBoardStyleSettings.fontScalePercent
+    return DEFAULT_BOARD_STYLE_SETTINGS.fontScalePercent
   }
 
   return Math.min(300, Math.max(50, Math.round(numericValue)))
@@ -84,25 +86,25 @@ function normalizeFontScalePercent(value: unknown): number {
 export function normalizeBoardStyleSettings(value?: Partial<BoardStyleSettings> | null): BoardStyleSettings {
   const fontFamily = value?.fontFamily && fontFamilies.has(value.fontFamily)
     ? value.fontFamily
-    : defaultBoardStyleSettings.fontFamily
+    : DEFAULT_BOARD_STYLE_SETTINGS.fontFamily
   const screenFormat = value?.screenFormat === '4:3' ? '4:3' : '16:9'
 
   return {
-    accentColor: normalizeColor(value?.accentColor, defaultBoardStyleSettings.accentColor),
-    boardBackground: normalizeColor(value?.boardBackground, defaultBoardStyleSettings.boardBackground),
-    borderColor: normalizeColor(value?.borderColor, defaultBoardStyleSettings.borderColor),
+    accentColor: normalizeColor(value?.accentColor, DEFAULT_BOARD_STYLE_SETTINGS.accentColor),
+    boardBackground: normalizeColor(value?.boardBackground, DEFAULT_BOARD_STYLE_SETTINGS.boardBackground),
+    borderColor: normalizeColor(value?.borderColor, DEFAULT_BOARD_STYLE_SETTINGS.borderColor),
     currentCallBackground: normalizeColor(
       value?.currentCallBackground,
-      defaultBoardStyleSettings.currentCallBackground,
+      DEFAULT_BOARD_STYLE_SETTINGS.currentCallBackground,
     ),
-    currentCallText: normalizeColor(value?.currentCallText, defaultBoardStyleSettings.currentCallText),
+    currentCallText: normalizeColor(value?.currentCallText, DEFAULT_BOARD_STYLE_SETTINGS.currentCallText),
     fontFamily,
     fontScalePercent: normalizeFontScalePercent(value?.fontScalePercent),
     historyBackground: normalizeColor(
       value?.historyBackground,
-      defaultBoardStyleSettings.historyBackground,
+      DEFAULT_BOARD_STYLE_SETTINGS.historyBackground,
     ),
-    historyText: normalizeColor(value?.historyText, defaultBoardStyleSettings.historyText),
+    historyText: normalizeColor(value?.historyText, DEFAULT_BOARD_STYLE_SETTINGS.historyText),
     screenFormat,
   }
 }

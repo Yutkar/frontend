@@ -5135,6 +5135,53 @@ h3 {
   outline: 0;
 }
 
+.board-style-reset-panel {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.board-style-reset-panel > div {
+  display: grid;
+  gap: 4px;
+  min-width: min(100%, 280px);
+}
+
+.board-style-reset-panel strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.board-style-reset-panel span {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.board-style-reset-confirm {
+  background: var(--surface);
+  border: 1px solid var(--primary-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.board-style-reset-confirm p {
+  color: var(--text);
+  font-weight: 800;
+  margin: 0;
+}
+
 .promo-upload-button {
   cursor: pointer;
   position: relative;

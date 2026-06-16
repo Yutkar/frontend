@@ -21,10 +21,10 @@ import {
 } from '@services/boardPromoMediaService'
 import { mediaService, type MediaFile } from '@services/mediaService'
 import {
+  DEFAULT_BOARD_STYLE_SETTINGS,
   boardFontOptions,
   boardScreenFormatOptions,
   boardStyleSettingsService,
-  defaultBoardStyleSettings,
   type BoardFontFamily,
   type BoardScreenFormat,
   type BoardStyleSettings,
@@ -117,10 +117,16 @@ function BoardFontScaleField({
   onChange: (value: number) => void
   value: number
 }) {
-  const initialValue = Number.isFinite(value) ? value : defaultBoardStyleSettings.fontScalePercent
+  const initialValue = Number.isFinite(value) ? value : DEFAULT_BOARD_STYLE_SETTINGS.fontScalePercent
   const [inputValue, setInputValue] = useState(String(initialValue))
   const numericValue = inputValue.trim() ? Number(inputValue) : Number.NaN
   const inputInvalid = !Number.isFinite(numericValue) || numericValue < 50 || numericValue > 300
+
+  useEffect(() => {
+    const nextValue = Number.isFinite(value) ? value : DEFAULT_BOARD_STYLE_SETTINGS.fontScalePercent
+
+    setInputValue(String(nextValue))
+  }, [value])
 
   return (
     <label className="field board-font-scale-field">
@@ -184,6 +190,11 @@ function BoardColorField({
   const [hexValue, setHexValue] = useState(colorValue.toUpperCase())
   const [hexError, setHexError] = useState('')
   const inputId = `board-color-${colorKey}`
+
+  useEffect(() => {
+    setHexValue(colorValue.toUpperCase())
+    setHexError('')
+  }, [colorValue])
 
   return (
     <div className="board-color-field">
@@ -321,7 +332,9 @@ export function BoardSettingsSection() {
   const [promoMedia, setPromoMedia] = useState<BoardPromoMedia>({})
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [mediaFilesLoading, setMediaFilesLoading] = useState(false)
-  const [boardStyleSettings, setBoardStyleSettings] = useState<BoardStyleSettings>(defaultBoardStyleSettings)
+  const [boardStyleSettings, setBoardStyleSettings] = useState<BoardStyleSettings>(DEFAULT_BOARD_STYLE_SETTINGS)
+  const [styleResetConfirmOpen, setStyleResetConfirmOpen] = useState(false)
+  const [styleFormVersion, setStyleFormVersion] = useState(0)
   const [promoVideoUrl, setPromoVideoUrl] = useState('')
   const [promoImageUrl, setPromoImageUrl] = useState('')
   const [promoMediaError, setPromoMediaError] = useState<string | null>(null)
@@ -363,7 +376,8 @@ export function BoardSettingsSection() {
 
     if (!draftProfile) {
       setPromoMedia({})
-      setBoardStyleSettings(defaultBoardStyleSettings)
+      setBoardStyleSettings(DEFAULT_BOARD_STYLE_SETTINGS)
+      setStyleResetConfirmOpen(false)
       setPromoVideoUrl('')
       setPromoImageUrl('')
       setPromoMediaError(null)
@@ -376,6 +390,7 @@ export function BoardSettingsSection() {
 
     setPromoMedia(nextPromoMedia)
     setBoardStyleSettings(boardStyleSettingsService.getSettings(draftProfile.id))
+    setStyleResetConfirmOpen(false)
     setPromoVideoUrl(getBoardPromoUrlInputValue(nextPromoMedia.videoUrl))
     setPromoImageUrl(getBoardPromoUrlInputValue(nextPromoMedia.imageUrl))
     setPromoMediaError(null)
@@ -582,6 +597,12 @@ export function BoardSettingsSection() {
     setBoardStyleSettings((current) => ({ ...current, ...nextSettings }))
   }
 
+  function resetBoardStyleSettingsToDefault() {
+    setBoardStyleSettings({ ...DEFAULT_BOARD_STYLE_SETTINGS })
+    setStyleFormVersion((current) => current + 1)
+    setStyleResetConfirmOpen(false)
+  }
+
   function cancelEditProfile() {
     setDraftProfile(null)
   }
@@ -733,7 +754,7 @@ export function BoardSettingsSection() {
       boardPromoMediaService.saveVideoUrl(screenProfileId, videoUrlValidation.normalizedUrl)
     }
     boardStyleSettingsService.saveSettings(screenProfileId, {
-      ...defaultBoardStyleSettings,
+      ...DEFAULT_BOARD_STYLE_SETTINGS,
       screenFormat: newScreenFormat,
     })
     setNewScreenName('')
@@ -1243,7 +1264,7 @@ export function BoardSettingsSection() {
                 </label>
 
                 <BoardFontScaleField
-                  key={draftProfile.id}
+                  key={`${draftProfile.id}-${styleFormVersion}`}
                   onChange={(fontScalePercent) => updateBoardStyleSettings({ fontScalePercent })}
                   value={boardStyleSettings.fontScalePercent}
                 />
@@ -1255,14 +1276,44 @@ export function BoardSettingsSection() {
                 {boardColorFields.map((field) => (
                   <BoardColorField
                     colorKey={field.key}
-                    fallbackValue={defaultBoardStyleSettings[field.key]}
-                    key={`${draftProfile.id}-${field.key}`}
+                    fallbackValue={DEFAULT_BOARD_STYLE_SETTINGS[field.key]}
+                    key={`${draftProfile.id}-${field.key}-${styleFormVersion}`}
                     label={field.label}
                     onChange={(value) => updateBoardStyleSettings({ [field.key]: value })}
                     value={boardStyleSettings[field.key]}
                   />
                 ))}
               </div>
+              <div className="board-style-reset-panel">
+                <div>
+                  <strong>Внешний вид табло</strong>
+                  <span>Сбросить цвета, шрифт, размер текста и формат экрана до стандартных значений.</span>
+                </div>
+                <Button
+                  onClick={() => setStyleResetConfirmOpen(true)}
+                  variant="secondary"
+                >
+                  Вернуть к стандартному
+                </Button>
+              </div>
+              {styleResetConfirmOpen ? (
+                <div
+                  aria-label="Подтверждение сброса внешнего вида табло"
+                  aria-modal="false"
+                  className="board-style-reset-confirm"
+                  role="alertdialog"
+                >
+                  <p>Вернуть стандартные цвета и шрифт табло?</p>
+                  <div className="button-row">
+                    <Button onClick={resetBoardStyleSettingsToDefault} variant="secondary">
+                      Вернуть
+                    </Button>
+                    <Button onClick={() => setStyleResetConfirmOpen(false)} variant="ghost">
+                      Отмена
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </BoardSettingsAccordion>
 
             {draftProfile.template === 'video_queue' ? (
