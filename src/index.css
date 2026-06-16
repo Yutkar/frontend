@@ -1317,6 +1317,33 @@ h3 {
   margin: 0;
 }
 
+.specialist-room-services {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--text);
+  margin-top: 14px;
+  max-width: 640px;
+  padding: 12px 14px;
+}
+
+.specialist-room-services span {
+  color: var(--text-soft);
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.specialist-room-services p {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.45;
+  margin: 0;
+}
+
 .specialist-panel {
   display: flex;
   flex-direction: column;

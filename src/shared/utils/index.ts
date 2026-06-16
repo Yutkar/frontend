@@ -14,6 +14,9 @@ export {
   getRoomPlaceNumber,
   getRoomPlaceType,
   getRoomPlaceTypeLabel,
+  isValidRoomNumber,
+  normalizeRoomLookupValue,
+  roomMatchesIdentifier,
 } from './room'
 export {
   formatWaitingTime,

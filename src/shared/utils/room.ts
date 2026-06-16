@@ -19,6 +19,9 @@ type PlaceMeta = {
 }
 
 const defaultPlaceType: ServicePlaceType = 'room'
+const roomNumberBody = String.raw`\d+[A-Za-zА-Яа-яӘәІіҢңҒғҮүҰұҚқӨөҺһ]?`
+const roomNumberPattern = new RegExp(`^${roomNumberBody}$`)
+const roomNumberPartPattern = new RegExp(roomNumberBody)
 
 const placeTypeMeta: Record<ServicePlaceType, PlaceMeta> = {
   desk: {
@@ -42,8 +45,14 @@ function normalizeRoomText(value?: string | number | null): string {
   return value == null ? '' : String(value).trim()
 }
 
-function isNumericRoomName(value: string): boolean {
-  return /^\d+$/.test(value)
+export function normalizeRoomLookupValue(value?: string | number | null): string {
+  return normalizeRoomText(value).replace(/\s+/g, '').toLocaleLowerCase('ru-RU')
+}
+
+export function isValidRoomNumber(value?: string | number | null): boolean {
+  const text = normalizeRoomText(value).replace(/\s+/g, '')
+
+  return roomNumberPattern.test(text)
 }
 
 function normalizePlaceType(value?: ServicePlaceType | string | null): ServicePlaceType | undefined {
@@ -70,11 +79,35 @@ function hasPlaceLabel(value: string): boolean {
   return /^(кабинет|окно|стол|терезе|үстел|room|window|desk)\b/i.test(value)
 }
 
-function extractRoomDigits(value?: string | number | null): string {
+function extractRoomNumber(value?: string | number | null): string {
   const text = normalizeRoomText(value)
-  const match = text.match(/\d+/)
+  const match = text.match(roomNumberPartPattern)
 
   return match?.[0] ?? ''
+}
+
+export function roomMatchesIdentifier(room: RoomNameSource | null | undefined, identifier?: string | number | null): boolean {
+  const target = normalizeRoomLookupValue(identifier)
+
+  if (!room || !target) {
+    return false
+  }
+
+  const lookupValues = [
+    room.id,
+    room.roomId,
+    room.number,
+    room.name,
+    room.title,
+    room.roomName,
+    getRoomPlaceNumber(room),
+    getRoomBoardId(room),
+    extractRoomNumber(room.name),
+    extractRoomNumber(room.title),
+    extractRoomNumber(room.roomName),
+  ]
+
+  return lookupValues.some((value) => normalizeRoomLookupValue(value) === target)
 }
 
 export function getRoomPlaceType(room?: RoomNameSource | null): ServicePlaceType {
@@ -96,13 +129,13 @@ export function getRoomPlaceNumber(room?: RoomNameSource | null): string {
 
   const rawNumber = normalizeRoomText(room.number)
   const number = rawNumber
-    ? isNumericRoomName(rawNumber) ? rawNumber : extractRoomDigits(rawNumber) || rawNumber
+    ? isValidRoomNumber(rawNumber) ? rawNumber.replace(/\s+/g, '') : extractRoomNumber(rawNumber) || rawNumber
     : ''
 
   return number
-    || extractRoomDigits(room.name)
-    || extractRoomDigits(room.title)
-    || extractRoomDigits(room.roomName)
+    || extractRoomNumber(room.name)
+    || extractRoomNumber(room.title)
+    || extractRoomNumber(room.roomName)
     || ''
 }
 
@@ -117,9 +150,9 @@ export function getRoomBoardId(room?: RoomNameSource | null): string {
     return number
   }
 
-  const namedId = extractRoomDigits(room.name)
-    || extractRoomDigits(room.title)
-    || extractRoomDigits(room.roomName)
+  const namedId = extractRoomNumber(room.name)
+    || extractRoomNumber(room.title)
+    || extractRoomNumber(room.roomName)
 
   if (namedId) {
     return namedId
@@ -148,7 +181,7 @@ export function formatRoomName(room?: RoomNameSource | null): string {
   if (rawName) {
     return hasPlaceLabel(rawName)
       ? rawName
-      : isNumericRoomName(rawName)
+      : isValidRoomNumber(rawName)
         ? `${placeLabel} ${rawName}`
         : rawName
   }

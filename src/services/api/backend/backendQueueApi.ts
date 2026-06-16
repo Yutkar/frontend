@@ -1,5 +1,5 @@
 import type { QueueSnapshot, RedirectTicketInput } from '@shared/types'
-import { formatRoomName, getRoomBoardId, isWithinWorkHours } from '@shared/utils'
+import { formatRoomName, getRoomBoardId, isWithinWorkHours, roomMatchesIdentifier } from '@shared/utils'
 import type { QueueStats, Room, Ticket } from '../../../types'
 import {
   toArchitectureRooms,
@@ -541,12 +541,25 @@ function getBackendRoomBoardId(room: BackendRoom): string {
   })
 }
 
+function backendRoomMatchesIdentifier(room: BackendRoom, identifier: string | number): boolean {
+  return roomMatchesIdentifier({
+    id: getRawBackendRoomId(room),
+    name: room.name,
+    number: room.number,
+    placeType: room.placeType ?? room.place_type,
+    roomId: room.roomId ?? room.room_id,
+    roomName: room.roomName ?? room.room_name,
+    title: room.title,
+  }, identifier)
+}
+
 async function resolveBackendRoomIdForBoard(roomId: string | number): Promise<string> {
   const boardRoomId = String(roomId)
 
   try {
     const response = await publicApiClient.get<unknown>('/rooms')
     const room = toBackendRooms(response.data).find((item) => (
+      backendRoomMatchesIdentifier(item, boardRoomId) ||
       getBackendRoomBoardId(item) === boardRoomId ||
       getRawBackendRoomId(item) === boardRoomId
     ))
@@ -569,6 +582,8 @@ function getBoardRoomFilterIds(
 
   snapshot.rooms
     .filter((room) => (
+      roomMatchesIdentifier(room, boardRoomId) ||
+      roomMatchesIdentifier(room, backendRoomId) ||
       String(room.id) === boardRoomId ||
       String(room.id) === backendRoomId ||
       getRoomBoardId(room) === boardRoomId
@@ -590,10 +605,12 @@ function filterBoardSnapshotByRoom(
     ...snapshot,
     rooms: snapshot.rooms.filter((room) => (
       roomIds.has(String(room.id)) ||
+      roomMatchesIdentifier(room, boardRoomId) ||
       getRoomBoardId(room) === boardRoomId
     )),
     tickets: snapshot.tickets.filter((ticket) => (
       (ticket.roomId !== undefined && roomIds.has(String(ticket.roomId))) ||
+      roomMatchesIdentifier({ id: ticket.roomId, name: ticket.roomName }, boardRoomId) ||
       getRoomBoardId({ id: ticket.roomId, name: ticket.roomName }) === boardRoomId
     )),
   }

@@ -125,6 +125,38 @@ function mergeTicketsById(...ticketGroups: Ticket[][]): Ticket[] {
   return Array.from(ticketMap.values())
 }
 
+function mergeRoomPreservingMetadata(nextRoom: Room, currentRoom?: Room): Room {
+  if (!currentRoom) {
+    return nextRoom
+  }
+
+  return {
+    ...currentRoom,
+    ...nextRoom,
+    department: nextRoom.department ?? currentRoom.department,
+    isTicketIssueEnabled: nextRoom.isTicketIssueEnabled ?? currentRoom.isTicketIssueEnabled,
+    kioskEnabled: nextRoom.kioskEnabled ?? currentRoom.kioskEnabled,
+    number: nextRoom.number ?? currentRoom.number,
+    placeType: nextRoom.placeType ?? currentRoom.placeType,
+    serviceTypeId: nextRoom.serviceTypeId ?? currentRoom.serviceTypeId,
+    serviceTypeIds: nextRoom.serviceTypeIds ?? currentRoom.serviceTypeIds,
+    serviceTypes: nextRoom.serviceTypes ?? currentRoom.serviceTypes,
+    services: nextRoom.services ?? currentRoom.services,
+    specialistName: nextRoom.specialistName ?? currentRoom.specialistName,
+    ticketIssueEnabled: nextRoom.ticketIssueEnabled ?? currentRoom.ticketIssueEnabled,
+    workEndTime: nextRoom.workEndTime ?? currentRoom.workEndTime,
+    workStartTime: nextRoom.workStartTime ?? currentRoom.workStartTime,
+    workingEndTime: nextRoom.workingEndTime ?? currentRoom.workingEndTime,
+    workingStartTime: nextRoom.workingStartTime ?? currentRoom.workingStartTime,
+  }
+}
+
+function mergeRoomsPreservingMetadata(nextRooms: Room[], currentRooms: Room[]): Room[] {
+  const currentRoomsById = new Map(currentRooms.map((room) => [String(room.id), room]))
+
+  return nextRooms.map((room) => mergeRoomPreservingMetadata(room, currentRoomsById.get(String(room.id))))
+}
+
 function replaceRoomTickets(currentTickets: Ticket[], roomTickets: Ticket[], roomId: string | number): Ticket[] {
   const roomIdValue = String(roomId)
 
@@ -193,6 +225,7 @@ function createSnapshotUpdate(
     postponedTickets,
     events: mergeQueueEvents(snapshot.events, state.events),
     returnedTicketOverrides: resolved.returnedTicketOverrides,
+    rooms: mergeRoomsPreservingMetadata(snapshot.rooms, state.rooms),
     tickets: resolved.tickets,
   }
 }
@@ -214,6 +247,7 @@ function createRoomActiveUpdate(
     noShowTickets: state.noShowTickets,
     postponedTickets: state.postponedTickets,
     returnedTicketOverrides: resolved.returnedTicketOverrides,
+    rooms: mergeRoomsPreservingMetadata(snapshot.rooms, state.rooms),
     tickets,
   }
 }
@@ -238,6 +272,7 @@ function createRoomSnapshotUpdate(
     noShowTickets,
     postponedTickets,
     returnedTicketOverrides: resolved.returnedTicketOverrides,
+    rooms: mergeRoomsPreservingMetadata(snapshot.rooms, state.rooms),
     tickets: mergeTicketsById(getClosedTickets(state.tickets), newClosedTickets, activeTickets, noShowTickets, postponedTickets),
   }
 }
@@ -423,7 +458,10 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         hydrated: true,
         lastUpdatedAt: new Date().toISOString(),
         loading: false,
-        rooms: snapshotHasRoom || !currentRoom ? snapshot.rooms : [currentRoom, ...snapshot.rooms],
+        rooms: mergeRoomsPreservingMetadata(
+          snapshotHasRoom || !currentRoom ? snapshot.rooms : [currentRoom, ...snapshot.rooms],
+          state.rooms,
+        ),
         statusMessage: defaultSuccessMessage,
       }))
     } catch (error) {

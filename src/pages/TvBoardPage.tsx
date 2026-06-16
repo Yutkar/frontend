@@ -13,7 +13,13 @@ import { queueService } from '@services/queueService'
 import type { BoardSettings } from '@services/api'
 import { useLocale } from '@shared/locales/useLocale'
 import type { Room, Ticket } from '@shared/types'
-import { formatRoomName, getRoomBoardId, getRoomClosedLabel } from '@shared/utils'
+import {
+  formatRoomName,
+  getRoomBoardId,
+  getRoomClosedLabel,
+  normalizeRoomLookupValue,
+  roomMatchesIdentifier,
+} from '@shared/utils'
 
 const defaultBoardSettings: BoardSettings = {
   boardType: 'general',
@@ -30,10 +36,17 @@ type RouteBoardSettings = BoardSettings & {
   resolvedProfileId: string
 }
 
+function boardIdentifierEquals(left?: string | number | null, right?: string | number | null): boolean {
+  const normalizedLeft = normalizeRoomLookupValue(left)
+  const normalizedRight = normalizeRoomLookupValue(right)
+
+  return Boolean(normalizedLeft && normalizedLeft === normalizedRight)
+}
+
 function getFallbackProfileId(settings: BoardSettings, roomId?: string): string {
   if (roomId) {
     return settings.profiles?.find((item) => (
-      item.boardType === 'individual' && String(item.roomBoardId ?? '') === String(roomId)
+      item.boardType === 'individual' && boardIdentifierEquals(item.roomBoardId, roomId)
     ))?.id ?? `room-${roomId}`
   }
 
@@ -46,7 +59,7 @@ function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, prof
     : undefined
   const profile = profileById ?? (roomId
     ? settings.profiles?.find((item) => (
-      item.boardType === 'individual' && String(item.roomBoardId ?? '') === String(roomId)
+      item.boardType === 'individual' && boardIdentifierEquals(item.roomBoardId, roomId)
     ))
     : settings.profiles?.find((item) => item.boardType === 'general'))
 
@@ -56,7 +69,7 @@ function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, prof
     if (
       roomId &&
       settings.boardType === 'individual' &&
-      String(settings.roomBoardId ?? '') === String(roomId)
+      boardIdentifierEquals(settings.roomBoardId, roomId)
     ) {
       return { ...settings, resolvedProfileId }
     }
@@ -140,11 +153,14 @@ export function TvBoardPage() {
 
         const nextTickets: Ticket[] = snapshot.tickets
         const nextRooms: Room[] = snapshot.rooms
+        const nextBoardRoom = roomId
+          ? nextRooms.find((room) => roomMatchesIdentifier(room, roomId)) ?? nextRooms[0]
+          : undefined
 
         setTickets(nextTickets)
         setRooms(nextRooms)
         setRoomName(roomId
-          ? formatRoomName(nextRooms[0] ?? { id: roomId })
+          ? formatRoomName(nextBoardRoom ?? { id: roomId })
           : '')
         setError(null)
         setBoardDataReady(true)
@@ -169,7 +185,7 @@ export function TvBoardPage() {
 
   const routeBoardSettings = getBoardSettingsForRoute(boardSettings, roomId, profileId)
   const boardRoom = roomId
-    ? rooms.find((room) => getRoomBoardId(room) === roomId || String(room.id) === roomId) ?? rooms[0]
+    ? rooms.find((room) => roomMatchesIdentifier(room, roomId) || getRoomBoardId(room) === roomId || String(room.id) === roomId) ?? rooms[0]
     : undefined
   const roomClosed = Boolean(roomId) && isRoomClosed(boardRoom)
   const roomHeaderName = roomClosed && roomName && tickets.length > 0 ? `${roomName} — закрыт` : roomName

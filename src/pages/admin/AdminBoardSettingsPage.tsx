@@ -45,7 +45,7 @@ import type { BoardScreen, BoardSettings, BoardSettingsProfile, BoardTemplate } 
 import { useLocale } from '@shared/locales/useLocale'
 import { Button } from '@shared/ui/components'
 import { copyTextToClipboard } from '@shared/utils/clipboard'
-import { getRoomBoardId } from '@shared/utils'
+import { getRoomBoardId, roomMatchesIdentifier } from '@shared/utils'
 import { getAdminErrorMessage, getRoomName, getRoomActive, type AdminRoomRecord } from './adminPageHelpers'
 
 const defaultBoardSettings: BoardSettings = {
@@ -460,7 +460,7 @@ export function BoardSettingsSection() {
           return screen
         }
 
-        const selectedRoom = rooms.find((room) => getRoomBoardId(room) === draftProfile.roomBoardId)
+        const selectedRoom = rooms.find((room) => roomMatchesIdentifier(room, draftProfile.roomBoardId))
 
         return {
           ...screen,

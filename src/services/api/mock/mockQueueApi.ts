@@ -1,4 +1,4 @@
-import { getRoomBoardId } from '@shared/utils'
+import { getRoomBoardId, roomMatchesIdentifier } from '@shared/utils'
 import type { QueueApi } from '../types'
 import {
   callNextSharedTicket,
@@ -33,6 +33,7 @@ export const mockQueueApi: QueueApi = {
     const roomIdValue = String(roomId)
     const rooms = snapshot.rooms.filter((room) => (
       room.id === roomIdValue ||
+      roomMatchesIdentifier(room, roomIdValue) ||
       getRoomBoardId(room) === roomIdValue
     ))
     const roomIds = new Set(rooms.map((room) => room.id))
@@ -42,7 +43,8 @@ export const mockQueueApi: QueueApi = {
       rooms,
       tickets: snapshot.tickets.filter((ticket) => (
         ticket.roomId !== undefined && roomIds.has(ticket.roomId)
-      ) || getRoomBoardId({ id: ticket.roomId, name: ticket.roomName }) === roomIdValue),
+      ) || roomMatchesIdentifier({ id: ticket.roomId, name: ticket.roomName }, roomIdValue)
+        || getRoomBoardId({ id: ticket.roomId, name: ticket.roomName }) === roomIdValue),
     })
   },
 

@@ -1,12 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Building2, PlusCircle } from 'lucide-react'
 import { adminService } from '@services/adminService'
-import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
+import { notifyServiceTypesChanged, subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
 import type { ServicePlaceType } from '@shared/types'
 import { Button } from '@shared/ui/components'
-import { formatRoomName, getRoomBoardId, getRoomPlaceType, normalizeWorkTime } from '@shared/utils'
+import {
+  formatRoomName,
+  getRoomBoardId,
+  getRoomPlaceType,
+  isValidRoomNumber,
+  normalizeWorkTime,
+} from '@shared/utils'
 import {
   getRoomActive,
   getAdminErrorMessage,
@@ -51,11 +57,11 @@ function normalizeId(value: string): string | number {
 }
 
 function toRoomNumberInput(room: AdminRoomRecord): string {
-  return getRoomBoardId(room).replace(/\D/g, '')
+  return getRoomBoardId(room)
 }
 
 function normalizeRoomNumberInput(value: string): string {
-  return value.replace(/\D/g, '')
+  return value.trim().replace(/\s+/g, '')
 }
 
 function getRoomWorkTimeLabel(room: AdminRoomRecord): string {
@@ -148,8 +154,8 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
 
     const roomNumber = normalizeRoomNumberInput(form.number)
 
-    if (!roomNumber) {
-      setError('Введите номер места обслуживания.')
+    if (!isValidRoomNumber(roomNumber)) {
+      setError('Введите номер, например 12 или 12А')
       return
     }
 
@@ -183,6 +189,7 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
       setSuccessMessage('Место обслуживания успешно сохранено')
       resetForm()
       await loadData()
+      notifyServiceTypesChanged()
       onRoomsChange?.()
     } catch (saveError) {
       console.error('Admin room save failed', saveError)
@@ -309,13 +316,14 @@ export function RoomsSection({ onRoomsChange }: RoomsSectionProps) {
             <label className="field">
               <span>Номер</span>
               <input
-                inputMode="numeric"
+                inputMode="text"
                 onChange={(event) => setForm((current) => ({
                   ...current,
                   number: normalizeRoomNumberInput(event.target.value),
                 }))}
-                pattern="[0-9]*"
-                placeholder="123"
+                pattern="\d+[A-Za-zА-Яа-яӘәІіҢңҒғҮүҰұҚқӨөҺһ]?"
+                placeholder="12А"
+                title="Введите номер, например 12 или 12А"
                 value={form.number}
               />
             </label>

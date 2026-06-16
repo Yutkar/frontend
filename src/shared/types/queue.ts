@@ -68,8 +68,22 @@ export type Room = {
   kioskEnabled?: boolean
   serviceTypeId?: string | number
   serviceTypeIds?: Array<string | number>
-  serviceTypes?: Array<string | number | { _id?: string | number; id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
-  services?: Array<string | number | { _id?: string | number; id?: string | number; name?: string; serviceTypeId?: string | number; title?: string }>
+  serviceTypes?: Array<string | number | {
+    _id?: string | number
+    id?: string | number
+    name?: string
+    serviceTypeId?: string | number
+    title?: string
+    translations?: Partial<Record<SmartQLanguage, string>>
+  }>
+  services?: Array<string | number | {
+    _id?: string | number
+    id?: string | number
+    name?: string
+    serviceTypeId?: string | number
+    title?: string
+    translations?: Partial<Record<SmartQLanguage, string>>
+  }>
   ticketIssueEnabled?: boolean
   currentTicketId?: string
   workload?: number

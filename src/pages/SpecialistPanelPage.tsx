@@ -3,71 +3,93 @@ import { Power, PowerOff } from 'lucide-react'
 import { SpecialistControls } from '@features/specialist/SpecialistControls'
 import { useQueueBootstrap } from '@features/queue/useQueueBootstrap'
 import { adminService } from '@services/adminService'
+import { subscribeServiceTypesChanged } from '@services/serviceTypeSync'
 import { ticketService } from '@services/ticketService'
 import type { TicketSettingsServiceTypeOption } from '@services/api'
 import { getServiceOptionLabel } from '@features/tickets/ticketFormOptions'
-import { t } from '@shared/locales/useLocale'
+import { t, useLanguage, type SmartQLanguage } from '@shared/locales/useLocale'
 import type { Room, User } from '@shared/types'
 import { Button, StatusBadge } from '@shared/ui/components'
-import { formatRoomName, getServiceTypeLabel } from '@shared/utils'
+import { formatRoomName } from '@shared/utils'
 import { useGlobalStore } from '@store/global'
 import { useQueueStore } from '@store/queue'
 
-function getRoomProcedureLabel(room?: Room, serviceTypes: TicketSettingsServiceTypeOption[] = []): string {
+type RoomServiceReference = NonNullable<Room['serviceTypes']>[number] | NonNullable<Room['services']>[number]
+
+function getRoomServiceRecordName(
+  service: RoomServiceReference,
+  language: SmartQLanguage,
+  serviceTypeById: Map<string, string>,
+): string {
+  if (typeof service === 'string' || typeof service === 'number') {
+    return serviceTypeById.get(String(service)) ?? ''
+  }
+
+  const serviceId = String(service.serviceTypeId ?? service.id ?? service._id ?? '')
+  const translatedName = service.translations?.[language]
+
+  return serviceTypeById.get(serviceId)
+    ?? translatedName
+    ?? service.name
+    ?? service.title
+    ?? ''
+}
+
+function getRoomServiceNames(
+  room?: Room,
+  serviceTypes: TicketSettingsServiceTypeOption[] = [],
+  language: SmartQLanguage = 'ru',
+): string[] {
   if (!room) {
-    return '-'
+    return []
   }
 
   const serviceTypeById = new Map(serviceTypes.map((serviceType) => [
     String(serviceType.id),
-    getServiceOptionLabel(serviceType),
+    getServiceOptionLabel(serviceType, language),
   ]))
   const directServices = [...(room.serviceTypes ?? []), ...(room.services ?? [])]
-    .map((service) => {
-      if (typeof service === 'string' || typeof service === 'number') {
-        return serviceTypeById.get(String(service)) ?? String(service)
-      }
-
-      const serviceId = String(service.serviceTypeId ?? service.id ?? service._id ?? '')
-
-      return service.name ?? service.title ?? serviceTypeById.get(serviceId) ?? serviceId
-    })
+    .map((service) => getRoomServiceRecordName(service, language, serviceTypeById))
     .filter(Boolean)
-
-  if (directServices.length > 0) {
-    return Array.from(new Set(directServices)).join(', ')
-  }
 
   const serviceNames = [room.serviceTypeId, ...(room.serviceTypeIds ?? [])]
     .map((serviceTypeId) => serviceTypeById.get(String(serviceTypeId)))
     .filter((name): name is string => Boolean(name))
 
-  if (serviceNames.length > 0) {
-    return Array.from(new Set(serviceNames)).join(', ')
-  }
-
-  return room.department || getServiceTypeLabel('consultation')
+  return Array.from(new Set([...directServices, ...serviceNames]))
 }
 
 function hasConfiguredServices(room: Room): boolean {
   const serviceIds = [
     ...(room.serviceTypeIds ?? []),
-    ...(room.services ?? []).map((service) => (typeof service === 'object' ? service.id ?? service.serviceTypeId : service)),
-    ...(room.serviceTypes ?? []).map((service) => (typeof service === 'object' ? service.id ?? service.serviceTypeId : service)),
+    ...(room.services ?? []).map((service) => (
+      typeof service === 'object'
+        ? service.id ?? service.serviceTypeId ?? service.name ?? service.title
+        : service
+    )),
+    ...(room.serviceTypes ?? []).map((service) => (
+      typeof service === 'object'
+        ? service.id ?? service.serviceTypeId ?? service.name ?? service.title
+        : service
+    )),
   ].filter((serviceId) => serviceId !== undefined && serviceId !== null && String(serviceId).trim() !== '')
 
   return Boolean(room.serviceTypeId) || serviceIds.length > 0
 }
 
 function SpecialistUserSummary({
+  language,
   room,
   serviceTypes,
   user,
 }: {
+  language: SmartQLanguage
   room: Room
   serviceTypes: TicketSettingsServiceTypeOption[]
   user: User
 }) {
+  const roomServiceNames = getRoomServiceNames(room, serviceTypes, language)
+
   return (
     <div>
       <span className="eyebrow">{t.specialist.currentSpecialist}</span>
@@ -83,9 +105,13 @@ function SpecialistUserSummary({
         </div>
         <div>
           <dt>{t.specialist.specialty}</dt>
-          <dd>{user.department || getRoomProcedureLabel(room, serviceTypes)}</dd>
+          <dd>{user.department || '-'}</dd>
         </div>
       </dl>
+      <div className="specialist-room-services">
+        <span>Услуги кабинета</span>
+        <p>{roomServiceNames.length > 0 ? roomServiceNames.join(', ') : 'У кабинета не настроены услуги'}</p>
+      </div>
     </div>
   )
 }
@@ -183,6 +209,7 @@ function SpecialistRoomToggle({ onChanged, room }: { onChanged: (room: Room) => 
 export function SpecialistPanelPage() {
   useQueueBootstrap()
 
+  const language = useLanguage()
   const [roomOverride, setRoomOverride] = useState<Room | null>(null)
   const [roomStatusChecked, setRoomStatusChecked] = useState(false)
   const [selectedRoomId, setSelectedRoomId] = useState('')
@@ -273,22 +300,28 @@ export function SpecialistPanelPage() {
   useEffect(() => {
     let active = true
 
-    ticketService
-      .getTicketSettingsOptions()
-      .then((options) => {
-        if (active) {
-          setServiceTypes(options.serviceTypes)
-        }
-      })
-      .catch((loadError) => {
-        console.error('Specialist service types load failed', loadError)
-        if (active) {
-          setServiceTypes([])
-        }
-      })
+    const loadServiceTypes = () => {
+      ticketService
+        .getTicketSettingsOptions()
+        .then((options) => {
+          if (active) {
+            setServiceTypes(options.serviceTypes)
+          }
+        })
+        .catch((loadError) => {
+          console.error('Specialist service types load failed', loadError)
+          if (active) {
+            setServiceTypes([])
+          }
+        })
+    }
+
+    loadServiceTypes()
+    const unsubscribe = subscribeServiceTypesChanged(loadServiceTypes)
 
     return () => {
       active = false
+      unsubscribe()
     }
   }, [])
 
@@ -319,7 +352,7 @@ export function SpecialistPanelPage() {
   return (
     <div className="page-stack">
       <section className="specialist-header">
-        <SpecialistUserSummary room={room} serviceTypes={serviceTypes} user={user} />
+        <SpecialistUserSummary language={language} room={room} serviceTypes={serviceTypes} user={user} />
         <div className="specialist-header-actions">
           <SpecialistRoomSelect
             onChange={(nextRoomId) => {

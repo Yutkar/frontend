@@ -183,6 +183,12 @@ function getPlaceNumberAudioPart(place?: TicketRoom): string | undefined {
   const placeNumber = getRoomPlaceNumber(place) || (place?.id ? String(place.id) : '')
   const numericPlaceNumber = placeNumber.replace(/\D/g, '')
 
+  if (placeNumber && numericPlaceNumber !== placeNumber) {
+    warnAudioIssue(
+      `Буквы в номере места обслуживания пока не озвучиваются отдельным файлом: ${placeNumber}. Используется числовая часть.`,
+    )
+  }
+
   if (!numericPlaceNumber) {
     return undefined
   }
