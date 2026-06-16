@@ -1,7 +1,11 @@
+import { mediaService, type MediaFile } from './mediaService'
+
 export type BoardPromoMedia = {
+  imageId?: number
   imageName?: string
   imageUrl?: string
   updatedAt?: string
+  videoId?: number
   videoName?: string
   videoUrl?: string
 }
@@ -89,8 +93,10 @@ function normalizeMedia(value: unknown): BoardPromoMedia {
 
   return {
     imageName: typeof record.imageName === 'string' ? record.imageName : undefined,
+    imageId: typeof record.imageId === 'number' ? record.imageId : undefined,
     imageUrl: typeof record.imageUrl === 'string' ? record.imageUrl : undefined,
     updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,
+    videoId: typeof record.videoId === 'number' ? record.videoId : undefined,
     videoName: typeof record.videoName === 'string' ? record.videoName : undefined,
     videoUrl: typeof record.videoUrl === 'string' ? record.videoUrl : undefined,
   }
@@ -138,21 +144,8 @@ function saveMedia(profileId: string | undefined | null, media: BoardPromoMedia)
   return normalizedMedia
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onerror = () => reject(new Error('Не удалось прочитать файл'))
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error('Не удалось прочитать файл'))
-    }
-    reader.readAsDataURL(file)
-  })
+function toBoardMediaUrl(mediaFile: MediaFile): string {
+  return mediaService.getMediaFullUrl(mediaFile.url)
 }
 
 export const boardPromoMediaService = {
@@ -165,6 +158,7 @@ export const boardPromoMediaService = {
 
     return saveMedia(profileId, {
       ...currentMedia,
+      imageId: undefined,
       imageName: undefined,
       imageUrl: undefined,
     })
@@ -175,9 +169,35 @@ export const boardPromoMediaService = {
 
     return saveMedia(profileId, {
       ...currentMedia,
+      videoId: undefined,
       videoName: undefined,
       videoUrl: undefined,
     })
+  },
+
+  removeMediaById(mediaId: number): PromoMediaStorage {
+    const storage = readStorage()
+    const nextStorage = Object.fromEntries(
+      Object.entries(storage).map(([profileId, media]) => {
+        const nextMedia = { ...media }
+
+        if (nextMedia.imageId === mediaId) {
+          nextMedia.imageId = undefined
+          nextMedia.imageName = undefined
+          nextMedia.imageUrl = undefined
+        }
+
+        if (nextMedia.videoId === mediaId) {
+          nextMedia.videoId = undefined
+          nextMedia.videoName = undefined
+          nextMedia.videoUrl = undefined
+        }
+
+        return [profileId, normalizeMedia(nextMedia)]
+      }),
+    )
+
+    return writeStorage(nextStorage)
   },
 
   saveImageUrl(profileId: string | undefined | null, imageUrl: string): BoardPromoMedia {
@@ -186,6 +206,7 @@ export const boardPromoMediaService = {
 
     return saveMedia(profileId, {
       ...currentMedia,
+      imageId: undefined,
       imageName: normalizedImageUrl ? 'URL' : undefined,
       imageUrl: normalizedImageUrl || undefined,
     })
@@ -201,8 +222,30 @@ export const boardPromoMediaService = {
 
     return saveMedia(profileId, {
       ...currentMedia,
+      videoId: undefined,
       videoName: validation.normalizedUrl ? 'URL' : undefined,
       videoUrl: validation.normalizedUrl || undefined,
+    })
+  },
+
+  saveMediaFile(profileId: string | undefined | null, mediaFile: MediaFile): BoardPromoMedia {
+    const currentMedia = this.getMedia(profileId)
+    const mediaUrl = toBoardMediaUrl(mediaFile)
+
+    if (mediaFile.type === 'video') {
+      return saveMedia(profileId, {
+        ...currentMedia,
+        videoId: mediaFile.id,
+        videoName: mediaFile.filename,
+        videoUrl: mediaUrl,
+      })
+    }
+
+    return saveMedia(profileId, {
+      ...currentMedia,
+      imageId: mediaFile.id,
+      imageName: mediaFile.filename,
+      imageUrl: mediaUrl,
     })
   },
 
@@ -211,34 +254,24 @@ export const boardPromoMediaService = {
       throw new Error('Выберите изображение')
     }
 
-    const imageUrl = await readFileAsDataUrl(file)
-    const currentMedia = this.getMedia(profileId)
+    const mediaFile = await mediaService.uploadMedia(file)
 
-    return saveMedia(profileId, {
-      ...currentMedia,
-      imageName: file.name,
-      imageUrl,
-    })
+    return this.saveMediaFile(profileId, { ...mediaFile, type: 'image' })
   },
 
   async uploadVideoFile(profileId: string | undefined | null, file: File): Promise<BoardPromoMedia> {
-    const supportedVideoTypes = new Set(['video/mp4', 'video/webm', 'video/ogg'])
+    const supportedVideoTypes = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
 
     if (file.type && !supportedVideoTypes.has(file.type)) {
-      throw new Error('Выберите видеофайл mp4/webm/ogg')
+      throw new Error('Выберите видеофайл mp4/webm/mov')
     }
 
-    if (!file.type && !/\.(mp4|webm|ogg)$/i.test(file.name)) {
-      throw new Error('Выберите видеофайл mp4/webm/ogg')
+    if (!file.type && !/\.(mp4|webm|mov)$/i.test(file.name)) {
+      throw new Error('Выберите видеофайл mp4/webm/mov')
     }
 
-    const videoUrl = await readFileAsDataUrl(file)
-    const currentMedia = this.getMedia(profileId)
+    const mediaFile = await mediaService.uploadMedia(file)
 
-    return saveMedia(profileId, {
-      ...currentMedia,
-      videoName: file.name,
-      videoUrl,
-    })
+    return this.saveMediaFile(profileId, { ...mediaFile, type: 'video' })
   },
 }

@@ -9,6 +9,7 @@ import {
   getBoardFontStack,
   type BoardStyleSettings,
 } from '@services/boardStyleSettingsService'
+import { mediaService } from '@services/mediaService'
 import { queueService } from '@services/queueService'
 import type { BoardSettings } from '@services/api'
 import { useLocale } from '@shared/locales/useLocale'
@@ -98,6 +99,32 @@ function getBoardSettingsForRoute(settings: BoardSettings, roomId?: string, prof
 
 function isRoomClosed(room?: Room): boolean {
   return Boolean(room && (room.active === false || room.isActive === false))
+}
+
+function hasBoardPromoMedia(media: BoardPromoMedia): boolean {
+  return Boolean(media.videoUrl || media.imageUrl)
+}
+
+async function getLatestBoardPromoMedia(): Promise<BoardPromoMedia> {
+  const latestMedia = await mediaService.getLatestMedia()
+
+  if (latestMedia.video) {
+    return {
+      videoId: latestMedia.video.id,
+      videoName: latestMedia.video.filename,
+      videoUrl: mediaService.getMediaFullUrl(latestMedia.video.url),
+    }
+  }
+
+  if (latestMedia.image) {
+    return {
+      imageId: latestMedia.image.id,
+      imageName: latestMedia.image.filename,
+      imageUrl: mediaService.getMediaFullUrl(latestMedia.image.url),
+    }
+  }
+
+  return {}
 }
 
 function getRouteRoomIds(settings: RouteBoardSettings): string[] {
@@ -225,15 +252,36 @@ export function TvBoardPage() {
   const roomHeaderName = roomClosed && roomName && visibleTickets.length > 0 ? `${roomName} — закрыт` : roomName
 
   useEffect(() => {
-    const loadLocalBoardSettings = () => {
-      setPromoMedia(boardPromoMediaService.getMedia(routeBoardSettings.resolvedProfileId))
-      setBoardStyleSettings(boardStyleSettingsService.getSettings(routeBoardSettings.resolvedProfileId))
+    let active = true
+
+    const loadLocalBoardSettings = async () => {
+      const localPromoMedia = boardPromoMediaService.getMedia(routeBoardSettings.resolvedProfileId)
+
+      if (active) {
+        setPromoMedia(localPromoMedia)
+        setBoardStyleSettings(boardStyleSettingsService.getSettings(routeBoardSettings.resolvedProfileId))
+      }
+
+      if (!hasBoardPromoMedia(localPromoMedia)) {
+        try {
+          const latestPromoMedia = await getLatestBoardPromoMedia()
+
+          if (active) {
+            setPromoMedia(latestPromoMedia)
+          }
+        } catch (mediaError) {
+          console.warn('Board latest media load failed', mediaError)
+        }
+      }
     }
-    loadLocalBoardSettings()
+    void loadLocalBoardSettings()
 
     const interval = window.setInterval(loadLocalBoardSettings, 5_000)
 
-    return () => window.clearInterval(interval)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
   }, [routeBoardSettings.resolvedProfileId])
 
   const boardStyle = {

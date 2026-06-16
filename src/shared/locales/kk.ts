@@ -52,7 +52,7 @@ export const kk: Locale = {
     selected: 'Файл таңдалды',
     clear: 'Файлды жою',
     change: 'Файлды өзгерту',
-    videoHint: 'MP4, WebM, OGG қолдау көрсетіледі',
+    videoHint: 'MP4, WebM, MOV қолдау көрсетіледі',
     imageHint: 'PNG, JPG, WebP қолдау көрсетіледі',
   },
   placeTypes: {

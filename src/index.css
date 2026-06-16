@@ -5177,6 +5177,68 @@ h3 {
   justify-items: center;
 }
 
+.board-media-library {
+  display: grid;
+  gap: 10px;
+}
+
+.board-media-library-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.board-media-list {
+  display: grid;
+  gap: 10px;
+}
+
+.board-media-item {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 86px minmax(0, 1fr) auto;
+  padding: 10px;
+}
+
+.board-media-thumb {
+  aspect-ratio: 16 / 9;
+  background: #020617;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.board-media-thumb img,
+.board-media-thumb video {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.board-media-item strong,
+.board-media-item span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.board-media-item strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.board-media-item span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
 .admin-inline-form {
   align-items: end;
   display: grid;

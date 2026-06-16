@@ -52,7 +52,7 @@ export const en: Locale = {
     selected: 'File selected',
     clear: 'Remove file',
     change: 'Change file',
-    videoHint: 'MP4, WebM, OGG are supported',
+    videoHint: 'MP4, WebM, MOV are supported',
     imageHint: 'PNG, JPG, WebP are supported',
   },
   placeTypes: {

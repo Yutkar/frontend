@@ -45,7 +45,7 @@ export const ru = {
     selected: 'Выбран файл',
     clear: 'Удалить файл',
     change: 'Изменить файл',
-    videoHint: 'Поддерживаются MP4, WebM, OGG',
+    videoHint: 'Поддерживаются MP4, WebM, MOV',
     imageHint: 'Поддерживаются PNG, JPG, WebP',
   },
   placeTypes: {

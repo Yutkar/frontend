@@ -19,6 +19,7 @@ import {
   validateBoardVideoUrl,
   type BoardPromoMedia,
 } from '@services/boardPromoMediaService'
+import { mediaService, type MediaFile } from '@services/mediaService'
 import {
   boardFontOptions,
   boardScreenFormatOptions,
@@ -318,6 +319,8 @@ export function BoardSettingsSection() {
   const [newScreenVideoUrl, setNewScreenVideoUrl] = useState('')
   const [newScreenVideoPreviewFailed, setNewScreenVideoPreviewFailed] = useState(false)
   const [promoMedia, setPromoMedia] = useState<BoardPromoMedia>({})
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
+  const [mediaFilesLoading, setMediaFilesLoading] = useState(false)
   const [boardStyleSettings, setBoardStyleSettings] = useState<BoardStyleSettings>(defaultBoardStyleSettings)
   const [promoVideoUrl, setPromoVideoUrl] = useState('')
   const [promoImageUrl, setPromoImageUrl] = useState('')
@@ -337,6 +340,22 @@ export function BoardSettingsSection() {
       })
       .catch((loadError) => setError(getAdminErrorMessage(loadError, 'Не удалось загрузить настройки табло')))
       .finally(() => setLoading(false))
+  }, [])
+
+  async function loadMediaFiles() {
+    setMediaFilesLoading(true)
+
+    try {
+      setMediaFiles(await mediaService.getMediaFiles())
+    } catch (mediaLoadError) {
+      console.warn('Board media files load failed', mediaLoadError)
+    } finally {
+      setMediaFilesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadMediaFiles()
   }, [])
 
   useEffect(() => {
@@ -786,6 +805,7 @@ export function BoardSettingsSection() {
       setPromoImageUrl(getBoardPromoUrlInputValue(nextPromoMedia.imageUrl))
       setPromoMediaError(null)
       setImagePreviewFailed(false)
+      await loadMediaFiles()
     } catch (promoError) {
       setPromoMediaError(getPromoMediaErrorMessage(promoError))
     }
@@ -806,6 +826,46 @@ export function BoardSettingsSection() {
       setPromoVideoUrl(getBoardPromoUrlInputValue(nextPromoMedia.videoUrl))
       setPromoMediaError(null)
       setVideoPreviewFailed(false)
+      await loadMediaFiles()
+    } catch (promoError) {
+      setPromoMediaError(getPromoMediaErrorMessage(promoError))
+    }
+  }
+
+  function selectPromoMediaFile(mediaFile: MediaFile) {
+    if (!draftProfile) return
+
+    const nextPromoMedia = boardPromoMediaService.saveMediaFile(draftProfile.id, mediaFile)
+
+    setPromoMedia(nextPromoMedia)
+    setPromoMediaError(null)
+
+    if (mediaFile.type === 'video') {
+      setPromoVideoUrl('')
+      setVideoPreviewFailed(false)
+    } else {
+      setPromoImageUrl('')
+      setImagePreviewFailed(false)
+    }
+  }
+
+  async function deletePromoMediaFile(mediaFile: MediaFile) {
+    if (!window.confirm(`Удалить файл "${mediaFile.filename}"?`)) {
+      return
+    }
+
+    try {
+      await mediaService.deleteMedia(mediaFile.id)
+      boardPromoMediaService.removeMediaById(mediaFile.id)
+      if (draftProfile) {
+        const nextPromoMedia = boardPromoMediaService.getMedia(draftProfile.id)
+
+        setPromoMedia(nextPromoMedia)
+        setPromoVideoUrl(getBoardPromoUrlInputValue(nextPromoMedia.videoUrl))
+        setPromoImageUrl(getBoardPromoUrlInputValue(nextPromoMedia.imageUrl))
+      }
+      await loadMediaFiles()
+      setPromoMediaError(null)
     } catch (promoError) {
       setPromoMediaError(getPromoMediaErrorMessage(promoError))
     }
@@ -1239,7 +1299,7 @@ export function BoardSettingsSection() {
                     Сохранить URL
                   </Button>
                   <AdminFileInput
-                    accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogg"
+                    accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
                     fileName={promoMedia.videoName && promoMedia.videoName !== 'URL' ? promoMedia.videoName : undefined}
                     hint={t.file.videoHint}
                     id={`promo-video-file-${draftProfile.id}`}
@@ -1326,6 +1386,68 @@ export function BoardSettingsSection() {
                 ) : (
                   <div className="promo-media-empty">Изображение не задано</div>
                 )}
+
+                <div className="board-media-library">
+                  <div className="board-media-library-header">
+                    <span className="board-settings-field-label">Загруженные медиафайлы</span>
+                    <Button
+                      disabled={mediaFilesLoading}
+                      onClick={() => void loadMediaFiles()}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      Обновить
+                    </Button>
+                  </div>
+                  {mediaFiles.length > 0 ? (
+                    <div className="board-media-list">
+                      {mediaFiles.map((mediaFile) => {
+                        const fullUrl = mediaService.getMediaFullUrl(mediaFile.url)
+                        const selected = mediaFile.type === 'video'
+                          ? promoMedia.videoId === mediaFile.id
+                          : promoMedia.imageId === mediaFile.id
+
+                        return (
+                          <article className="board-media-item" key={mediaFile.id}>
+                            <div className="board-media-thumb">
+                              {mediaFile.type === 'video' ? (
+                                <video muted playsInline src={fullUrl} />
+                              ) : (
+                                <img alt="" src={fullUrl} />
+                              )}
+                            </div>
+                            <div>
+                              <strong>{mediaFile.filename}</strong>
+                              <span>{mediaFile.type === 'video' ? 'Видео' : 'Фото'}</span>
+                            </div>
+                            <div className="button-row">
+                              <Button
+                                disabled={selected}
+                                onClick={() => selectPromoMediaFile(mediaFile)}
+                                size="sm"
+                                variant="secondary"
+                              >
+                                {selected ? 'Выбрано' : 'Выбрать'}
+                              </Button>
+                              <Button
+                                icon={<Trash2 size={14} />}
+                                onClick={() => void deletePromoMediaFile(mediaFile)}
+                                size="sm"
+                                variant="danger"
+                              >
+                                Удалить
+                              </Button>
+                            </div>
+                          </article>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="promo-media-empty">
+                      {mediaFilesLoading ? 'Загружаем медиафайлы...' : 'Загруженных медиафайлов пока нет'}
+                    </div>
+                  )}
+                </div>
               </BoardSettingsAccordion>
             ) : null}
 
